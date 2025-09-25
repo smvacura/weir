@@ -257,12 +257,9 @@ theorem apply_absorb_right_of_le
 
 theorem mem_subnet_iff_mask_eq
   (ip a : IP) (m : SubnetMask) :
-  ip ∈ subnet a m ↔ applySubnetMask a m = applySubnetMask ip m := by
-  constructor
-  intro h
-  exact h.symm
-  intro h
-  exact h.symm
+  ip ∈ subnet a m ↔ applySubnetMask a m = applySubnetMask ip m :=
+    ⟨by intro h; exact h.symm, by intro h; exact h.symm⟩
+
 
 theorem subnet_contains_self
   (a : IP) (m : SubnetMask) :
@@ -278,6 +275,8 @@ theorem subnet_containement
   constructor
   intro h
   constructor
+  unfold _root_.Subset at h
+
   sorry
   have s₁ := subnet a m₁
   have s₂ := subnet b m₂
@@ -289,9 +288,6 @@ theorem subnet_containement
     simpa [mem_subnet_iff_mask_eq, eq_comm] using hb_mem
   exact hmask
 
-  simpa only [Subset s₁ s₂] using h
-
-  sorry
   sorry
 
 
