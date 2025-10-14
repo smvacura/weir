@@ -145,16 +145,21 @@ def maskVecCast (m : SubnetMask) : BitVec 32 :=
 def maskVec (m : SubnetMask) : BitVec 32 :=
   BitVec.allOnes 32 <<< (32 - m.val)
 
-lemma mask_zero_index_lt_32 (m : SubnetMask) (h : 0 < m.val): m.val - 1 < 32 := by
+lemma mask_zero_index_lt_32 {m : SubnetMask} (h : 0 < m.val): m.val - 1 < 32 := by
   rw [Nat.sub_lt_iff_lt_add]
   · simp; rw [Nat.lt_succ_iff]; exact m.property.right
   · exact Nat.succ_le.mpr h
 
+lemma bit_allOnes_true {n k : Nat} (hk : k < n) :
+    (BitVec.allOnes n)[k]'hk = true := by
+  exact BitVec.getElem_allOnes k hk
+
 @[simp]
-theorem allOnes_bit (m : SubnetMask) (h : 0 < m.val):
-  (BitVec.allOnes 32)[m.val - 1]'(mask_zero_index_lt_32 m h) = true := by
-  simp
-  sorry
+theorem mask_allOnes_bit (m : SubnetMask) (h : 0 < m.val):
+  (BitVec.allOnes 32)[m.val - 1]'(mask_zero_index_lt_32 h) = true := by
+  have h_lt32 : m.val - 1 < 32 := by
+    apply mask_zero_index_lt_32 h
+  exact bit_allOnes_true h_lt32
 
 @[simp]
 def applySubnetMask (ip : IP) (mask : SubnetMask): IP :=
@@ -217,8 +222,6 @@ lemma test (x : Nat) (h : x > 0) : (BitVec.allOnes 1) <<< 1 = 0#1 := by
   bv_decide
 
 
-
-
 def sameSubnet (ip₁ ip₂ : IP) (mask : SubnetMask) : Prop :=
   applySubnetMask ip₁ mask = applySubnetMask ip₂ mask
 
@@ -230,8 +233,6 @@ def subnet (a : IP) (m : SubnetMask) : Set IP :=
 
 
 def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
-
-
 
 
 theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetMask (applySubnetMask ip mask₁ ) mask₂ = applySubnetMask ip (SubnetMask.min mask₁ mask₂) := by
