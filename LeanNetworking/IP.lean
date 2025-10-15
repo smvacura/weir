@@ -200,22 +200,35 @@ lemma min_within_bounds {m₁ m₂ : SubnetMask} : 0 ≤ m₁.val.min m₂.val �
   · rw [←mask_min_val_nat]; exact SubnetMask.mask_min_le_32
 
 
-lemma maskVec_bit {m i} (h : i < 32) :
+lemma maskVec_bit {m i} (h : i < 32):
   ((BitVec.allOnes 32 <<< (32 - m))[i]'h) = decide (i ≥ 32 - m) := by
   simp
-  sorry
-
+  have hbit : ((4294967295#32 : BitVec 32)[i - (32 - m)]) = true := by
+    apply bit_allOnes_true
+  rw [hbit]
+  rw [Bool.and_true]
+  have h₀ : (¬ i < 32 - m) ↔ 32 ≤ i + m := by
+    simp
+  by_cases h : 32 ≤ i + m
+  · have : ¬ i < 32 - m := h₀.mpr h
+    simp [this, h]
+  · have : i < 32 - m := by
+      rw [←Nat.not_lt] at h
+      simp at h
+      apply Nat.lt_sub_of_add_lt h
+    simp [this, h]
 
 @[simp]
 theorem maskVec_and_eq_maskVec_min (mask₁ mask₂ : SubnetMask) : (maskVec mask₁) &&& (maskVec mask₂) = maskVec (SubnetMask.min mask₁ mask₂) := by
-  simp  only [maskVec]
+  simp only [maskVec]
   rw [SubnetMask.min_val, Nat.min_eq_min]
   have h₁ := mask₁.property
   have h₂ := mask₂.property
   generalize hk₁ : 32 - mask₁.val = k₁
   generalize hk₂ : 32 - mask₂.val = k₂
   generalize hkₘ : 32 - Nat.min mask₁.val mask₂.val = kₘ
-  sorry
+  ext i hi
+  simp
 
 
 lemma test (x : Nat) (h : x > 0) : (BitVec.allOnes 1) <<< 1 = 0#1 := by
@@ -301,6 +314,7 @@ lemma mask_vec_get (m : SubnetMask) (i : Fin 32): (maskVec m).getLsbD i = decide
 theorem mask_vec_left_absorb_of_le
   {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂):
   maskVec m₁ &&& maskVec m₂ = maskVec m₁ := by
+  rw [mask_composition]
   sorry
 
 
