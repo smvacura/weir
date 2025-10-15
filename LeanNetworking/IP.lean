@@ -155,12 +155,6 @@ lemma bit_allOnes_true {n k : Nat} (hk : k < n) :
     (BitVec.allOnes n)[k]'hk = true := by
   exact BitVec.getElem_allOnes k hk
 
-@[simp]
-theorem mask_allOnes_bit (m : SubnetMask) (h : 0 < m.val):
-  (BitVec.allOnes 32)[m.val - 1]'(mask_zero_index_lt_32 h) = true := by
-  have h_lt32 : m.val - 1 < 32 := by
-    apply mask_zero_index_lt_32 h
-  exact bit_allOnes_true h_lt32
 
 @[simp]
 def applySubnetMask (ip : IP) (mask : SubnetMask): IP :=
@@ -200,7 +194,7 @@ lemma min_within_bounds {m₁ m₂ : SubnetMask} : 0 ≤ m₁.val.min m₂.val �
   · rw [←mask_min_val_nat]; exact SubnetMask.mask_min_le_32
 
 
-lemma maskVec_bit {m i} (h : i < 32):
+lemma maskvec_bit {m i} (h : i < 32):
   ((BitVec.allOnes 32 <<< (32 - m))[i]'h) = decide (i ≥ 32 - m) := by
   simp
   have hbit : ((4294967295#32 : BitVec 32)[i - (32 - m)]) = true := by
@@ -219,11 +213,11 @@ lemma maskVec_bit {m i} (h : i < 32):
     simp [this, h]
 
 @[simp]
-theorem maskVec_and_eq_maskVec_min {mask₁ mask₂ : SubnetMask} : (maskVec mask₁) &&& (maskVec mask₂) = maskVec (SubnetMask.min mask₁ mask₂) := by
+theorem maskvec_and_eq_maskvec_min {mask₁ mask₂ : SubnetMask} : (maskVec mask₁) &&& (maskVec mask₂) = maskVec (SubnetMask.min mask₁ mask₂) := by
   simp only [maskVec]
   rw [SubnetMask.min_val, Nat.min_eq_min]
   ext i hi
-  repeat rw [maskVec_bit]
+  repeat rw [maskvec_bit]
   simp
   have hbit₁ : ((4294967295#32 : BitVec 32)[i - (32 - mask₁.val)]) = true := by
     apply bit_allOnes_true
@@ -242,7 +236,7 @@ theorem maskVec_and_eq_maskVec_min {mask₁ mask₂ : SubnetMask} : (maskVec mas
     exact hmask
   · intro h
     have hmask := Nat.lt_succ_iff.mp (Nat.not_le.mp hmask)
-    rw [Nat.min_comm (a := mask₁.val) (b := mask₂.val)]
+    rw [Nat.min_comm mask₁.val mask₂.val]
     rw [Nat.min_eq_left hmask]
     exact h.right
 
@@ -272,11 +266,11 @@ def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
 
 
 theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetMask (applySubnetMask ip mask₁ ) mask₂ = applySubnetMask ip (SubnetMask.min mask₁ mask₂) := by
-  simp only [applySubnetMask, IP]
+  repeat rw [applySubnetMask]
   repeat rw [BitVec.and_self]
   repeat rw [BitVec.and_eq]
   rw [BitVec.and_assoc]
-  rw [maskVec_and_eq_maskVec_min]
+  rw [maskvec_and_eq_maskvec_min]
 
 -- lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
 --   constructor
@@ -331,8 +325,6 @@ theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetM
 theorem mask_vec_left_absorb_of_le
   {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂):
   maskVec m₁ &&& maskVec m₂ = maskVec m₁ := by
-  apply maskVec_and_eq_maskVec_min
-  -- rw [mask_composition]
   sorry
 
 
