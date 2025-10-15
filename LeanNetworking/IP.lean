@@ -90,6 +90,7 @@ theorem min_eq_left {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) : SubnetMask.mi
   rw [←Nat.min_eq_min]
   simp [Nat.min_eq_left h]
 
+
 theorem min_eq_right {m₁ m₂ : SubnetMask} (h : m₂ ≤ m₁) : SubnetMask.min m₁ m₂ = m₂ := by
   rw [SubnetMask.min, SubnetMask.mk]
   apply Subtype.ext
@@ -222,17 +223,40 @@ lemma maskVec_bit {m i} (h : i < 32):
 theorem maskVec_and_eq_maskVec_min (mask₁ mask₂ : SubnetMask) : (maskVec mask₁) &&& (maskVec mask₂) = maskVec (SubnetMask.min mask₁ mask₂) := by
   simp only [maskVec]
   rw [SubnetMask.min_val, Nat.min_eq_min]
-  have h₁ := mask₁.property
-  have h₂ := mask₂.property
-  generalize hk₁ : 32 - mask₁.val = k₁
-  generalize hk₂ : 32 - mask₂.val = k₂
-  generalize hkₘ : 32 - Nat.min mask₁.val mask₂.val = kₘ
   ext i hi
+  repeat rw [maskVec_bit]
   simp
+  have hbit₁ : ((4294967295#32 : BitVec 32)[i - (32 - mask₁.val)]) = true := by
+    apply bit_allOnes_true
+  have hbit₂ : ((4294967295#32 : BitVec 32)[i - (32 - mask₂.val)]) = true := by
+    apply bit_allOnes_true
+  rw [hbit₁, hbit₂]
+  repeat rw [Bool.and_true]
+  simp [←decide_not, ←Bool.decide_and]
+  constructor
 
+  by_cases hmask: mask₁.val < mask₂.val
+  · intro h
+    rw [Nat.min_eq_left]
+    exact h.left
+    apply Nat.le_of_lt
+    exact hmask
+  · intro h
+    have hmask := Nat.lt_succ_iff.mp (Nat.not_le.mp hmask)
+    rw [Nat.min_comm (a := mask₁.val) (b := mask₂.val)]
+    rw [Nat.min_eq_left hmask]
+    exact h.right
 
-lemma test (x : Nat) (h : x > 0) : (BitVec.allOnes 1) <<< 1 = 0#1 := by
-  bv_decide
+  intro h
+  constructor
+
+  have h₁ := Nat.min_le_left mask₁.val mask₂.val
+  have h₂ := Nat.add_le_add_left h₁ i
+  exact Nat.le_trans h h₂
+
+  have h₁ := Nat.min_le_right mask₁.val mask₂.val
+  have h₂ := Nat.add_le_add_left h₁ i
+  exact Nat.le_trans h h₂
 
 
 def sameSubnet (ip₁ ip₂ : IP) (mask : SubnetMask) : Prop :=
@@ -314,7 +338,7 @@ lemma mask_vec_get (m : SubnetMask) (i : Fin 32): (maskVec m).getLsbD i = decide
 theorem mask_vec_left_absorb_of_le
   {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂):
   maskVec m₁ &&& maskVec m₂ = maskVec m₁ := by
-  rw [mask_composition]
+  -- rw [mask_composition]
   sorry
 
 
