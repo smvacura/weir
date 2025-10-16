@@ -1,5 +1,7 @@
 import Std.Tactic.BVDecide
 
+import LeanNetworking.Util
+
 macro "lemma" n:declId sig:declSig val:declVal : command =>
   `(theorem $n:declId $sig:declSig $val:declVal)
 
@@ -282,25 +284,6 @@ lemma allones_left_shift_cancel {w : Nat} (m n : Nat) : BitVec.allOnes w <<< m =
   repeat rw [Nat.shiftLeft_eq] at h'
   sorry
 
-theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = a - n → m = n := by
-  intro h
-  have hₘ : (a - m) + m = a := by
-    have h := Nat.add_sub_of_le h₁
-    rw [Nat.add_comm]
-    exact h
-  have hₙ : (a - n) + n = a := by
-    have h := Nat.add_sub_of_le h₂
-    rw [Nat.add_comm]
-    exact h
-  have : (a - m) + m = (a - n) + n := by
-    rw [hₘ, ← hₙ]
-    repeat rw [Nat.sub_add_cancel]
-    repeat exact h₂
-  -- now substitute using `h : a - m = a - n`
-  have : (a - n) + m = (a - n) + n := by
-    simpa [h] using this
-  exact Nat.add_left_cancel this
-
 
 lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
   constructor
@@ -313,7 +296,7 @@ lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ mas
   simp only [maskVec] at h
   have allones_equal := allones_left_shift_cancel (w:=32) (m:=32-mask₁.val) (n:=32-mask₂.val)
   have h₁ := allones_equal h
-  apply sub_right_inj mask₁.property.right mask₂.property.right
+  apply Util.sub_right_inj mask₁.property.right mask₂.property.right
   exact h₁
 
 
