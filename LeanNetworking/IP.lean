@@ -272,54 +272,49 @@ theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetM
   rw [BitVec.and_assoc]
   rw [maskvec_and_eq_maskvec_min]
 
--- lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
---   constructor
 
---   intro h
---   have h₁ : maskVec mask₁ = maskVec mask₂ := by rw [h]
---   exact h₁
+lemma allones_left_shift_cancel {w : Nat} (m n : Nat) : BitVec.allOnes w <<< m = BitVec.allOnes w <<< n → m = n := by
+  intro h
+  have h' : (BitVec.allOnes w <<< m).toNat = (BitVec.allOnes w <<< n).toNat := by
+    exact congrArg BitVec.toNat h
+  repeat rw [BitVec.toNat_shiftLeft] at h'
+  repeat rw [BitVec.toNat_allOnes] at h'
+  repeat rw [Nat.shiftLeft_eq] at h'
+  sorry
 
---   intro h
---   apply Subtype.ext
---   have h₁ := mask₁.property.right
---   have h₂ := mask₂.property.right
---   cases Nat.eq_or_lt_of_le h₁ with
---   | inl heq₁ =>
---     rw [heq₁]
---     cases Nat.eq_or_lt_of_le h₂ with
---     | inl heq₂ =>
---       exact heq₂.symm
---     | inr hlt₂ =>
---       let i : Fin 32 := ⟨mask₂.val, hlt₂⟩
---       have hi :
---         (maskVec mask₁).getLsbD i = (maskVec mask₂).getLsbD i := by
---         rw [h]
---       have : False := by
---         simp [maskVec, i, heq₁, hlt₂] at hi
---       contradiction
---   | inr hlt₁ =>
---     cases Nat.eq_or_lt_of_le h₂ with
---     | inl heq₂ =>
---       let i : Fin 32 := ⟨mask₁.val, hlt₁⟩
---       have hi :
---         (maskVec mask₁).getLsbD i = (maskVec mask₂).getLsbD i := by
---         rw [h]
---       have : False := by
---         simp [maskVec, i, heq₂, hlt₁] at hi
---       contradiction
---     | inr hlt₂ =>
---       let i : Fin 32 := ⟨mask₁.val, hlt₁⟩
---       have hi : BitVec.getLsbD (maskVec mask₁) i
---           = BitVec.getLsbD (maskVec mask₂) i := by
---           rw [h]
---       simp [maskVec, i, hlt₁] at hi
---       let j : Fin 32 := ⟨mask₂.val, hlt₂⟩
---       have hj : BitVec.getLsbD (maskVec mask₂) j
---           = BitVec.getLsbD (maskVec mask₁) j := by
---           rw [h]
---       simp [maskVec, j, hlt₂] at hj
---       have h' := Nat.le_antisymm hi hj
---       exact h'.symm
+theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = a - n → m = n := by
+  intro h
+  have hₘ : (a - m) + m = a := by
+    have h := Nat.add_sub_of_le h₁
+    rw [Nat.add_comm]
+    exact h
+  have hₙ : (a - n) + n = a := by
+    have h := Nat.add_sub_of_le h₂
+    rw [Nat.add_comm]
+    exact h
+  have : (a - m) + m = (a - n) + n := by
+    rw [hₘ, ← hₙ]
+    repeat rw [Nat.sub_add_cancel]
+    repeat exact h₂
+  -- now substitute using `h : a - m = a - n`
+  have : (a - n) + m = (a - n) + n := by
+    simpa [h] using this
+  exact Nat.add_left_cancel this
+
+
+lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
+  constructor
+
+  intro h
+  rw [h]
+
+  intro h
+  apply Subtype.ext
+  simp only [maskVec] at h
+  have allones_equal := allones_left_shift_cancel (w:=32) (m:=32-mask₁.val) (n:=32-mask₂.val)
+  have h₁ := allones_equal h
+  apply sub_right_inj mask₁.property.right mask₂.property.right
+  exact h₁
 
 
 theorem mask_vec_left_absorb_of_le
