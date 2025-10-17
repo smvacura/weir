@@ -275,13 +275,14 @@ theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetM
   rw [maskvec_and_eq_maskvec_min]
 
 
-lemma allones_left_shift_cancel {w : Nat} (m n : Nat) : BitVec.allOnes w <<< m = BitVec.allOnes w <<< n → m = n := by
+lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤ w): BitVec.allOnes w <<< m = BitVec.allOnes w <<< n → m = n := by
   intro h
   have h' : (BitVec.allOnes w <<< m).toNat = (BitVec.allOnes w <<< n).toNat := by
     exact congrArg BitVec.toNat h
   repeat rw [BitVec.toNat_shiftLeft] at h'
   repeat rw [BitVec.toNat_allOnes] at h'
   repeat rw [Nat.shiftLeft_eq] at h'
+
   sorry
 
 
@@ -295,7 +296,10 @@ lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ mas
   apply Subtype.ext
   simp only [maskVec] at h
   have allones_equal := allones_left_shift_cancel (w:=32) (m:=32-mask₁.val) (n:=32-mask₂.val)
-  have h₁ := allones_equal h
+
+  have hm := Nat.sub_le 32 mask₁.val
+  have hn := Nat.sub_le 32 mask₂.val
+  have h₁ := allones_equal hm hn h
   apply Util.sub_right_inj mask₁.property.right mask₂.property.right
   exact h₁
 
