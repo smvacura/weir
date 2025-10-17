@@ -1,18 +1,21 @@
 import Std.Tactic.BVDecide
 
+import Mathlib.Data.Nat.ModEq
+
+
 import LeanNetworking.Util
 
 macro "lemma" n:declId sig:declSig val:declVal : command =>
   `(theorem $n:declId $sig:declSig $val:declVal)
 
-abbrev Set (α : Type u) := α → Prop
+-- abbrev Set (α : Type u) := α → Prop
 
-notation:50 x:51 " ∈ " S:51 => S x
+-- notation:50 x:51 " ∈ " S:51 => S x
 
-def Subset {α : Type u} (A B : Set α) :=
-  ∀ {x : α}, x ∈ A → x ∈ B
+-- def Subset {α : Type u} (A B : Set α) :=
+--   ∀ {x : α}, x ∈ A → x ∈ B
 
-infix:50 " ⊆ " => Subset
+-- infix:50 " ⊆ " => Subset
 
 axiom extensionality {α} (A B : Set α) : (∀x, x ∈ A ↔ x ∈ B) ↔ A = B
 
@@ -57,20 +60,22 @@ def mk (n : Nat) : SubnetMask :=
 def min (mask₁ mask₂ : SubnetMask) :=
   SubnetMask.mk (Nat.min mask₁.val mask₂.val)
 
-
-
+instance : Coe SubnetMask Nat where
+  coe m := m.val
 
 instance : LT SubnetMask where
-  lt a b := a.val < b.val
+  lt a b := (a : ℕ) < (b : ℕ)
 
 instance : LE SubnetMask where
-  le a b := a.val ≤ b.val
+  le a b := (a : ℕ) ≤ (b : ℕ)
+
 
 lemma eq_impl_le (m₁ m₂ : SubnetMask) :
   m₁ = m₂ → m₁ ≤ m₂ := by
   intro h
-  simp [SubnetMask.instLE]
+  rw [SubnetMask.instLE]
   simp [Subtype.eq_iff.mp h]
+
 
 lemma subnet_le_32 (mask : SubnetMask) :  mask.val ≤ 32 := by
   exact mask.property.right
@@ -89,16 +94,14 @@ theorem min_eq_left {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) : SubnetMask.mi
   rw [SubnetMask.min, SubnetMask.mk]
   apply Subtype.ext
   simp [min_val_32_eq_val]
-  rw [←Nat.min_eq_min]
-  simp [Nat.min_eq_left h]
+  exact h
 
 
 theorem min_eq_right {m₁ m₂ : SubnetMask} (h : m₂ ≤ m₁) : SubnetMask.min m₁ m₂ = m₂ := by
   rw [SubnetMask.min, SubnetMask.mk]
   apply Subtype.ext
   simp [min_val_32_eq_val]
-  rw [←Nat.min_eq_min]
-  simp [Nat.min_eq_right h]
+  exact h
 
 lemma name_later {m n k : Nat} (h₁ : m ≤ k) (h₂ : n ≤ k) : Min.min m n ≤ k := by
   by_cases hmn : m ≤ n
@@ -108,7 +111,7 @@ lemma name_later {m n k : Nat} (h₁ : m ≤ k) (h₂ : n ≤ k) : Min.min m n �
 
 theorem mask_min_le_32 {m₁ m₂ : SubnetMask} : (SubnetMask.min m₁ m₂).val ≤ 32 := by
   simp [SubnetMask.min, SubnetMask.mk, SubnetMask.min_val_32_eq_val]
-  apply name_later m₁.property.right m₂.property.right
+  exact Or.inl m₁.property.right
 
 
 theorem lt_of_not_le {m₁ m₂ : SubnetMask} : ¬ m₁ ≤ m₂ → m₂ < m₁ := by
@@ -269,7 +272,6 @@ def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
 
 theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetMask (applySubnetMask ip mask₁ ) mask₂ = applySubnetMask ip (SubnetMask.min mask₁ mask₂) := by
   repeat rw [applySubnetMask]
-  repeat rw [BitVec.and_self]
   repeat rw [BitVec.and_eq]
   rw [BitVec.and_assoc]
   rw [maskvec_and_eq_maskvec_min]
@@ -282,7 +284,6 @@ lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤
   repeat rw [BitVec.toNat_shiftLeft] at h'
   repeat rw [BitVec.toNat_allOnes] at h'
   repeat rw [Nat.shiftLeft_eq] at h'
-
   sorry
 
 
@@ -353,7 +354,6 @@ theorem subnet_align_base {a b : IP} {m : SubnetMask}
 theorem subnet_contains_self
   (a : IP) (m : SubnetMask) :
   applySubnetMask a m ∈ subnet a m := by
-  simp only [subnet]
   have h : m ≤ m := by simp [SubnetMask.eq_impl_le]
   exact apply_absorb_left_of_le h
 
@@ -381,7 +381,6 @@ lemma witness_between_prefixes {a : IP} {m₁ m₂ : SubnetMask} :
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
   constructor
-  unfold _root_.Subset
   intro h
   apply Classical.byContradiction
   intro not_m2_le_m1
@@ -390,7 +389,6 @@ theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   simp only [applySubnetMask] at h
   sorry
   intro h
-  unfold _root_.Subset
   intros x ha
   sorry
 
