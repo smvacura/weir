@@ -18,17 +18,6 @@ theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = 
   rw [h] at this
   exact Nat.add_left_cancel this
 
-lemma le_two_pow_of_le {a b : Nat} (h : a ≤ b) : a ≤ 2 ^ b := by
-  induction b with
-  | zero =>
-    rw [Nat.pow_zero]
-    rw [Nat.le_zero] at h
-    rw [h]
-    trivial
-  | succ k ih =>
-    rw [Nat.pow_succ]
-    sorry
-
 
 --TODO: clean up a bit
 theorem Mod.two_pow_inj {a b m : Nat} (ha : a ≤ m) (hb : b ≤ m) (hmod : 2 ^ a ≡ 2 ^ b [MOD 2 ^ m]) : a = b := by
