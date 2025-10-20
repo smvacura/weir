@@ -2,20 +2,11 @@ import Std.Tactic.BVDecide
 
 import Mathlib.Data.Nat.ModEq
 
-
 import LeanNetworking.Util
 
 macro "lemma" n:declId sig:declSig val:declVal : command =>
   `(theorem $n:declId $sig:declSig $val:declVal)
 
--- abbrev Set (α : Type u) := α → Prop
-
--- notation:50 x:51 " ∈ " S:51 => S x
-
--- def Subset {α : Type u} (A B : Set α) :=
---   ∀ {x : α}, x ∈ A → x ∈ B
-
--- infix:50 " ⊆ " => Subset
 
 axiom extensionality {α} (A B : Set α) : (∀x, x ∈ A ↔ x ∈ B) ↔ A = B
 
@@ -313,7 +304,9 @@ lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ mas
 theorem mask_vec_left_absorb_of_le
   {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂):
   maskVec m₁ &&& maskVec m₂ = maskVec m₁ := by
-  sorry
+  rw [maskvec_and_eq_maskvec_min]
+  rw [←mask_vec_cancel]
+  exact SubnetMask.min_eq_left h
 
 
 lemma mask_vec_right_absorb_of_le
