@@ -30,11 +30,13 @@ lemma le_two_pow_of_le {a b : Nat} (h : a ≤ b) : a ≤ 2 ^ b := by
     sorry
 
 
+
 theorem Mod.two_pow_inj {a b m : Nat} (ha : a ≤ m) (hb : b ≤ m) (hmod : 2 ^ a ≡ 2 ^ b [MOD m]) : a = b := by
   sorry
 
 
-theorem gcd_pred_is_one {a : Nat} : gcd a (a - 1) = 1 := by
-  sorry
+theorem gcd_pred_is_one {a : Nat} (ha : 1 ≤ a): gcd a (a - 1) = 1 := by
+  have h := Nat.coprime_sub_self_left ha
+  simp_all only [coprime_one_right_eq_true, gcd_self_sub_right, gcd_one_right]
 
 end Util

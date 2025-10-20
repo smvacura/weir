@@ -286,7 +286,7 @@ lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤
   repeat rw [BitVec.toNat_allOnes] at h
   repeat rw [Nat.shiftLeft_eq] at h
   rw [←Nat.ModEq.eq_1] at h
-  replace h := Nat.ModEq.cancel_left_of_coprime Util.gcd_pred_is_one h
+  replace h := Nat.ModEq.cancel_left_of_coprime (Util.gcd_pred_is_one (by apply Nat.one_le_pow')) h
   replace hm : m ≤ 2 ^ w := by exact Util.le_two_pow_of_le hm
   replace hn : n ≤ 2 ^ w := by exact Util.le_two_pow_of_le hn
   exact Util.Mod.two_pow_inj (m:=2^w) hm hn h
