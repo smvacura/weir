@@ -241,18 +241,18 @@ theorem maskvec_and_eq_maskvec_min {mask₁ mask₂ : SubnetMask} : (maskVec mas
     exact hmask
   · intro h
     have hmask := Nat.lt_succ_iff.mp (Nat.not_le.mp hmask)
-    rw [Nat.min_comm mask₁.val mask₂.val]
+    rw [Nat.min_comm mask₁ mask₂]
     rw [Nat.min_eq_left hmask]
     exact h.right
 
   intro h
   constructor
 
-  have h₁ := Nat.min_le_left mask₁.val mask₂.val
+  have h₁ := Nat.min_le_left mask₁ mask₂
   have h₂ := Nat.add_le_add_left h₁ i
   exact Nat.le_trans h h₂
 
-  have h₁ := Nat.min_le_right mask₁.val mask₂.val
+  have h₁ := Nat.min_le_right mask₁ mask₂
   have h₂ := Nat.add_le_add_left h₁ i
   exact Nat.le_trans h h₂
 
@@ -260,8 +260,9 @@ theorem maskvec_and_eq_maskvec_min {mask₁ mask₂ : SubnetMask} : (maskVec mas
 def sameSubnet (ip₁ ip₂ : IP) (mask : SubnetMask) : Prop :=
   applySubnetMask ip₁ mask = applySubnetMask ip₂ mask
 
+def Network m := {n // applySubnetMask n m = n}
 
-def Subnet ip₁ mask := {ip₂ // sameSubnet ip₁ ip₂ mask}
+def Hosts m n := {ip // applySubnetMask ip m = n}
 
 def subnet (a : IP) (m : SubnetMask) : Set IP :=
   fun ip => applySubnetMask ip m = applySubnetMask a m
@@ -279,12 +280,16 @@ theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetM
 
 lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤ w): BitVec.allOnes w <<< m = BitVec.allOnes w <<< n → m = n := by
   intro h
-  have h' : (BitVec.allOnes w <<< m).toNat = (BitVec.allOnes w <<< n).toNat := by
+  replace h : (BitVec.allOnes w <<< m).toNat = (BitVec.allOnes w <<< n).toNat := by
     exact congrArg BitVec.toNat h
-  repeat rw [BitVec.toNat_shiftLeft] at h'
-  repeat rw [BitVec.toNat_allOnes] at h'
-  repeat rw [Nat.shiftLeft_eq] at h'
-  sorry
+  repeat rw [BitVec.toNat_shiftLeft] at h
+  repeat rw [BitVec.toNat_allOnes] at h
+  repeat rw [Nat.shiftLeft_eq] at h
+  rw [←Nat.ModEq.eq_1] at h
+  replace h := Nat.ModEq.cancel_left_of_coprime Util.gcd_pred_is_one h
+  replace hm : m ≤ 2 ^ w := by exact Util.le_two_pow_of_le hm
+  replace hn : n ≤ 2 ^ w := by exact Util.le_two_pow_of_le hn
+  exact Util.Mod.two_pow_inj (m:=2^w) hm hn h
 
 
 lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
@@ -295,7 +300,7 @@ lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ mas
 
   intro h
   apply Subtype.ext
-  simp only [maskVec] at h
+  rw [maskVec] at h
   have allones_equal := allones_left_shift_cancel (w:=32) (m:=32-mask₁.val) (n:=32-mask₂.val)
 
   have hm := Nat.sub_le 32 mask₁.val
@@ -321,14 +326,14 @@ lemma mask_vec_right_absorb_of_le
 theorem apply_absorb_left_of_le
   {ip : IP} {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) :
   applySubnetMask (applySubnetMask ip m₁) m₂ = applySubnetMask ip m₁ := by
-  simp only [mask_composition]
+  rw [mask_composition]
   rw [SubnetMask.min_eq_left h]
 
 
 theorem apply_absorb_right_of_le
   {ip : IP} {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) :
   applySubnetMask (applySubnetMask ip m₂) m₁ = applySubnetMask ip m₁ := by
-  simp only [mask_composition]
+  rw [mask_composition]
   rw [SubnetMask.min_eq_right h]
 
 
@@ -348,8 +353,6 @@ theorem subnet_align_base {a b : IP} {m : SubnetMask}
   constructor
   · intro h; rw [←hb]; exact h
   · intro h; rw [hb]; exact h
-
-
 
 theorem subnet_contains_self
   (a : IP) (m : SubnetMask) :
@@ -377,16 +380,14 @@ lemma witness_between_prefixes {a : IP} {m₁ m₂ : SubnetMask} :
 
 
 
-
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
   constructor
   intro h
-  apply Classical.byContradiction
-  intro not_m2_le_m1
+  by_contra not_m2_le_m1
   have m1_lt_l2 : m₁ < m₂ := by exact SubnetMask.lt_of_not_le not_m2_le_m1
   unfold subnet at h
-  simp only [applySubnetMask] at h
+  rw [applySubnetMask] at h
   sorry
   intro h
   intros x ha
