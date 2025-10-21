@@ -1,6 +1,8 @@
 import Std.Tactic.BVDecide
 
 import Mathlib.Data.Nat.ModEq
+import Mathlib.Tactic.ApplyFun
+import Mathlib.Data.BitVec
 
 import LeanNetworking.Util
 
@@ -191,7 +193,7 @@ lemma min_within_bounds {m₁ m₂ : SubnetMask} : 0 ≤ m₁.val.min m₂.val �
 
 
 lemma maskvec_bit {m i} (h : i < 32):
-  ((BitVec.allOnes 32 <<< (32 - m))[i]'h) = decide (i ≥ 32 - m) := by
+  ((BitVec.allOnes 32 <<< (32 - m))[i]) = decide (i ≥ 32 - m) := by
   simp
   have hbit : ((4294967295#32 : BitVec 32)[i - (32 - m)]) = true := by
     apply bit_allOnes_true
@@ -262,6 +264,8 @@ def subnet (a : IP) (m : SubnetMask) : Set IP :=
 def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
 
 
+lemma mem_subnet {a m ip} : (ip ∈ subnet a m) ↔ applySubnetMask ip m = applySubnetMask a m := Iff.rfl
+
 theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetMask (applySubnetMask ip mask₁ ) mask₂ = applySubnetMask ip (SubnetMask.min mask₁ mask₂) := by
   repeat rw [applySubnetMask]
   repeat rw [BitVec.and_eq]
@@ -280,6 +284,29 @@ lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤
   replace h := Nat.ModEq.cancel_left_of_coprime (Util.gcd_pred_is_one (by apply Nat.one_le_pow')) h
   exact Util.Mod.two_pow_inj hm hn h
 
+
+--TODO: replace aesop proof
+lemma one_hot_eq_iff_eq {w : Nat} {m n : Nat} (hm : m < w) (hn : n < w) : m = n ↔ (BitVec.ofNat w 1 <<< n)[m] = true := by
+  simp_all only [BitVec.getElem_shiftLeft, BitVec.getElem_one, Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true,
+    decide_eq_false_iff_not, not_lt, decide_eq_true_eq]
+  apply Iff.intro
+  · intro a
+    subst a
+    simp_all only [le_refl, Nat.sub_self, and_self]
+  · intro a
+    obtain ⟨left, right⟩ := a
+    have h₁ := Nat.sub_eq_zero_iff_le.mp right
+    exact Nat.le_antisymm h₁ left
+
+
+lemma one_hot_neq_iff_neq {w : Nat} {m n : Nat} (hm : m < w) (hn : n < w) : m ≠ n ↔ (BitVec.ofNat w 1 <<< n)[m] = false := by
+  apply Iff.intro
+  · intro a
+    have h' := mt (one_hot_eq_iff_eq hm hn).mpr a
+    exact Bool.bool_eq_false h'
+  · intro a
+    have h' := Bool.bool_iff_false.mpr a
+    exact mt (one_hot_eq_iff_eq hm hn).mp h'
 
 lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
   constructor
@@ -373,15 +400,6 @@ lemma witness_between_prefixes {a : IP} {m₁ m₂ : SubnetMask} :
 
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
-  constructor
-  intro h
-  by_contra not_m2_le_m1
-  have m1_lt_l2 : m₁ < m₂ := by exact SubnetMask.lt_of_not_le not_m2_le_m1
-  unfold subnet at h
-  rw [applySubnetMask] at h
-  sorry
-  intro h
-  intros x ha
   sorry
 
 -- theorem subnet_containement
