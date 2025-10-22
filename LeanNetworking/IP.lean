@@ -254,6 +254,50 @@ theorem maskvec_and_eq_maskvec_min {mask₁ mask₂ : SubnetMask} : (maskVec mas
   exact Nat.le_trans h h₂
 
 
+--TODO: cleanup
+lemma bitvec_eq_of_forall_bits {w} {u v : BitVec w} (h : ∀ (i : Fin w), u[i]'i.prop = v[i]'i.prop) : u = v := by
+  ext j hj
+  replace h : ∀ (i : ℕ) (hi : i < w), u[i] = v[i] := by
+    intro j hj
+    show u[j] = v[j]
+    have : (↑(⟨j, hj⟩ : Fin w) : ℕ) = j := by
+      -- a lemma that cast from Fin to Nat gives the original j
+      simp
+    -- rewrite that and then apply h (on Fin)
+    simpa [this] using h (⟨j, hj⟩ : Fin w)
+  exact h j hj
+
+
+lemma exists_ne_bit_of_ne {w : Nat} {u v : BitVec w} (h : u ≠ v) : ∃i : Fin w, u[i]'i.prop ≠ v[i]'i.prop := by
+  simp_all only [ne_eq, Fin.getElem_fin]
+  by_contra hne
+  simp at hne
+  replace hne := bitvec_eq_of_forall_bits hne
+  contradiction
+
+
+lemma ne_of_exists_ne_bit {w : Nat} {u v : BitVec w} (h : ∃ (i : ℕ) (hi : i < w), u[i] ≠ v[i]) : u ≠ v := by
+  rcases h with ⟨i, hi, h_neq⟩
+  simp_all only [ne_eq]
+  apply Aesop.BuiltinRules.not_intro
+  intro a
+  subst a
+  simp_all only [not_true_eq_false]
+
+--TODO: fix aesop simp
+lemma flip_inside_prefix_imp_ne {m : SubnetMask} {a b : IP} : (∃ (i : Nat) (hi32 : i < 32), 32 - m.val ≤ i ∧ a[i] ≠ b[i]) → applySubnetMask a m ≠ applySubnetMask b m := by
+  intro h
+  rcases h with ⟨i, hi32, hkeep, hdiff⟩
+  simp only [applySubnetMask, maskVec]
+  simp only [BitVec.and_eq]
+  apply ne_of_exists_ne_bit
+  exists i
+  exists hi32
+  repeat rw [BitVec.getElem_and]
+  rw [mask_vec_decide]
+  simp only [ge_iff_le]
+  simp_all only [Nat.sub_le_iff_le_add, ne_eq, decide_true, Bool.and_true, not_false_eq_true]
+
 def sameSubnet (ip₁ ip₂ : IP) (mask : SubnetMask) : Prop :=
   applySubnetMask ip₁ mask = applySubnetMask ip₂ mask
 
@@ -275,6 +319,39 @@ theorem mask_composition (ip : IP) (mask₁ mask₂ : SubnetMask) : applySubnetM
   repeat rw [BitVec.and_eq]
   rw [BitVec.and_assoc]
   rw [maskvec_and_eq_maskvec_min]
+
+theorem left_mask_composition_of_le {ip : IP} {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) : applySubnetMask (applySubnetMask ip m₁ ) m₂ = applySubnetMask ip m₁ := by
+  simp only [mask_composition]
+  have hmin := SubnetMask.min_eq_left h
+  rw [hmin]
+
+
+theorem right_mask_composition_of_le {ip : IP} {m₁ m₂ : SubnetMask} (h : m₁ ≤ m₂) : applySubnetMask (applySubnetMask ip m₂) m₁ = applySubnetMask ip m₁ := by
+  simp only [mask_composition]
+  have hmin := SubnetMask.min_eq_right h
+  rw [hmin]
+
+lemma ge_w_allones_left_shift_eq_zero {w : Nat} {m : Nat} (hm : m ≥ w) : BitVec.allOnes w <<< m = 0#w :=
+  by simp_all only [ge_iff_le, BitVec.shiftLeft_eq_zero]
+
+lemma lt_w_allones_left_shift_ne_zero {w : Nat} {m : Nat} (hm : m < w) : BitVec.allOnes w <<< m ≠ 0#w := by
+  simp_all only [ne_eq, BitVec.msb_shiftLeft, BitVec.getMsbD_allOnes, decide_true, BitVec.ne_zero_of_msb_true,
+    not_false_eq_true]
+
+lemma zero_allones_left_shift_eq_one {w : Nat} {m : Nat} (hm : m = 0) : BitVec.allOnes w <<< m = BitVec.allOnes w := by
+  subst hm
+  simp_all only [BitVec.shiftLeft_zero]
+
+lemma gt_zero_allones_left_shift_ne_one {w : Nat} {m : Nat} (hw : 1 ≤ w) (hm : m > 0) : BitVec.allOnes w <<< m ≠ BitVec.allOnes w := by
+  simp_all only [gt_iff_lt, ne_eq]
+  by_contra a
+  replace a := congrArg BitVec.toNat a
+  rw [BitVec.toNat_shiftLeft] at a
+  repeat rw [BitVec.toNat_allOnes] at a
+  repeat rw [Nat.shiftLeft_eq] at a
+  have h : m = 0 := by sorry
+  replace hm := Nat.ne_of_gt hm
+  contradiction
 
 
 lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤ w): BitVec.allOnes w <<< m = BitVec.allOnes w <<< n → m = n := by
@@ -448,6 +525,25 @@ lemma mask_delta_drop {m₁ m₂ : SubnetMask}
   rw [BitVec.and_eq]
   rw [BitVec.and_comm]
   exact mask_and_delta_disjoint_le h (m₂.property.right)
+
+
+lemma bitvec_and_xor_distrib_right {w : Nat} {x u v : BitVec w} : (u ^^^ v) &&& x = (u &&& x) ^^^ (v &&& x) := by
+  apply_fun BitVec.toNat
+  · simp_all
+    rw [Nat.and_xor_distrib_right]
+  · exact BitVec.toNat_injective
+
+lemma bit_xor_decide {w : Nat} {u v : BitVec w} {i : Nat} (hi : i < w) : (u ^^^ v)[i] = u[i] ↔ v[i] = false := by
+  constructor
+  intro h
+  rw [BitVec.getElem_xor] at h
+  by_contra hf
+  simp_all only [Bool.bne_true, Bool.not_eq_eq_eq_not, Bool.eq_not_self]
+
+  intro h
+  rw [BitVec.getElem_xor]
+  rw [h]
+  exact Bool.xor_false u[i]
 
 
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
