@@ -192,6 +192,11 @@ lemma min_within_bounds {m₁ m₂ : SubnetMask} : 0 ≤ m₁.val.min m₂.val �
   · rw [←mask_min_val_nat]; exact SubnetMask.mask_min_le_32
 
 
+lemma mask_vec_decide {w : Nat} {m i : Nat} (hi : i < w):
+  ((BitVec.allOnes w <<< m)[i]) = decide (i ≥ m) := by
+  simp_all only [BitVec.getElem_shiftLeft, BitVec.getElem_allOnes, Bool.and_true, ge_iff_le, Bool.not_eq_eq_eq_not]
+  simp [←decide_not]
+
 lemma maskvec_bit {m i} (h : i < 32):
   ((BitVec.allOnes 32 <<< (32 - m))[i]) = decide (i ≥ 32 - m) := by
   simp
@@ -307,6 +312,40 @@ lemma one_hot_neq_iff_neq {w : Nat} {m n : Nat} (hm : m < w) (hn : n < w) : m �
   · intro a
     have h' := Bool.bool_iff_false.mpr a
     exact mt (one_hot_eq_iff_eq hm hn).mp h'
+
+--TODO replace aesop parts
+lemma one_hot_decide {w : Nat} {i n : Nat} (hi : i < w) :
+  (BitVec.ofNat w 1 <<< n)[i] = decide (i = n) := by
+  by_cases h : i = n
+  · subst h
+    simp_all only [BitVec.getElem_shiftLeft, lt_self_iff_false, decide_false, Bool.not_false, Nat.sub_self,
+    BitVec.getElem_one, decide_true, Bool.and_self]
+  · simp_all only [BitVec.getElem_shiftLeft, BitVec.getElem_one, decide_false, Bool.and_eq_false_imp,
+    Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not, not_lt]
+    intro a
+    apply Aesop.BuiltinRules.not_intro
+    intro a₁
+    replace a₁ := Nat.sub_eq_zero_iff_le.mp a₁
+    have ha := Nat.le_antisymm a₁ a
+    contradiction
+
+
+--TODO: cleanup
+lemma mask_and_delta_disjoint {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w) : BitVec.allOnes w <<< (w - m) &&& BitVec.ofNat w 1 <<< (w - n) = 0 := by
+  ext i hi
+  rw [BitVec.getElem_and]
+  rw [BitVec.ofNat_eq_ofNat, BitVec.getElem_zero]
+  rw [one_hot_decide, mask_vec_decide]
+  rw [←Bool.decide_and]
+  rw [decide_eq_false_iff_not]
+  rw [not_and]
+  intro h
+  have hmw : m < w := Nat.lt_trans hm hnw
+  have hmnw : w - n < w - m := Nat.sub_lt_sub_left hmw hm
+  have higt := Nat.lt_of_lt_of_le hmnw h
+  have hneq := Ne.symm $ Nat.ne_of_lt higt
+  rw [←ne_eq]
+  exact hneq
 
 lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
   constructor
