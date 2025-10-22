@@ -548,35 +548,50 @@ lemma bit_xor_decide {w : Nat} {u v : BitVec w} {i : Nat} (hi : i < w) : (u ^^^ 
 
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
-  sorry
+  constructor
+  intro h
+  contrapose h
+  replace h : m₁ < m₂ := Nat.lt_of_not_le h
+  let δ := (BitVec.ofNat 32 1 <<< ((32 - m₂ : ℕ)))
+  have h' : applySubnetMask (a ^^^ δ) m₁ = applySubnetMask a m₁ := by
+    repeat rw [applySubnetMask]
+    rw [BitVec.and_eq]
+    rw [maskVec]
+    rw [bitvec_and_xor_distrib_right]
+    nth_rw 2 [BitVec.and_comm]
+    rw [mask_and_delta_disjoint_le h m₂.property.right]
+    --TODO: refine simp
+    simp
+  have h'' : applySubnetMask (a ^^^ δ) m₂ ≠ applySubnetMask a m₂ := by
+    apply flip_inside_prefix_imp_ne
+    exists 32 - m₂
+    have hlt : 32 - (m₂ : ℕ)  < 32 := by
+      have : 0 < (m₂: ℕ) := lt_of_le_of_lt m₁.property.left h
+      exact Nat.sub_lt (by decide) this
+    exists hlt
+    exists by rfl
+    apply mt (bit_xor_decide hlt).mp
+    rw [Bool.not_eq_false]
+    simp [δ]
+  have hmem₁ : (a ^^^ δ) ∈ subnet a m₁ := by
+    simp only [mem_subnet_iff_mask_eq]
+    exact h'.symm
+  have hmem₂ : (a ^^^ δ) ∉ subnet a m₂ := by
+    simp only [mem_subnet_iff_mask_eq, ←ne_eq]
+    exact h''.symm
+  simp only [Set.subset_def, Classical.not_forall]
+  exact ⟨a ^^^ δ, ⟨hmem₁, hmem₂⟩⟩
 
--- theorem subnet_containement
---   (a b : IP) (m₁ m₂ : SubnetMask) :
---   (subnet a m₁) ⊆ (subnet b m₂) ↔ (m₂ ≤ m₁ ∧ applySubnetMask a m₂ = applySubnetMask b m₂) := by
---   constructor
---   intro h
---   constructor
---   unfold _root_.Subset at h
---   have hx : subnet a m₁ a := by
---   -- show that the base address `a` is in its own subnet
---     simp [subnet, applySubnetMask]
---   have hₜ := h hx
---   have x := a
---   have h₂ : applySubnetMask a m₁ = applySubnetMask a m₁ := by rfl
 
+  intro h
+  simp only [Set.subset_def]
+  intros x hx
+  simp_all only [mem_subnet_iff_mask_eq]
+  replace hx := congrArg (λ ip => applySubnetMask ip m₂) hx
+  simp only at hx
+  repeat rw [right_mask_composition_of_le h] at hx
+  exact hx
 
---   sorry
---   have s₁ := subnet a m₁
---   have s₂ := subnet b m₂
---   have ha_mem : a ∈ subnet a m₁ := by
---   -- a ∈ {x | mask x m₁ = mask a m₁}
---     simp [mem_subnet_iff_mask_eq]
---   have hb_mem : a ∈ subnet b m₂ := h ha_mem
---   have hmask : applySubnetMask a m₂ = applySubnetMask b m₂ := by
---     simpa [mem_subnet_iff_mask_eq, eq_comm] using hb_mem
---   exact hmask
-
---   sorry
 
 
 #eval (ipFromDecimal
