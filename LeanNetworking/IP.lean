@@ -119,7 +119,6 @@ def delta (m : SubnetMask) : BitVec 32 :=
   BitVec.ofNat 32 (1 <<< (32 - m.val))
 
 
-
 def ipFromDecimal (w x y z : IPDecimalBlock) : IP :=
   let block_one := BitVec.ofNat 8 w.val
   let block_two := BitVec.ofNat 8 x.val
@@ -331,7 +330,8 @@ lemma one_hot_decide {w : Nat} {i n : Nat} (hi : i < w) :
 
 
 --TODO: cleanup
-lemma mask_and_delta_disjoint {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w) : BitVec.allOnes w <<< (w - m) &&& BitVec.ofNat w 1 <<< (w - n) = 0 := by
+@[simp]
+lemma mask_and_delta_disjoint_lt {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w) : BitVec.allOnes w <<< (w - m) &&& BitVec.ofNat w 1 <<< (w - n) = 0 := by
   ext i hi
   rw [BitVec.getElem_and]
   rw [BitVec.ofNat_eq_ofNat, BitVec.getElem_zero]
@@ -342,10 +342,34 @@ lemma mask_and_delta_disjoint {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w) : 
   intro h
   have hmw : m < w := Nat.lt_trans hm hnw
   have hmnw : w - n < w - m := Nat.sub_lt_sub_left hmw hm
-  have higt := Nat.lt_of_lt_of_le hmnw h
-  have hneq := Ne.symm $ Nat.ne_of_lt higt
+  have hneq := Ne.symm $ Nat.ne_of_lt $ Nat.lt_of_lt_of_le hmnw h
   rw [←ne_eq]
   exact hneq
+
+lemma mask_and_delta_disjoint_le {w : Nat} {m n : Nat} (hm: m < n) (hnw : n ≤ w) : BitVec.allOnes w <<< (w - m) &&& BitVec.ofNat w 1 <<< (w - n) = 0 := by
+  by_cases h : n = w
+  · replace hnw := h
+    rw [hnw]
+    clear h
+    ext i hi
+    rw [BitVec.getElem_and]
+    rw [BitVec.ofNat_eq_ofNat, BitVec.getElem_zero]
+    rw [one_hot_decide, mask_vec_decide]
+    rw [←Bool.decide_and]
+    rw [decide_eq_false_iff_not]
+    rw [not_and]
+    intro h
+    rw [hnw] at hm
+    have hwm : w - m ≥ 1 := by
+      apply Nat.sub_pos_iff_lt.2
+      exact hm
+    rw [Nat.sub_eq_zero_of_le (by rfl)]
+    apply Nat.ne_zero_iff_zero_lt.mpr
+    have h' := Nat.le_trans hwm h
+    exact h'
+  · replace h: n < w := Nat.lt_of_le_of_ne hnw h
+    exact mask_and_delta_disjoint_lt hm h
+
 
 lemma mask_vec_cancel (mask₁ mask₂ : SubnetMask) : mask₁ = mask₂ ↔ maskVec mask₁ = maskVec mask₂ := by
   constructor
@@ -417,24 +441,13 @@ theorem subnet_contains_self
   have h : m ≤ m := by simp [SubnetMask.eq_impl_le]
   exact apply_absorb_left_of_le h
 
-lemma mask_delta_drop {a : IP} {m₁ m₂ : SubnetMask}
+lemma mask_delta_drop {m₁ m₂ : SubnetMask}
     (h : m₁ < m₂) :
   applySubnetMask (delta m₂) m₁ = 0 := by
-  unfold applySubnetMask delta maskVec
-  sorry
-
-
-
-
-lemma witness_between_prefixes {a : IP} {m₁ m₂ : SubnetMask} :
-  m₁ < m₂ → ∃x, applySubnetMask x m₁ = applySubnetMask a m₁ ∧ applySubnetMask x m₂ ≠ applySubnetMask a m₂ := by
-  intro h
-  have x := (applySubnetMask a m₁) ^^^ delta m₂
-  exists x
-  constructor
-  · sorry
-  · sorry
-
+  simp only [applySubnetMask, delta, maskVec]
+  rw [BitVec.and_eq]
+  rw [BitVec.and_comm]
+  exact mask_and_delta_disjoint_le h (m₂.property.right)
 
 
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
