@@ -192,9 +192,19 @@ lemma min_within_bounds {m₁ m₂ : SubnetMask} : 0 ≤ m₁.val.min m₂.val �
 
 
 lemma mask_vec_decide {w : Nat} {m i : Nat} (hi : i < w):
-  ((BitVec.allOnes w <<< m)[i]) = decide (i ≥ m) := by
+  (BitVec.allOnes w <<< m)[i] = decide (i ≥ m) := by
   simp_all only [BitVec.getElem_shiftLeft, BitVec.getElem_allOnes, Bool.and_true, ge_iff_le, Bool.not_eq_eq_eq_not]
   simp [←decide_not]
+
+lemma host_vec_decide {w : Nat} {m i : Nat} (hi : i < w):
+  (BitVec.allOnes w >>> m)[i] = decide (i < w - m) := by
+  simp_all only [BitVec.getElem_ushiftRight, BitVec.getLsbD_allOnes, decide_eq_decide]
+  apply Iff.intro
+  · intro a
+    rw [Nat.add_comm] at a
+    exact Nat.lt_sub_of_add_lt a
+  · intro a
+    exact Nat.add_lt_of_lt_sub' a
 
 lemma maskvec_bit {m i} (h : i < 32):
   ((BitVec.allOnes 32 <<< (32 - m))[i]) = decide (i ≥ 32 - m) := by
@@ -406,6 +416,27 @@ lemma one_hot_decide {w : Nat} {i n : Nat} (hi : i < w) :
     contradiction
 
 
+lemma delta_decide {w : Nat} {m i : Nat} (hi : i < w) :
+  (1#w <<< m)[i] = decide (i = m) := by
+  simp_all only [BitVec.getElem_shiftLeft, BitVec.getElem_one]
+  rw [←decide_not]
+  rw [←Bool.decide_and]
+  rw [decide_eq_decide]
+  constructor
+
+  intro ⟨h, h'⟩
+  replace h := Nat.not_lt.mp h
+  replace h' := Nat.sub_eq_zero_iff_le.mp h'
+  exact Nat.le_antisymm h' h
+
+  intro h
+  constructor
+  apply Nat.not_lt.mpr
+  exact Nat.le_of_eq h.symm
+
+  exact Nat.sub_eq_zero_iff_le.mpr $ Nat.le_of_eq h
+
+
 --TODO: cleanup
 @[simp]
 lemma mask_and_delta_disjoint_lt {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w) : BitVec.allOnes w <<< (w - m) &&& BitVec.ofNat w 1 <<< (w - n) = 0 := by
@@ -592,6 +623,9 @@ theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   repeat rw [right_mask_composition_of_le h] at hx
   exact hx
 
+theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
+  (subnet a m₁) ⊆ (subnet b m₂) ↔ (m₂ ≤ m₁ ∧ applySubnetMask a m₂ = applySubnetMask b m₂) := by
+  sorry
 
 
 #eval (ipFromDecimal
