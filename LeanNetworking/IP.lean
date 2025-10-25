@@ -626,6 +626,8 @@ theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   repeat rw [right_mask_composition_of_le h] at hx
   exact hx
 
+
+--TODO: comment and clean up
 theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   (subnet a m₁) ⊆ (subnet b m₂) ↔ (m₂ ≤ m₁ ∧ applySubnetMask a m₂ = applySubnetMask b m₂) := by
   constructor
@@ -636,55 +638,48 @@ theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   contrapose h
   rw [Classical.not_forall]
   let δ := (1#32 <<< ((32 - m₂ : ℕ)))
-  exists (a &&& BitVec.allOnes 32 <<< (32 - (m₂ : ℕ))) ||| (b &&& BitVec.allOnes 32 >>> (m₂ : ℕ )) ^^^ δ
+  exists a ^^^ (~~~(a ^^^ b) &&& δ)
   replace h := Nat.not_le.mp h
 
   rw [Classical.not_imp]
   constructor
   simp only [applySubnetMask, maskVec, BitVec.and_eq]
-  ext i hi
-  simp only [ BitVec.getElem_and, mask_vec_decide, host_vec_decide, δ, delta_decide, BitVec.getElem_or, BitVec.getElem_xor]
-  by_cases hA : 32 - (↑m₂ : ℕ) ≤ i
-  · have hLt : ¬ i < 32 - (↑m₂ : ℕ) := by exact Nat.not_lt.mpr hA
-    simp [hA, hLt]
-    by_cases hI : i = 32 - m₂
-    · have hLE : ¬32 ≤ i + m₁ := by
-        simp_all only [Subtype.coe_lt_coe, le_refl, lt_self_iff_false, not_false_eq_true, not_le]
-        replace h := Nat.add_lt_add_left h (32 - m₂)
-        have h₁ : (32 - ↑m₂ : ℕ) + ↑m₂ = 32 :=
-          Nat.sub_add_cancel m₂.property.right
-        have hlt : (32 - ↑m₂ : ℕ ) + ↑m₁ < 32 :=
-          by simpa [h₁] using h
-        exact hlt
-      subst hI
-      simp_all only [Subtype.coe_lt_coe, le_refl, lt_self_iff_false, not_false_eq_true, not_le, decide_true,
-        Bool.or_true, Bool.true_and, Bool.and_eq_right_iff_imp, decide_eq_true_eq, isEmpty_Prop, IsEmpty.forall_iff]
-    · simp_all only [Subtype.coe_lt_coe, Nat.sub_le_iff_le_add, not_lt, decide_false, Bool.or_false]
 
-  · have hLt : ¬ i ≥ 32 - (↑m₁ : ℕ) := by
-      have hi_add : i + m₂ < 32 := by
-        simpa [Nat.lt_sub_iff_add_lt] using hA
+  set M₁ : BitVec 32 := BitVec.allOnes 32 <<< (32 - ↑m₁) with hM₁
+  set δ  : BitVec 32 := (1#32) <<< (32 - ↑m₂) with hδ
+  set X  : BitVec 32 := (~~~(a ^^^ b)) &&& δ with hX
 
-      have hi_add' : i + m₁ < 32 :=
-        lt_trans (Nat.add_lt_add_left h i) hi_add
+  have hδ0 : δ &&& M₁ = 0 := by
+    rw [BitVec.and_comm]
+    exact mask_and_delta_disjoint_le h m₂.property.right
 
-      have hi_m1 : i < 32 - m₁ := by
-        simpa [Nat.lt_sub_iff_add_lt] using hi_add'
+  have hX0 : X &&& M₁ = 0 := by
+    unfold X
+    rw [BitVec.and_assoc]
+    rw [hδ0]
+    simp only [BitVec.ofNat_eq_ofNat]
+    rw [BitVec.and_zero]
 
-      exact Nat.not_le.mpr hi_m1
-    simp only [hA, hLt, decide_false, Bool.and_false]
+  have hx : ((a ^^^ X) &&& M₁) = (a &&& M₁) ^^^ (X &&& M₁) := by
+    rw [←bitvec_and_xor_distrib_right]
+
+  calc
+    a &&& M₁
+        = (a &&& M₁) ^^^ 0 := by simp
+    _   = (a &&& M₁) ^^^ (X &&& M₁) := by simp [hX0]
+    _   = ((a ^^^ X) &&& M₁) := by simp [hx]
+    _   = ((a ^^^ ((~~~(a ^^^ b)) &&& δ)) &&& M₁) := by simp [hX]
 
   apply ne_of_exists_ne_bit
   simp only [applySubnetMask, maskVec, BitVec.and_eq]
-  simp only [BitVec.getElem_and, mask_vec_decide, host_vec_decide, δ, delta_decide, BitVec.getElem_or, BitVec.getElem_xor]
+  simp only [BitVec.getElem_and, mask_vec_decide, δ, delta_decide, BitVec.getElem_xor, BitVec.getElem_not]
   exists (32 - m₂)
   have hs : 0 < 32 := by decide
   have hgez : 0 < (m₂ : ℕ) := Nat.lt_of_le_of_lt m₁.property.left h
   exists (Nat.sub_lt (n:=32) (by decide) hgez)
-  simp only [ge_iff_le, le_refl, decide_true, Bool.and_true, Bool.xor_true, lt_irrefl, decide_false, Bool.and_false, Bool.not_false]
+  simp only [ge_iff_le, le_refl, decide_true, Bool.and_true, Bool.bne_not, Bool.bne_self_left,
+    ne_eq, Bool.eq_not_self, not_false_eq_true]
 
-
-  sorry
 
   replace h := h a
   rw [eq_comm]
