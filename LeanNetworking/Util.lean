@@ -3,6 +3,9 @@ open Nat
 
 namespace Util
 
+/-- Generic type for a Nat with upper and lower bounds with `h ≤ n ≤ k` -/
+def BoundedNat (h k: Nat) := { n : Nat // h ≤ n ∧ n ≤ k }
+
 theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = a - n → m = n := by
   intro h
   have hₘ : (a - m) + m = a := by
@@ -36,14 +39,12 @@ theorem Mod.two_pow_inj {a b m : Nat} (ha : a ≤ m) (hb : b ≤ m) (hmod : 2 ^ 
     subst h_2
     simp_all only [le_refl]
     simp [ModEq.eq_1] at hmod
-    --TODO: try to remove simp
-    have hamod : 2 ^ a % 2 ^ b = 0 := by
-      simp_all only
-    have hdiv : 2 ^ b ∣ 2 ^ a := Nat.dvd_of_mod_eq_zero hamod
+    --TODO: try to remove simps
+    have hdiv : 2 ^ b ∣ 2 ^ a := Nat.dvd_of_mod_eq_zero hmod
     have hle  : b ≤ a := (pow_dvd_pow_iff_le_right (by decide : 1 < (2 :ℕ))).mp hdiv
     exact Nat.le_antisymm ha hle
   · simp_all only [not_or]
-    obtain ⟨left, right⟩ := h
+    have ⟨left, right⟩ := h
     replace ha : a < m := lt_of_le_of_ne ha left
     replace hb : b < m := lt_of_le_of_ne hb right
     have hm : m > 0 := zero_lt_of_lt ha
