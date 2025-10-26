@@ -1,9 +1,5 @@
 import LeanNetworking.Util
 
-macro "lemma" n:declId sig:declSig val:declVal : command =>
-  `(theorem $n:declId $sig:declSig $val:declVal)
-
-
 abbrev IP := BitVec 32
 
 /-- An IPv4 decimal block, which is a `Nat` bounded by `0` and `255`, inclusive -/

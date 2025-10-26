@@ -1,6 +1,8 @@
 import Mathlib.Data.Nat.ModEq
 open Nat
 
+lemma test {x : Nat}: x ≤ x := Nat.le_refl x
+
 namespace Util
 
 /-- Generic type for a Nat with upper and lower bounds with `h ≤ n ≤ k` -/
