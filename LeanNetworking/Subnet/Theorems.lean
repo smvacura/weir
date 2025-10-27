@@ -140,3 +140,65 @@ theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   rw [←h.right]
   simp only [←mem_subnet_iff_mask_eq, ←Set.subset_def]
   exact subnet_subset_width.mpr h.left
+
+theorem subnet_antisymm {a b : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ ⊆ subnet b m₂ ∧  subnet b m₂ ⊆ subnet a m₁ ↔
+  subnet a m₁ = subnet b m₂ := by
+
+  apply Iff.intro
+
+  -- subnet a m₁ ⊆ subnet b m₂ ∧ subnet b m₂ ⊆ subnet a m₁ → subnet a m₁ = subnet b m₂
+  intro ⟨ha, hb⟩
+
+  ext x
+  apply Iff.intro
+
+  -- case x ∈ subnet a m₁
+  · intro h
+    exact ha h
+  -- case x ∈ subnet b m₂
+  · intro h
+    exact hb h
+
+  -- case subnet a m₁ = subnet b m₂ → subnet a m₁ ⊆ subnet b m₂ ∧ subnet b m₂ ⊆ subnet a m₁
+  intro heq
+  simp_all only [subset_refl, and_self]
+
+theorem subnet_eq_iff_mask_network_eq {a b : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ = subnet b m₂ ↔ applySubnetMask a m₁ = applySubnetMask b m₂ ∧ m₁ = m₂ := by
+
+  apply Iff.intro
+  -- case mp: subnet a m₁ = subnet a m₂ → a = b ∧ m₁ = m₂
+  intro heq
+
+  rw [←subnet_antisymm] at heq
+  rcases heq with ⟨ha, hb⟩
+  replace ha := subnet_containement.mp ha
+  rcases ha with ⟨ham, haip⟩
+  replace hb := subnet_containement.mp hb
+  rcases hb with ⟨hbm, hbip⟩
+
+  have heq := (mask_le_antisymm ham hbm).symm
+  nth_rewrite 1 [heq] at hbip
+  exact ⟨hbip.symm, heq⟩
+
+  -- case applySubnetMask a m₁ = applySubnetMask b m₂ ∧ m₁ = m₂ → subnet a m₁ = subnet b m₂
+  intro ⟨hip, hmask⟩
+  -- extentionality: S₁ ⊆ S₂ → ∀x ∈ S₁, x ∈ S₂
+  ext x
+
+  apply Iff.intro
+
+  --case  x ∈ subnet a m₁ → x ∈ subnet b m₂
+  repeat rw [mem_subnet_iff_mask_eq]
+  intro ha
+  rw [hip] at ha
+  nth_rw 2 [hmask.symm]
+  exact ha
+
+  --case x ∈ subnet b m₂ → x ∈ subnet a m₁
+  repeat rw [mem_subnet_iff_mask_eq]
+  intro hb
+  rw [hip.symm] at hb
+  nth_rw 2 [hmask]
+  exact hb

@@ -2,6 +2,15 @@ import LeanNetworking.Util
 import LeanNetworking.Mask.Defs
 import LeanNetworking.Mask.BitVec
 
+theorem mask_le_antisymm {m₁ m₂ : SubnetMask} :
+  m₁ ≤ m₂ → m₂ ≤ m₁ → m₁ = m₂ := by
+
+  intro h1 h2
+
+  simp_all only [SubnetMask.instLE]
+  have heq := Nat.le_antisymm h1 h2
+
+  exact Subtype.coe_inj.mp heq
 
 lemma mask_zero_index_lt_32 {m : SubnetMask} (h : 0 < m.val): m.val - 1 < 32 := by
   rw [Nat.sub_lt_iff_lt_add]
