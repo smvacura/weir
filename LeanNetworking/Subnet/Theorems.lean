@@ -1,5 +1,7 @@
 import LeanNetworking.Subnet.Defs
 
+open BitVecUtil
+
 lemma mem_subnet {a m ip} : (ip ∈ subnet a m) ↔ applySubnetMask ip m = applySubnetMask a m := Iff.rfl
 
 theorem mem_subnet_iff_mask_eq

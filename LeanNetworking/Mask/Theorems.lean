@@ -2,6 +2,8 @@ import LeanNetworking.Util
 import LeanNetworking.Mask.Defs
 import LeanNetworking.Mask.BitVec
 
+open BitVecUtil
+
 theorem mask_le_antisymm {m₁ m₂ : SubnetMask} :
   m₁ ≤ m₂ → m₂ ≤ m₁ → m₁ = m₂ := by
 
@@ -159,7 +161,7 @@ lemma mask_and_delta_disjoint_lt {w : Nat} {m n : Nat} (hm: m < n) (hnw : n < w)
   ext i hi
   rw [BitVec.getElem_and]
   rw [BitVec.ofNat_eq_ofNat, BitVec.getElem_zero]
-  rw [one_hot_decide, mask_vec_decide]
+  rw [lshift_one_hot_decide, mask_vec_decide]
   rw [←Bool.decide_and]
   rw [decide_eq_false_iff_not]
   rw [not_and]
@@ -178,7 +180,7 @@ lemma mask_and_delta_disjoint_le {w : Nat} {m n : Nat} (hm: m < n) (hnw : n ≤ 
     ext i hi
     rw [BitVec.getElem_and]
     rw [BitVec.ofNat_eq_ofNat, BitVec.getElem_zero]
-    rw [one_hot_decide, mask_vec_decide]
+    rw [lshift_one_hot_decide, mask_vec_decide]
     rw [←Bool.decide_and]
     rw [decide_eq_false_iff_not]
     rw [not_and]
