@@ -11,12 +11,13 @@ namespace IPDecimalBlock
 interval for IP decimal blocks-/
 lemma ip_bounds_correct (n : Nat) :
   0 ≤ max 0 (min n 255) ∧ (max 0 (min n 255)) ≤ 255 := by
-  constructor
-  apply Nat.zero_le
-  rw  [Nat.max_le]
-  constructor
-  decide
-  apply Nat.min_le_right
+  apply And.intro
+
+  · apply Nat.zero_le
+  · rw  [Nat.max_le]
+    apply And.intro
+    · decide
+    · apply Nat.min_le_right
 
 
 /-- Contstruct an IP decimal block from `n` by forcing `n` into `[0, 255]`-/
