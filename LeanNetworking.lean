@@ -7,3 +7,5 @@ import «LeanNetworking».«Mask».BitVec
 import «LeanNetworking».«Mask».Theorems
 import «LeanNetworking».«Subnet».Defs
 import «LeanNetworking».«Subnet».Theorems
+import «LeanNetworking».«CIDR».Defs
+import «LeanNetworking».«CIDR».Theorems
