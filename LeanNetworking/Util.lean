@@ -27,7 +27,9 @@ theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = 
 --TODO: clean up a bit
 theorem Mod.two_pow_inj {a b m : Nat} (ha : a ≤ m) (hb : b ≤ m) (hmod : 2 ^ a ≡ 2 ^ b [MOD 2 ^ m]) : a = b := by
   by_cases h : a = m ∨ b = m
+  -- case a = m ∨ b = m
   · cases h with
+  -- case a = m
   | inl h_1 =>
     subst h_1
     simp_all only [le_refl]
@@ -37,14 +39,15 @@ theorem Mod.two_pow_inj {a b m : Nat} (ha : a ≤ m) (hb : b ≤ m) (hmod : 2 ^ 
     have hdiv : 2 ^ a ∣ 2 ^ b := Nat.dvd_of_mod_eq_zero hbmod
     have hle  : a ≤ b := (pow_dvd_pow_iff_le_right (by decide : 1 < (2 :ℕ))).mp hdiv
     exact Nat.le_antisymm hle hb
+  -- case b = m
   | inr h_2 =>
     subst h_2
     simp_all only [le_refl]
     simp [ModEq.eq_1] at hmod
-    --TODO: try to remove simps
     have hdiv : 2 ^ b ∣ 2 ^ a := Nat.dvd_of_mod_eq_zero hmod
     have hle  : b ≤ a := (pow_dvd_pow_iff_le_right (by decide : 1 < (2 :ℕ))).mp hdiv
     exact Nat.le_antisymm ha hle
+  -- a ≠ m ∧ b ≠ m
   · simp_all only [not_or]
     have ⟨left, right⟩ := h
     replace ha : a < m := lt_of_le_of_ne ha left
