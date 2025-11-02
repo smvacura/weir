@@ -12,3 +12,9 @@ def subnet (a : IP) (m : SubnetMask) : Set IP :=
 
 /-- The size of a subnet is `2^n`, where `n` is the length of the network portion-/
 def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
+
+
+def sameSubnet {a b : IP} {m₁ m₂ : SubnetMask} : Prop :=
+  ∀ ip : IP,
+  applySubnetMask ip m₁ = applySubnetMask a m₁ ↔
+  applySubnetMask ip m₂ = applySubnetMask b m₂

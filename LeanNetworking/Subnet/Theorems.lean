@@ -10,6 +10,9 @@ theorem mem_subnet_iff_mask_eq
     ⟨by intro h; exact h.symm, by intro h; exact h.symm⟩
 
 
+theorem subnet_eq_iff_same_subnet {a b ip : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ = subnet b m₂ ↔ sameSubnet (a:=a) (b:=b) (m₁:=m₁) (m₂:=m₂) := by sorry
+
 theorem subnet_align_base {a b : IP} {m : SubnetMask}
     (hb : b ∈ subnet a m) :
   subnet a m = subnet b m := by
