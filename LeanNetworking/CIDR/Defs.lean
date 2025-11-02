@@ -18,7 +18,7 @@ instance : LE CIDR where
 
 
 instance : LT CIDR where
-  lt c₁ c₂ := cidr.toSet c₁ ⊆  cidr.toSet c₂ ∧ c₁ ≠ c₂
+  lt c₁ c₂ := cidr.toSet c₁ ⊆  cidr.toSet c₂ ∧ ¬ cidr.toSet c₂ ⊆ cidr.toSet c₁
 
 
 lemma aligned_base {c : CIDR} : applySubnetMask c.base c.mask = c.base := by
@@ -62,3 +62,16 @@ theorem cidr.le_antisymm {c₁ c₂ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₁ �
   intros h1 h2
   have heq := subset_antisymm h1 h2
   exact cidr.toSet_inj.mp heq
+
+theorem cidr.le_trans {c₁ c₂ c₃ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₃ → c₁ ≤ c₃ := by
+  intro h1 h2
+  simp only [instLECIDR]
+  exact subset_trans h1 h2
+
+
+instance : PartialOrder CIDR where
+  le := (· ≤ ·)
+  lt := (· < ·)
+  le_refl := fun c => cidr.le_refl
+  le_antisymm := fun c₁ c₂ => cidr.le_antisymm
+  le_trans := fun c₁ c₂ c₃ => cidr.le_trans
