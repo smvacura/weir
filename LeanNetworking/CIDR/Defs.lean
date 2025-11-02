@@ -2,7 +2,7 @@ import LeanNetworking.Subnet.Defs
 import LeanNetworking.Subnet.Theorems
 
 
-
+@[ext]
 structure CIDR where
   (base : IP)
   (mask : SubnetMask)
@@ -27,12 +27,25 @@ lemma aligned_base {c : CIDR} : applySubnetMask c.base c.mask = c.base := by
 variable (a b : CIDR)
 
 
-theorem cidr.toSet_cancel {c₁ c₂ : CIDR} : cidr.toSet c₁ = cidr.toSet c₂ ↔ c₁ = c₂ := by
+theorem cidr.toSet_inj {c₁ c₂ : CIDR} : cidr.toSet c₁ = cidr.toSet c₂ ↔ c₁ = c₂ := by
   apply Iff.intro
 
   -- (→) toSet c₁ = toSet c₂ → c₁ = c₁
   intro h
-  sorry
+  ext i hi
+
+  -- proving bases equal
+  unfold toSet at h
+  rw [subnet_eq_iff_mask_network_eq] at h
+  have ⟨happly, hmask⟩ := h
+  repeat rw [aligned_base] at happly
+
+  exact congrArg (fun x => x[i]) happly
+
+  -- proving masks equal
+  unfold toSet at h
+  rw [subnet_eq_iff_mask_network_eq] at h
+  exact h.right
 
   -- (←) c₁ = c₂ → toSet c₁ = toSet c₂
   intro h
@@ -48,4 +61,4 @@ theorem cidr.le_antisymm {c₁ c₂ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₁ �
   simp only [instLECIDR]
   intros h1 h2
   have heq := subset_antisymm h1 h2
-  exact cidr.toSet_cancel.mp heq
+  exact cidr.toSet_inj.mp heq
