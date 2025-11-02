@@ -10,8 +10,29 @@ theorem mem_subnet_iff_mask_eq
     ⟨by intro h; exact h.symm, by intro h; exact h.symm⟩
 
 
-theorem subnet_eq_iff_same_subnet {a b ip : IP} {m₁ m₂ : SubnetMask} :
-  subnet a m₁ = subnet b m₂ ↔ sameSubnet (a:=a) (b:=b) (m₁:=m₁) (m₂:=m₂) := by sorry
+theorem subnet_eq_iff_same_subnet {a b : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ = subnet b m₂ ↔ sameSubnet (a:=a) (b:=b) (m₁:=m₁) (m₂:=m₂) := by
+
+  apply Iff.intro
+  -- (→) subnet a m₁ = subnet b m₂ → sameSubnet
+  unfold sameSubnet
+  intro h ip
+  have h_ip := congrArg (fun S => ip ∈ S) h
+  simp [] at h_ip
+  repeat rw [mem_subnet_iff_mask_eq] at h_ip
+  nth_rw 1 [eq_comm]
+  nth_rw 2 [eq_comm]
+  exact h_ip
+
+  -- (←) sameSubnet → subnet a m₁ = subnet b m₂
+  unfold sameSubnet
+  intro h
+  apply Set.ext
+  intro ip
+  repeat rw [mem_subnet_iff_mask_eq]
+  nth_rw 1 [eq_comm]
+  nth_rw 2 [eq_comm]
+  apply h
 
 theorem subnet_align_base {a b : IP} {m : SubnetMask}
     (hb : b ∈ subnet a m) :
