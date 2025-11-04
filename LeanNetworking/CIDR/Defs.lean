@@ -13,6 +13,17 @@ def cidr.toSet (c : CIDR) :=
   subnet c.base c.mask
 
 
+def cidr.disjoint (c₁ c₂ : CIDR) :=
+  cidr.toSet c₁ ∩ cidr.toSet c₂ = ∅
+
+
+def cidr.isAligned (c : CIDR) (m : SubnetMask) :=
+  applySubnetMask c.base m = c.base
+
+
+def cidr.areAligned (c₁ c₂ : CIDR) :=
+  c₁.base = c₂.base
+
 instance : LE CIDR where
   le c₁ c₂ := cidr.toSet c₁ ⊆ cidr.toSet c₂
 
@@ -24,7 +35,8 @@ instance : LT CIDR where
 lemma aligned_base {c : CIDR} : applySubnetMask c.base c.mask = c.base := by
   exact c.aligned
 
-variable (a b : CIDR)
+
+
 
 
 theorem cidr.toSet_inj {c₁ c₂ : CIDR} : cidr.toSet c₁ = cidr.toSet c₂ ↔ c₁ = c₂ := by
@@ -70,8 +82,36 @@ theorem cidr.le_trans {c₁ c₂ c₃ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₃ 
 
 
 instance : PartialOrder CIDR where
-  le := (· ≤ ·)
-  lt := (· < ·)
   le_refl := fun c => cidr.le_refl
   le_antisymm := fun c₁ c₂ => cidr.le_antisymm
   le_trans := fun c₁ c₂ c₃ => cidr.le_trans
+
+
+def cidr.isAdjacent (c₁ c₂ : CIDR) :=
+  c₁.mask = c₂.mask ∧ |intOfIP c₁.base - intOfIP c₂.base| = subnetSize c₁.mask
+
+
+def cidr.sameMask (c₁ c₂ : CIDR) :=
+  c₁.mask = c₂.mask
+
+
+def cidr.inSupernet (c s : CIDR) := c < s
+
+
+
+--TODO: fix signature issue
+def cidr.supernetOfList (ℓ : List CIDR) (h : ℓ ≠ []) : CIDR :=
+  let b₀ := (ℓ.head h).base
+  let m := (ℓ.head h).mask
+  let n := Nat.log2 ℓ.length
+  let M := SubnetMask.mk $ m - n
+  CIDR.mk (applySubnetMask b₀ M) M (by rw [mask_idempotence])
+
+
+--TODO: maybe define predicates here
+def cidr.isMergeable (ℓ : List CIDR) (h : ℓ ≠ []):=
+  List.Pairwise cidr.disjoint ℓ
+  ∧ List.Pairwise cidr.sameMask ℓ
+  ∧ List.Forall (λ c => cidr.inSupernet c (cidr.supernetOfList ℓ h)) ℓ
+  ∧ Nat.isPowerOfTwo ℓ.length
+  ∧ ∃c ∈ ℓ, cidr.isAligned c (SubnetMask.mk $ Nat.log2 ℓ.length)

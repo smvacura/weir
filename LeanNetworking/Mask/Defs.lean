@@ -47,6 +47,14 @@ instance : LE SubnetMask where
   le a b := (a : ℕ) ≤ (b : ℕ)
 
 
+instance : HAdd SubnetMask Nat SubnetMask where
+  hAdd m n :=
+    if (m : ℕ) + n > 32
+    then SubnetMask.mk 32
+    else SubnetMask.mk $ (m : ℕ) + n
+
+instance : HSub SubnetMask Nat SubnetMask where
+  hSub m n := SubnetMask.mk $ (m : ℕ) - n
 
 lemma eq_impl_le (m₁ m₂ : SubnetMask) :
   m₁ = m₂ → m₁ ≤ m₂ := by

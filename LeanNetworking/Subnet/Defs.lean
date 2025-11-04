@@ -10,7 +10,7 @@ def subnet (a : IP) (m : SubnetMask) : Set IP :=
   fun ip => applySubnetMask ip m = applySubnetMask a m
 
 
-/-- The size of a subnet is `2^n`, where `n` is the length of the network portion-/
+/-- The size of a subnet is `2^n`, where `n` is the length of the host portion-/
 def subnetSize (mask : SubnetMask) := 2^(32-mask.val)
 
 

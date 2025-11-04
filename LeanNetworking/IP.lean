@@ -5,6 +5,20 @@ abbrev IP := BitVec 32
 /-- An IPv4 decimal block, which is a `Nat` bounded by `0` and `255`, inclusive -/
 abbrev IPDecimalBlock := Util.BoundedNat 0 255
 
+
+def intOfIP (ip : IP) : Int :=
+  BitVec.toInt ip
+
+instance : LE IP where
+  le a b := intOfIP a ≤ intOfIP b
+
+instance : LT IP where
+  lt a b := intOfIP a < intOfIP b
+
+instance : Min IP where
+  min a b := if a < b then a else b
+
+
 namespace IPDecimalBlock
 
 /--  clipping the number into the interval `[0, 255]` puts the number into the required
