@@ -6,8 +6,14 @@ import LeanNetworking.Subnet.Theorems
 @[ext] structure CIDR where
   (base : IP)
   (mask : SubnetMask)
-  (aligned : applySubnetMask base mask = base)
 
+
+@[ext] structure AlignedCIDR extends CIDR where
+  (aligned: applySubnetMask base mask = base)
+
+
+instance : Coe AlignedCIDR CIDR where
+  coe c := CIDR.mk c.base c.mask
 
 /-- The underlying subnet from a CIDR block-/
 def cidr.toSet (c : CIDR) :=
@@ -38,8 +44,21 @@ instance : LT CIDR where
   lt c₁ c₂ := cidr.toSet c₁ ⊆  cidr.toSet c₂ ∧ ¬ cidr.toSet c₂ ⊆ cidr.toSet c₁
 
 
-/-- cidr.toSet is injective-/
-theorem cidr.toSet_inj {c₁ c₂ : CIDR} : cidr.toSet c₁ = cidr.toSet c₂ ↔ c₁ = c₂ := by
+/-- ≤ instance for Aligned CIDR blocks. Equivalent to subset of their subnets-/
+instance : LE AlignedCIDR where
+  le c₁ c₂ := cidr.toSet c₁ ⊆ cidr.toSet c₂
+
+
+/-- < instance for Aligned CIDR blocks. Equivalent to strict subset of their subnets-/
+instance : LT AlignedCIDR where
+  lt c₁ c₂ := cidr.toSet c₁ ⊆  cidr.toSet c₂ ∧ ¬ cidr.toSet c₂ ⊆ cidr.toSet c₁
+
+
+/-- cidr.toSet is injective is both CIDR blocks are aligned-/
+theorem cidr.aligned_toSet_inj
+  {c₁ c₂ : AlignedCIDR}:
+  cidr.toSet c₁ = cidr.toSet c₂ ↔ c₁ = c₂ := by
+
   apply Iff.intro
 
   -- (→) toSet c₁ = toSet c₂ → c₁ = c₁
@@ -62,7 +81,8 @@ theorem cidr.toSet_inj {c₁ c₂ : CIDR} : cidr.toSet c₁ = cidr.toSet c₂ �
 
   -- (←) c₁ = c₂ → toSet c₁ = toSet c₂
   intro h
-  exact congrArg cidr.toSet h
+  have hCIDR : (c₁ : CIDR) = (c₂ : CIDR) := congrArg AlignedCIDR.toCIDR h
+  exact congrArg cidr.toSet hCIDR
 
 
 theorem cidr.le_refl {c : CIDR} : c ≤ c := by
@@ -70,23 +90,31 @@ theorem cidr.le_refl {c : CIDR} : c ≤ c := by
   exact subset_refl (toSet c)
 
 
-theorem cidr.le_antisymm {c₁ c₂ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₁ → c₁ = c₂ := by
-  simp only [instLECIDR]
-  intros h1 h2
-  have heq := subset_antisymm h1 h2
-  exact cidr.toSet_inj.mp heq
-
 theorem cidr.le_trans {c₁ c₂ c₃ : CIDR} : c₁ ≤ c₂ → c₂ ≤ c₃ → c₁ ≤ c₃ := by
   intro h1 h2
   simp only [instLECIDR]
   exact subset_trans h1 h2
 
 
-/-- CIDR blocks form a partial order, with subset of subnets as R-/
-instance : PartialOrder CIDR where
+/- LE is symmetric only on Aligned CIDRS-/
+theorem cidr.aligned_le_antisymm {c₁ c₂ : AlignedCIDR} : c₁ ≤ c₂ → c₂ ≤ c₁ → c₁ = c₂ := by
+  simp only [instLEAlignedCIDR]
+  intros h1 h2
+  have heq := subset_antisymm h1 h2
+  exact cidr.aligned_toSet_inj.mp heq
+
+
+/-- CIDR blocks form a preorder, with subset of subnets as R-/
+instance : Preorder CIDR where
   le_refl := fun c => cidr.le_refl
-  le_antisymm := fun c₁ c₂ => cidr.le_antisymm
   le_trans := fun c₁ c₂ c₃ => cidr.le_trans
+
+
+/-- CIDR blocks form a partial order, with subset of subnets as R-/
+instance : PartialOrder AlignedCIDR where
+  le_refl := fun c => cidr.le_refl
+  le_trans := fun c₁ c₂ c₃ => cidr.le_trans
+  le_antisymm := fun c₁ c₂ => cidr.aligned_le_antisymm
 
 
 /-- CIDR blocks are adjacent iff they share a mask and their base addresses
@@ -110,7 +138,7 @@ def cidr.supernetOfList (ℓ : List CIDR) (h : ℓ ≠ []) : CIDR :=
   let m := (ℓ.head h).mask
   let n := Nat.log2 ℓ.length
   let M := SubnetMask.mk $ m - n
-  CIDR.mk (applySubnetMask b₀ M) M (by rw [mask_idempotence])
+  CIDR.mk (applySubnetMask b₀ M) M
 
 
 /-- A list of CIDR blocks are mergeable iff:
