@@ -157,4 +157,3 @@ def cidr.isMergeable (ℓ : List CIDR) (h : ℓ ≠ []):=
   ∧ List.Pairwise cidr.sameMask ℓ
   ∧ List.Forall (λ c => cidr.inSupernet c (cidr.supernetOfList ℓ h)) ℓ
   ∧ Nat.isPowerOfTwo ℓ.length
-  ∧ ∃c ∈ ℓ, cidr.isAligned c (SubnetMask.mk $ Nat.log2 ℓ.length)
