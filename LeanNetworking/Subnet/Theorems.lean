@@ -2,14 +2,21 @@ import LeanNetworking.Subnet.Defs
 
 open BitVecUtil
 
+
+/-- An IP is a member of the subnet determined by `a, m` iff applying `m` to `ip` yields the same results
+ as applying `m` to `a`-/
 lemma mem_subnet {a m ip} : (ip ∈ subnet a m) ↔ applySubnetMask ip m = applySubnetMask a m := Iff.rfl
 
+
+/-- An IP is a member of the subnet determined by `a, m` iff applying `m` to `ip` yields the same results
+ as applying `m` to `a`-/
 theorem mem_subnet_iff_mask_eq
   (ip a : IP) (m : SubnetMask) :
   ip ∈ subnet a m ↔ applySubnetMask a m = applySubnetMask ip m :=
     ⟨by intro h; exact h.symm, by intro h; exact h.symm⟩
 
 
+/-- Conversion between subnet equality and the sameSubnet prop-/
 theorem subnet_eq_iff_same_subnet {a b : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ = subnet b m₂ ↔ sameSubnet (a:=a) (b:=b) (m₁:=m₁) (m₂:=m₂) := by
 
@@ -34,6 +41,9 @@ theorem subnet_eq_iff_same_subnet {a b : IP} {m₁ m₂ : SubnetMask} :
   nth_rw 2 [eq_comm]
   apply h
 
+
+/-- If `b` is in the subnet defined by `a, m`, the subnet formed by `b, m` must be equal
+  to the subnet defined by `a, m`-/
 theorem subnet_align_base {a b : IP} {m : SubnetMask}
     (hb : b ∈ subnet a m) :
   subnet a m = subnet b m := by
@@ -45,12 +55,16 @@ theorem subnet_align_base {a b : IP} {m : SubnetMask}
   · intro h; rw [←hb]; exact h
   · intro h; rw [hb]; exact h
 
+
+/-- The IP formed by applying `m` to `a` is a member of the subnet defined by `a, m`-/
 theorem subnet_contains_self
   (a : IP) (m : SubnetMask) :
   applySubnetMask a m ∈ subnet a m := by
   have h : m ≤ m := by simp [SubnetMask.eq_impl_le]
   exact apply_absorb_left_of_le h
 
+
+/-- Subnet subsets with the same base `a` implies the subset mask is lesser than the superset mask-/
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
   constructor
@@ -101,14 +115,15 @@ theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   exact hx
 
 
---TODO: comment and clean up
+/-- Subnet α ⊆ Subnet β means the mask of β must be less specific than that of α,
+  and both subnets have the same base up to β  -/
 theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   (subnet a m₁) ⊆ (subnet b m₂) ↔ (m₂ ≤ m₁ ∧ applySubnetMask a m₂ = applySubnetMask b m₂) := by
-  constructor
+  apply Iff.intro
 
   intro h
   simp only [Set.subset_def, mem_subnet_iff_mask_eq] at h
-  constructor
+  apply And.intro
   contrapose h
   rw [Classical.not_forall]
   let δ := (1#32 <<< ((32 - m₂ : ℕ)))
@@ -116,7 +131,7 @@ theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   replace h := Nat.not_le.mp h
 
   rw [Classical.not_imp]
-  constructor
+  apply And.intro
   simp only [applySubnetMask, maskVec, BitVec.and_eq]
 
   set M₁ : BitVec 32 := BitVec.allOnes 32 <<< (32 - ↑m₁) with hM₁
@@ -167,6 +182,8 @@ theorem subnet_containement {a b : IP} {m₁ m₂ : SubnetMask} :
   simp only [←mem_subnet_iff_mask_eq, ←Set.subset_def]
   exact subnet_subset_width.mpr h.left
 
+
+/-- Subnet subsets work the same as set subsets w.r.t. antisymmetry-/
 theorem subnet_antisymm {a b : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet b m₂ ∧  subnet b m₂ ⊆ subnet a m₁ ↔
   subnet a m₁ = subnet b m₂ := by
@@ -190,6 +207,9 @@ theorem subnet_antisymm {a b : IP} {m₁ m₂ : SubnetMask} :
   intro heq
   simp_all only [subset_refl, and_self]
 
+
+/-- A specialized corollary from `subnet_containment`-- if two subnets are equal,
+  their masks are equal and their bases are equal up to the common mask `m`-/
 theorem subnet_eq_iff_mask_network_eq {a b : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ = subnet b m₂ ↔ applySubnetMask a m₁ = applySubnetMask b m₂ ∧ m₁ = m₂ := by
 
