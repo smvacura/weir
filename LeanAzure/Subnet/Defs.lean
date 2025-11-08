@@ -1,4 +1,4 @@
-import LeanNetworking.CIDR.defs
+import LeanNetworking.CIDR.Defs
 
 
 inductive Action where
