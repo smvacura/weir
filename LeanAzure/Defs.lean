@@ -1,3 +1,5 @@
+import LeanNetworking.CIDR.Defs
+
 inductive AzureLocation
 | australia_central
 | australia_central2
@@ -56,6 +58,24 @@ inductive AzureLocation
 | west_us2
 | west_us3
 
+
+inductive AzureAddressPrefix
+| ActionGroup
+| ApiManagement
+| ApplicationInsightsAvailability
+| AppConfiguration
+| AppService
+| AzureActiveDirectory
+| AzureBackup
+| AzureCloud
+| AzureContainerRegistry
+| AzureCosmosDB
+| AzureLoadBalancer
+| Storage
+| Sql
+| Internet
+| VirtualNetwork
+| PrefixList (ℓ : List CIDR)
 
 structure Tag where
   name : String

@@ -32,8 +32,8 @@ structure AzureSecurityRule where
   protocol : Protocol
   source_port_range : Port
   destination_port_range : Port
-  source_address_prefix : CIDR
-  destination_address_prefix : CIDR
+  source_address_prefix : AzureAddressPrefix
+  destination_address_prefix : AzureAddressPrefix
 
 
 structure AzureNSG where
