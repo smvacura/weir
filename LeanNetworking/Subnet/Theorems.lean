@@ -51,7 +51,7 @@ theorem subnet_align_base {a b : IP} {m : SubnetMask}
   intro x
   repeat rw [mem_subnet_iff_mask_eq]
   repeat rw [mem_subnet_iff_mask_eq] at hb
-  constructor
+  apply Iff.intro
   · intro h; rw [←hb]; exact h
   · intro h; rw [hb]; exact h
 
@@ -67,7 +67,7 @@ theorem subnet_contains_self
 /-- Subnet subsets with the same base `a` implies the subset mask is lesser than the superset mask-/
 theorem subnet_subset_width {a : IP} {m₁ m₂ : SubnetMask} :
   subnet a m₁ ⊆ subnet a m₂ ↔ m₂ ≤ m₁ := by
-  constructor
+  apply Iff.intro
   intro h
   contrapose h
   replace h : m₁ < m₂ := Nat.lt_of_not_le h

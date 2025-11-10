@@ -11,13 +11,20 @@ namespace SubnetMask
 @[simp] theorem subnet_bounds_correct (n : Nat) :
   0 ≤ max 0 (min n 32) ∧ (max 0 (min n 32)) ≤ 32 := by
 
-  constructor
+  apply And.intro
+
+  -- case 0 ≤ max 0 (min n 32)
   apply Nat.zero_le
   rw [Nat.max_le]
 
-  constructor
-  decide
-  apply Nat.min_le_right
+  -- case 0 ≤ 32 ∧ min n 32 ≤ 32
+
+  apply And.intro
+
+  -- case 0 ≤ 32
+  · decide
+  -- case min n 32 ≤ 32
+  · apply Nat.min_le_right
 
 
 /-- The SubnetMask constructor. Clips `n` into the interval `[0, 32]`-/
