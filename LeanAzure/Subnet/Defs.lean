@@ -1,4 +1,5 @@
 import LeanNetworking.CIDR.Defs
+import LeanAzure.NSG.Defs
 
 
 inductive Action where
@@ -16,3 +17,4 @@ structure AzureSubnet where
   address_prefixes : List CIDR
 
   delegations : List Delegation
+  nsgs : List AzureNSG

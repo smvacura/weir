@@ -1,4 +1,5 @@
 import LeanNetworking.CIDR.Defs
+import LeanAzure.NSG.Defs
 
 inductive PrivateAllocation where
 | Static
@@ -30,6 +31,7 @@ structure AzureNIC where
   dns_servers : List IP
   edges_zone : Unit
   ip_forwarding_enabled : Bool
+  nsgs : List AzureNSG
 
 
 def isStatic (n : IPConfiguration) : Prop := n.private_allocation = PrivateAllocation.Static
