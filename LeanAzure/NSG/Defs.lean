@@ -21,7 +21,7 @@ inductive Protocol where
 
 
 inductive Port where
-  | Specific (p : Nat)
+  | Specific (ℓ : List Nat)
   | All
 
 structure AzureSecurityRule where
@@ -40,4 +40,11 @@ structure AzureNSG where
   name : String
   location : AzureLocation
   resource_group : AzureResourceGroup
+  rules : AzureSecurityRule
   tags : List Tag
+
+
+def portInPorts (p : Nat) (P : Port) :=
+  match P with
+  | .All => True
+  | .Specific ℓ => p ∈ ℓ

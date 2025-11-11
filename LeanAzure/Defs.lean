@@ -87,3 +87,9 @@ structure AzureResourceGroup where
   location : AzureLocation
   managed_by : String
   tags : List Tag
+
+
+def ipInAddressPrefix (ip : IP) (pre : AzureAddressPrefix) :=
+  match pre with
+  | .PrefixList ℓ => ∃c ∈ ℓ, ip ∈ cidr.toSet c
+  | _ => False
