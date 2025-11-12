@@ -65,6 +65,14 @@ def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
   ipInAddressPrefix ip r.destination_address_prefix
 
 
+def isMinimalMatchingRule (ip : IP) (rule : AzureSecurityRule) (nsg : AzureNSG) :=
+  (ipInAddressPrefix ip rule.destination_address_prefix) ∧
+  ∀rule' ∈ nsg.rules,
+    ipInAddressPrefix ip rule'.destination_address_prefix →
+    rule.direction = rule'.direction
+    → rule' < rule
+
+
 def portInboundAllowed (ip : IP) (port : Nat) (nsg : AzureNSG) : Prop :=
   ∃rule ∈ nsg.rules, ((ipInAddressPrefix ip rule.destination_address_prefix) ∧
     portInPorts port rule.destination_port_range ∧
