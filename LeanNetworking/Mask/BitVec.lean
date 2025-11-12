@@ -195,7 +195,7 @@ lemma bitvec_and_xor_distrib_right {w : Nat} {x u v : BitVec w} :
 lemma bit_xor_decide {w : Nat} {u v : BitVec w} {i : Nat}
   (hi : i < w) : (u ^^^ v)[i] = u[i] ↔ v[i] = false := by
 
-  constructor
+  apply Iff.intro
   intro h
   rw [BitVec.getElem_xor] at h
   by_contra hf
