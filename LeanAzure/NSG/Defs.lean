@@ -60,21 +60,25 @@ def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
   ipInAddressPrefix ip r.destination_address_prefix
 
 
-def isMinimalMatchingRule (ip : IP) (port : Nat) (rule : AzureSecurityRule) (nsg : AzureNSG) :=
-  ipInAddressPrefix ip rule.destination_address_prefix
-  ∧ portInPorts port rule.destination_port_range
+def isMinimalMatchingRule (ips ipd : IP) (ports portd : Nat) (rule : AzureSecurityRule) (nsg : AzureNSG) :=
+  ipInAddressPrefix ips rule.source_address_prefix
+  ∧ ipInAddressPrefix ipd rule.destination_address_prefix
+  ∧ portInPorts ports rule.source_port_range
+  ∧ portInPorts portd rule.destination_port_range
   ∧ ∀rule' ∈ nsg.rules,
-    ipInAddressPrefix ip rule'.destination_address_prefix
-    → portInPorts port rule'.destination_port_range
+    ipInAddressPrefix ips rule'.source_address_prefix
+    → ipInAddressPrefix ipd rule'.destination_address_prefix
+    → portInPorts ports rule'.source_port_range
+    → portInPorts portd rule'.destination_port_range
     → rule.direction = rule'.direction
     → rule' ≠ rule
     → rule' < rule
 
 
-def addressInboundAllowed (ip : IP) (port : Nat) (nsg : AzureNSG) : Prop :=
-  ∃rule ∈ nsg.rules, isMinimalMatchingRule ip port rule nsg
+def addressInboundAllowed (ips ipd : IP) (ports portd : Nat) (nsg : AzureNSG) : Prop :=
+  ∃rule ∈ nsg.rules, isMinimalMatchingRule ips ipd ports portd rule nsg
     ∧ rule.direction = .Inbound
     ∧ rule.access = .Allow
 
-def inboundAllowedAddresses (nsg : AzureNSG) : Set FullAddress :=
-  fun (ip, port) => addressInboundAllowed ip port nsg
+def inboundAllowedAddresses (ipd : IP) (portd : Nat) (nsg : AzureNSG) : Set FullAddress :=
+  fun (ips, ports) => addressInboundAllowed ips ipd ports portd nsg
