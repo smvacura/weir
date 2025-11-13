@@ -1,3 +1,8 @@
+import Mathlib.Data.Set.Lattice
+import Mathlib.Data.Finset.Basic
+import Mathlib.Tactic
+
+
 import LeanNetworking.CIDR.Defs
 import LeanAzure.NSG.Defs
 
@@ -31,7 +36,7 @@ structure AzureNIC where
   dns_servers : List IP
   edges_zone : Unit
   ip_forwarding_enabled : Bool
-  nsgs : List AzureNSG
+  nsgs : Finset AzureNSG
 
 
 def isStatic (n : IPConfiguration) : Prop := n.private_allocation = PrivateAllocation.Static
@@ -40,3 +45,7 @@ def isDynamic (n : IPConfiguration) : Prop := n.private_allocation ≠  PrivateA
 
 def reachableIPs (n : AzureNIC) : Set IP :=
   List.foldl (λa (b : IPConfiguration) => a ∪ (cidr.toSet b.subnet)) {} n.ip_configs
+
+
+def allowedByNIC (nic : AzureNIC) : Set FullAddress :=
+  ⋃ nsg ∈ nic.nsgs, inboundAllowedAddresses nsg

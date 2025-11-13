@@ -1,5 +1,10 @@
 import LeanNetworking.CIDR.Defs
 
+
+inductive PortList where
+  | Specific (ℓ : List Nat)
+  | All
+
 inductive AzureLocation
 | australia_central
 | australia_central2
@@ -93,3 +98,7 @@ def ipInAddressPrefix (ip : IP) (pre : AzureAddressPrefix) :=
   match pre with
   | .PrefixList ℓ => ∃c ∈ ℓ, ip ∈ cidr.toSet c
   | _ => False
+
+
+abbrev FullAddress : Type :=
+  IP × Nat
