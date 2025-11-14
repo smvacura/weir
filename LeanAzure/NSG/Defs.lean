@@ -1,5 +1,33 @@
 import LeanNetworking.CIDR.Defs
 import LeanAzure.Defs
+import LeanNetworking.Util
+
+abbrev Priority := Util.BoundedNat 100 4096
+
+namespace Priority
+
+
+--TODO: simplify Aesop proof
+theorem priority_bounds_correct (n : Nat) :
+  100 ≤ max 100 (min n 4096) ∧ (max 100 (min n 4096)) ≤ 4096 := by
+
+  simp_all only [le_sup_left, sup_le_iff, Nat.reduceLeDiff, inf_le_right, and_self]
+
+
+def mk (n : ℕ) : Priority :=
+  ⟨max 100 (min n 4096), priority_bounds_correct n⟩
+
+
+instance : Coe Priority Nat where
+  coe p := p.val
+
+instance : LT Priority where
+  lt p₁ p₂ := (p₁ : ℕ) < (p₂ : ℕ)
+
+instance : Min Priority where
+  min p₁ p₂ := Priority.mk (Nat.min (p₁ : ℕ) (p₂ : ℕ))
+
+end Priority
 
 inductive Direction where
   | Inbound
@@ -21,7 +49,7 @@ inductive Protocol where
 
 structure AzureSecurityRule where
   name : String
-  rule_priority : Nat
+  rule_priority : Priority
   direction : Direction
   access : Access
   protocol : Protocol
