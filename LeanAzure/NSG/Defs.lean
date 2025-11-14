@@ -27,6 +27,18 @@ instance : LT Priority where
 instance : Min Priority where
   min p₁ p₂ := Priority.mk (Nat.min (p₁ : ℕ) (p₂ : ℕ))
 
+noncomputable instance : DecidableEq Priority := by
+  intros p q
+  classical
+  exact decEq p q
+
+def allPriorities_Nat : Finset ℕ :=
+  (Finset.range (4096 + 1)).filter fun n => 100 ≤ n
+
+
+noncomputable def all : Finset Priority :=
+  Finset.image mk allPriorities_Nat
+
 end Priority
 
 inductive Direction where
@@ -83,6 +95,13 @@ def portInPorts (p : Nat) (P : PortList) :=
   | .All => True
   | .Specific ℓ => p ∈ ℓ
 
+
+def rulePriorityAvailable (p : Priority) (n : AzureNSG) :=
+  ¬∃r ∈ n.rules, r.rule_priority ≠ p
+
+
+def lowestAvailablePriority (n : AzureNSG) :=
+  {p ∈ Priority.all | rulePriorityAvailable p n}
 
 def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
   ipInAddressPrefix ip r.destination_address_prefix
