@@ -17,6 +17,29 @@ theorem priority_bounds_correct (n : Nat) :
 def mk (n : ℕ) : Priority :=
   ⟨max 100 (min n 4096), priority_bounds_correct n⟩
 
+def toPriority? (n : ℕ) : Option Priority :=
+  if h : 100 ≤ n ∧ n ≤ 4096 then
+    some ⟨n, h⟩
+  else
+    none
+
+def toPriority?_injective : ∀ (a a' : ℕ) (b : Priority),
+  toPriority? a = some b → toPriority? a' = some b → a = a':= by
+  intros a a'
+
+  unfold toPriority?
+  intro b a_1 a_2
+  simp_all only [Option.dite_none_right_eq_some, Option.some.injEq]
+  obtain ⟨w, h⟩ := a_1
+  obtain ⟨w_1, h_1⟩ := a_2
+  obtain ⟨left, right⟩ := w
+  obtain ⟨left_1, right_1⟩ := w_1
+  subst h_1
+  sorry
+
+def prioritiesFrom (s : Finset ℕ) : Finset Priority :=
+  Finset.filterMap toPriority? s toPriority?_injective
+
 
 instance : Coe Priority Nat where
   coe p := p.val
