@@ -4,6 +4,9 @@ import LeanNetworking.Util
 
 abbrev Priority := Util.BoundedNat 100 4096
 
+
+abbrev FinPriority := Fin (4096-100+1)
+
 namespace Priority
 
 
@@ -17,11 +20,34 @@ theorem priority_bounds_correct (n : Nat) :
 def mk (n : ℕ) : Priority :=
   ⟨max 100 (min n 4096), priority_bounds_correct n⟩
 
+instance : Coe Priority Nat where
+  coe p := p.val
+
+instance : LT Priority where
+  lt p₁ p₂ := (p₁ : ℕ) < (p₂ : ℕ)
+
+
+instance : Min Priority where
+  min p₁ p₂ := Priority.mk (Nat.min (p₁ : ℕ) (p₂ : ℕ))
+
+
 def toPriority? (n : ℕ) : Option Priority :=
   if h : 100 ≤ n ∧ n ≤ 4096 then
     some ⟨n, h⟩
   else
     none
+
+theorem priority_val_eq_imp_eq (p₁ p₂ : Priority) :
+  p₁.val = p₂.val ↔ p₁ = p₂ := by
+
+  apply Iff.intro
+  · intro a
+    sorry
+  · intro a
+    subst a
+    simp_all only
+
+
 
 def toPriority?_injective : ∀ (a a' : ℕ) (b : Priority),
   toPriority? a = some b → toPriority? a' = some b → a = a':= by
@@ -40,15 +66,6 @@ def toPriority?_injective : ∀ (a a' : ℕ) (b : Priority),
 def prioritiesFrom (s : Finset ℕ) : Finset Priority :=
   Finset.filterMap toPriority? s toPriority?_injective
 
-
-instance : Coe Priority Nat where
-  coe p := p.val
-
-instance : LT Priority where
-  lt p₁ p₂ := (p₁ : ℕ) < (p₂ : ℕ)
-
-instance : Min Priority where
-  min p₁ p₂ := Priority.mk (Nat.min (p₁ : ℕ) (p₂ : ℕ))
 
 noncomputable instance : DecidableEq Priority := by
   intros p q
@@ -123,7 +140,12 @@ def rulePriorityAvailable (p : Priority) (n : AzureNSG) :=
   ¬∃r ∈ n.rules, r.rule_priority ≠ p
 
 
-def lowestAvailablePriority (n : AzureNSG) :=
+instance (n : AzureNSG) [DecidableEq Priority]:
+  DecidablePred fun p => rulePriorityAvailable p n := by
+  sorry
+
+
+noncomputable def lowestAvailablePriority (n : AzureNSG) :=
   {p ∈ Priority.all | rulePriorityAvailable p n}
 
 def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
