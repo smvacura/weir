@@ -106,13 +106,28 @@ def rulePriorityAvailable (p : Priority) (n : AzureNSG) :=
   ¬∃r ∈ n.rules, r.rule_priority ≠ p
 
 
+def decAll (s : Finset AzureSecurityRule) :
+    Decidable (∀ r ∈ s, r.rule_priority = x) :=
+  inferInstance
+
+
 instance (n : AzureNSG) [DecidableEq Priority]:
   DecidablePred fun p => rulePriorityAvailable p n := by
-  sorry
+
+  intro x
+
+  simp_all only
+  unfold rulePriorityAvailable
+
+  simp_all only [ne_eq, not_exists, not_and, Decidable.not_not]
+
+
+  exact decAll n.rules
 
 
 def lowestAvailablePriority (n : AzureNSG) :=
   {p ∈ Priority.all | rulePriorityAvailable p n}
+
 
 def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
   ipInAddressPrefix ip r.destination_address_prefix
