@@ -106,11 +106,6 @@ def rulePriorityAvailable (p : Priority) (n : AzureNSG) :=
   ¬∃r ∈ n.rules, r.rule_priority ≠ p
 
 
-def decAll (s : Finset AzureSecurityRule) :
-    Decidable (∀ r ∈ s, r.rule_priority = x) :=
-  inferInstance
-
-
 instance (n : AzureNSG) [DecidableEq Priority]:
   DecidablePred fun p => rulePriorityAvailable p n := by
 
@@ -118,11 +113,7 @@ instance (n : AzureNSG) [DecidableEq Priority]:
 
   simp_all only
   unfold rulePriorityAvailable
-
-  simp_all only [ne_eq, not_exists, not_and, Decidable.not_not]
-
-
-  exact decAll n.rules
+  infer_instance
 
 
 def lowestAvailablePriority (n : AzureNSG) :=
