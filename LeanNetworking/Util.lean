@@ -8,6 +8,22 @@ namespace Util
 /-- Generic type for a Nat with upper and lower bounds with `h ≤ n ≤ k` -/
 def BoundedNat (h k: Nat) := { n : Nat // h ≤ n ∧ n ≤ k }
 
+def BoundedNat.toVal {lo hi : Nat} (b : BoundedNat lo hi) := b.val
+
+instance (lo hi : Nat) : DecidableEq (BoundedNat lo hi) := by
+  intro x y
+
+  by_cases h : x.val = y.val
+  · apply isTrue
+    cases x
+    cases y
+    cases h
+    rfl
+  · apply isFalse
+    intro hxy
+    apply h
+    exact congrArg BoundedNat.toVal hxy
+
 theorem sub_right_inj {a m n : Nat} (h₁ : m ≤ a) (h₂ : n ≤ a) : a - m = a - n → m = n := by
   intro h
   have hₘ : (a - m) + m = a := by

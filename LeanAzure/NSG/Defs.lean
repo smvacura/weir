@@ -37,46 +37,12 @@ def toPriority? (n : ℕ) : Option Priority :=
   else
     none
 
-theorem priority_val_eq_imp_eq (p₁ p₂ : Priority) :
-  p₁.val = p₂.val ↔ p₁ = p₂ := by
-
-  apply Iff.intro
-  · intro a
-    sorry
-  · intro a
-    subst a
-    simp_all only
-
-
-
-def toPriority?_injective : ∀ (a a' : ℕ) (b : Priority),
-  toPriority? a = some b → toPriority? a' = some b → a = a':= by
-  intros a a'
-
-  unfold toPriority?
-  intro b a_1 a_2
-  simp_all only [Option.dite_none_right_eq_some, Option.some.injEq]
-  obtain ⟨w, h⟩ := a_1
-  obtain ⟨w_1, h_1⟩ := a_2
-  obtain ⟨left, right⟩ := w
-  obtain ⟨left_1, right_1⟩ := w_1
-  subst h_1
-  sorry
-
-def prioritiesFrom (s : Finset ℕ) : Finset Priority :=
-  Finset.filterMap toPriority? s toPriority?_injective
-
-
-noncomputable instance : DecidableEq Priority := by
-  intros p q
-  classical
-  exact decEq p q
 
 def allPriorities_Nat : Finset ℕ :=
   (Finset.range (4096 + 1)).filter fun n => 100 ≤ n
 
 
-noncomputable def all : Finset Priority :=
+def all : Finset Priority :=
   Finset.image mk allPriorities_Nat
 
 end Priority
@@ -145,7 +111,7 @@ instance (n : AzureNSG) [DecidableEq Priority]:
   sorry
 
 
-noncomputable def lowestAvailablePriority (n : AzureNSG) :=
+def lowestAvailablePriority (n : AzureNSG) :=
   {p ∈ Priority.all | rulePriorityAvailable p n}
 
 def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=
