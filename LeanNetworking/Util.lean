@@ -10,6 +10,78 @@ def BoundedNat (h k: Nat) := { n : Nat // h ≤ n ∧ n ≤ k }
 
 def BoundedNat.toVal {lo hi : Nat} (b : BoundedNat lo hi) := b.val
 
+instance {lo hi : Nat} : CoeOut (BoundedNat lo hi) Nat where
+  coe (b : BoundedNat lo hi) := b.val
+
+instance (lo hi : Nat) : LE (BoundedNat lo hi) where
+  le b₁ b₂ := b₁.val ≤ b₂.val
+
+instance (lo hi : Nat) : LT (BoundedNat lo hi) where
+  lt b₁ b₂ := b₁.val < b₂.val
+
+lemma BoundedNat.not_le {lo hi : Nat} {b₁ b₂ : BoundedNat lo hi} :
+  ¬b₁ ≤ b₂ ↔ b₂ < b₁ := by
+
+  apply Iff.intro
+
+  intro h
+  unfold instLEBoundedNat at h
+  unfold instLTBoundedNat
+  simp_all only [Subtype.coe_le_coe, _root_.not_le, Subtype.coe_lt_coe]
+
+  intro h
+  unfold instLTBoundedNat at h
+  unfold instLEBoundedNat
+  simp_all only [Subtype.coe_le_coe, _root_.not_le, Subtype.coe_lt_coe]
+
+lemma BoundedNat.le_of_lt {lo hi : Nat} {b₁ b₂ : BoundedNat lo hi} :
+  b₁ < b₂ → b₁ ≤  b₂ := by
+
+  intro h
+  unfold instLTBoundedNat at h
+  unfold instLEBoundedNat
+  change ((b₁ : Nat) ≤ (b₂ : Nat))
+  replace h : Nat.succ (b₁ : Nat) ≤ (b₂ : Nat) :=
+      Nat.succ_le_of_lt h
+  exact Nat.le_trans (Nat.le_succ _) h
+
+instance (lo hi : Nat) : LinearOrder (BoundedNat lo hi) where
+  le := (· ≤ ·)
+  lt := (· < ·)
+  le_refl b₁ := Nat.le_refl b₁.val
+  le_trans b₁ b₂ b₃ := Nat.le_trans
+  le_antisymm b₁ b₂ h₁ h₂ := by
+    apply Subtype.ext
+    exact Nat.le_antisymm h₁ h₂
+  le_total b₁ b₂ := by
+    by_cases h : b₁ ≤ b₂
+    · apply Or.inl
+      exact h
+    · simp_all only [false_or]
+      replace h := BoundedNat.not_le.mp h
+      exact BoundedNat.le_of_lt h
+  toDecidableLE := by
+    intro x y
+    by_cases h : x.val ≤ y.val
+    · apply isTrue
+      simp_all only [Subtype.coe_le_coe]
+    · apply isFalse
+      simp_all only [Subtype.coe_le_coe, not_le]
+      exact BoundedNat.not_le.mpr h
+  lt_iff_le_not_ge b₁ b₂ := by
+    apply Iff.intro
+
+    intro h
+    have hle := BoundedNat.le_of_lt h
+    simp_all only [true_and]
+    apply Not.intro
+    intro hble
+    have h' := BoundedNat.not_le.mpr h
+    contradiction
+
+    intro ⟨hle, hnle⟩
+    exact BoundedNat.not_le.mp hnle
+
 instance (lo hi : Nat) : DecidableEq (BoundedNat lo hi) := by
   intro x y
 
