@@ -1,11 +1,12 @@
+import Mathlib.Data.Finset.Insert
+import Mathlib.Data.Finset.Max
+import Mathlib.Data.Finset.Pairwise
+
 import LeanNetworking.CIDR.Defs
 import LeanAzure.Defs
 import LeanNetworking.Util
 
 abbrev Priority := Util.BoundedNat 100 4096
-
-
-abbrev FinPriority := Fin (4096-100+1)
 
 namespace Priority
 
@@ -50,11 +51,12 @@ end Priority
 inductive Direction where
   | Inbound
   | Outbound
-
+  deriving DecidableEq
 
 inductive Access where
   | Allow
   | Deny
+  deriving DecidableEq
 
 -- Tcp, Udp, Icmp, Esp, Ah or *
 inductive Protocol where
@@ -64,6 +66,7 @@ inductive Protocol where
   | ESP
   | AH
   | All
+  deriving DecidableEq
 
 structure AzureSecurityRule where
   name : String
@@ -75,7 +78,7 @@ structure AzureSecurityRule where
   destination_port_range : PortList
   source_address_prefix : AzureAddressPrefix
   destination_address_prefix : AzureAddressPrefix
-
+  deriving DecidableEq
 
 instance : LT AzureSecurityRule where
   lt r₁ r₂ := r₁.rule_priority > r₂.rule_priority
@@ -85,7 +88,7 @@ instance : Max AzureSecurityRule where
 
 
 def unique_priority (rules : Finset AzureSecurityRule) : Prop :=
-  ∀ {r r'}, r ∈ rules → r' ∈ rules → r ≠ r' → r.rule_priority ≠ r'.rule_priority
+  (↑rules : Set AzureSecurityRule).Pairwise (fun (a : AzureSecurityRule) (b : AzureSecurityRule) => a.rule_priority ≠ b.rule_priority)
 
 structure AzureNSG where
   name : String
@@ -95,6 +98,37 @@ structure AzureNSG where
   rule_priority_uniqueness: unique_priority rules
   tags : List Tag
 
+
+instance : Insert AzureSecurityRule (Finset AzureSecurityRule) where
+  insert r rules :=
+    if ∃r' ∈ rules, r.rule_priority = r'.rule_priority
+    then rules
+    else insert r rules
+
+lemma insert_preserves_priority_uniqueness {nsg : AzureNSG} :
+  unique_priority (insert r nsg.rules) := by
+  unfold insert
+  unfold instInsertAzureSecurityRuleFinset
+  simp_all only
+  split
+  next h =>
+    exact nsg.rule_priority_uniqueness
+  next h =>
+    simp_all only [not_exists, not_and]
+    unfold unique_priority
+    simp_all only [Finset.coe_insert, ne_eq]
+
+    sorry
+
+
+def addRule (nsg : AzureNSG) (r : AzureSecurityRule) : AzureNSG :=
+  { nsg with
+  rules := insert r nsg.rules,
+  rule_priority_uniqueness := insert_preserves_priority_uniqueness
+  }
+
+infixl:70 " ◁ " => fun (nsg : AzureNSG) (r : AzureSecurityRule) =>
+  addRule nsg r
 
 def portInPorts (p : Nat) (P : PortList) :=
   match P with
@@ -117,7 +151,7 @@ instance (n : AzureNSG) [DecidableEq Priority]:
 
 
 def lowestAvailablePriority (n : AzureNSG) :=
-  {p ∈ Priority.all | rulePriorityAvailable p n}
+  Finset.min' {p ∈ Priority.all | rulePriorityAvailable p n}
 
 
 def trafficMatchesRule (ip : IP) (r : AzureSecurityRule) :=

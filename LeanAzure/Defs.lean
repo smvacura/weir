@@ -4,6 +4,7 @@ import LeanNetworking.CIDR.Defs
 inductive PortList where
   | Specific (ℓ : List Nat)
   | All
+  deriving DecidableEq
 
 inductive AzureLocation
 | australia_central
@@ -81,6 +82,7 @@ inductive AzureAddressPrefix
 | Internet
 | VirtualNetwork
 | PrefixList (ℓ : List CIDR)
+deriving DecidableEq
 
 structure Tag where
   name : String

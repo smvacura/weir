@@ -6,10 +6,12 @@ import LeanNetworking.Subnet.Theorems
 @[ext] structure CIDR where
   (base : IP)
   (mask : SubnetMask)
+  deriving DecidableEq
 
 
 @[ext] structure AlignedCIDR extends CIDR where
   (aligned: applySubnetMask base mask = base)
+  deriving DecidableEq
 
 
 instance : Coe AlignedCIDR CIDR where
