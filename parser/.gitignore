@@ -1,0 +1,18 @@
+# dune build artifacts
+/_build/
+_dune/
+
+/.dune/
+
+/# executable symlinks
+*.exe
+*.bc
+*.byte
+*.native
+
+# generated opam switch stuff (if using local switch)
+.opam/
+
+# editor + tooling junk
+*.install
+*.merli*
