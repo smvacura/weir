@@ -1,3 +1,5 @@
+open Subprocess
+
 open Parser.Smt_ir
 open Parser.Smt_to_file
 
@@ -11,4 +13,9 @@ let test_ir = [
   GetModel
 ]
 
-let () = smt_to_file test_ir "test.smt2"
+let () = 
+  let filename = "test.smt2" in
+  let z3_cmd = cmd ["z3"; filename] in
+  smt_to_file test_ir filename;
+  let model = Subprocess.read z3_cmd in
+  print_string model;

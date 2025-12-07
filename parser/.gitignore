@@ -16,3 +16,7 @@ _dune/
 # editor + tooling junk
 *.install
 *.merli*
+
+
+# generated smt files
+*.smt2

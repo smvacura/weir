@@ -1,4 +1,6 @@
 (executable
  (public_name parser)
  (name main)
- (libraries parser))
+ (libraries 
+  parser
+  subprocess))

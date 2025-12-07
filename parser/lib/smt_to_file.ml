@@ -27,10 +27,12 @@ let smt_cmd_to_string (cmd : smt_cmd) =
 
 let smt_to_string_list l = List.map smt_cmd_to_string l
 
-let write_string_list_to_file f l = let oc = Out_channel.open_text f in
-  List.iter (Out_channel.output_string oc) l 
+let write_string_list_to_file f l = 
+  let oc = Out_channel.open_text f in
+  List.iter (Out_channel.output_string oc) l;
+  close_out oc
 
 let smt_to_file l f = 
   l 
   |> smt_to_string_list
-  |> write_string_list_to_file f
+  |> write_string_list_to_file f;
