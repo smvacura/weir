@@ -1,6 +1,26 @@
 open Parser.Smt_to_file
 open OUnit2
 
+open In_channel
+
+
+(* A lovely string diff printer from StackOverflow user gache
+https://stackoverflow.com/questions/22947495/string-difference-pretty-printer-for-ounit-assert-equal?utm_source=chatgpt.com*)
+(* was removed but perhaps it will be back to make string testing nicer*)
+
+let read_file filename =
+  with_open_bin filename input_all
+
+let test_file_write expected cmds =
+  try
+    smt_to_file cmds "temp.smt2";
+    let contents = read_file "temp.smt2" |> String.split_on_char '\r' |> String.concat "" in
+    assert_equal expected contents ~printer:(fun s -> Printf.sprintf "%S" s)
+  with e ->
+    Sys.remove "temp.smt2";
+    raise e;
+  ;
+  Sys.remove "temp.smt2"
 
 
 let basic_tests = "test suite for simple terms" >::: [
@@ -18,5 +38,10 @@ let basic_tests = "test suite for simple terms" >::: [
   "imp" >:: (fun _ -> assert_equal "(=> p q)" @@ smt_term_to_string (Imp (Symbol "p", Symbol "q")));
 ]
 
+let file_tests = "test suite for writing to file" >::: [
+  "term" >:: (fun _ -> test_file_write "(declare-const x (_ BitVec 8))\n" [DeclareConst ("x", BitVec 8);]);
+]
+
 let () = 
   run_test_tt_main basic_tests;
+  run_test_tt_main file_tests;
