@@ -1,2 +1,5 @@
 (test
- (name test_parser))
+ (name test_parser)
+ (libraries 
+  parser
+  ounit2))

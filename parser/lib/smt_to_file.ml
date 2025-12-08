@@ -26,7 +26,7 @@ let rec smt_term_to_string (term : smt_term) =
       ^ smt_term_to_string b2
       ^ ")"
   | And l -> "(and " ^ smt_term_list_to_string l ^ ")"
-  | Or l -> "(and " ^ smt_term_list_to_string l ^ ")"
+  | Or l -> "(or " ^ smt_term_list_to_string l ^ ")"
   | Not t -> "(not " ^ smt_term_to_string t ^ ")"
   | Imp (p, q) -> "(=> " ^ smt_term_to_string p ^ " " ^ smt_term_to_string q ^ ")"
 
