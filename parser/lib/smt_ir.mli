@@ -9,6 +9,13 @@ type smt_term =
 | Bool of bool
 | BV of int * int
 | Eq of smt_term * smt_term
+| LT of smt_term * smt_term
+| LE of smt_term * smt_term
+| ITE of smt_term * smt_term * smt_term
+| And of smt_term list
+| Or of smt_term list
+| Not of smt_term
+| Imp of smt_term * smt_term
 
 
 type smt_cmd =
