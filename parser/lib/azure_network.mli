@@ -4,3 +4,17 @@ module Vnet : sig
 
 end
 
+
+module Subnet : sig
+
+    type t
+
+end 
+
+
+module NSG : sig
+
+    type t
+
+end
+
