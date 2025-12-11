@@ -16,7 +16,7 @@ module IPv4 = struct
     o lsl (8 * pos) 
     |> of_int
 
-  let of_octets w x y z =
+  let of_octets_opt w x y z =
     if in_bounds w && in_bounds x && in_bounds y && in_bounds z
     then
       Some (
@@ -27,11 +27,11 @@ module IPv4 = struct
       )
     else None
     
-  let of_string s = 
+  let of_string_opt s = 
     let blocks = String.split_on_char '.' s 
     |> List.map int_of_string_opt in
     match blocks with
-    | [Some w; Some x; Some y; Some z] -> of_octets w x y z
+    | [Some w; Some x; Some y; Some z] -> of_octets_opt w x y z
     | _ -> None
     
 end
@@ -48,6 +48,18 @@ module IPv4Mask = struct
   else
     let shift = 32 - n in
     logand (shift_left 0xffffffffl shift) 0xffffffffl
+
+  
+  let make_opt m =
+    if m >= 0 && m <= 32
+    then Some m
+    else None
+
+  let of_string_opt s =
+    match int_of_string_opt s with
+    | Some m -> make_opt m
+    | None -> None
+  
 end
 
 module CIDR = struct
@@ -55,4 +67,17 @@ module CIDR = struct
     ip : IPv4.t;
     mask : IPv4Mask.t
   }
+
+  let make ip mask = {
+    ip=ip;
+    mask=mask;
+  }
+
+  let of_string_opt s = 
+    match String.split_on_char '/' s with
+    | [s_ip; s_m] -> 
+      match IPv4.of_string_opt s_ip, IPv4Mask.of_string_opt s_m with
+      | Some ip, Some m -> Some {ip=ip; mask=m}
+      | _ -> None
+    | _ -> None
 end
