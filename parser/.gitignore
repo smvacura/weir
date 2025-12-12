@@ -20,3 +20,6 @@ _dune/
 
 # generated smt files
 *.smt2
+
+#TF plan files
+*.json
