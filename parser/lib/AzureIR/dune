@@ -1,0 +1,4 @@
+(library
+ (name azureir)
+ (libraries parser)
+ (flags (:standard -w -a)))
