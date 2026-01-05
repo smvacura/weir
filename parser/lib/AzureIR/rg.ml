@@ -15,6 +15,8 @@ type t = {
     tags : tag list
   }
 
+let get_name rg = rg.name
+
 let make_rg name location managed_by tags = {
   name = name;
   location = location;

@@ -86,8 +86,7 @@ module AzureTFParser = struct
 
   
   let add_rg (world : Azureir.World.t) (rg : Azureir.Rg.t) = 
-    let name = "" in
-    let rgs' = Azureir.Rg.Map.add (Azureir.Rg.Id.of_string name) rg world.resource_groups in
+    let rgs' = Azureir.Rg.Map.add (Azureir.Rg.get_name rg) rg world.resource_groups in
     { world with resource_groups = rgs'}
   
   let parse_resource json_resource (world : Azureir.World.t) err =

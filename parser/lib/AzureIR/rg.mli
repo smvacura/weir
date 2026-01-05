@@ -11,6 +11,8 @@ end
 
 type t
 
+val get_name : t -> Id.t
+
 val make_rg : string -> azure_location -> string -> tag list -> t
 
 module Map : Map.S with type key = Id.t 
