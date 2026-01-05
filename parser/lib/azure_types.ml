@@ -116,6 +116,64 @@ let loc_of_string_opt = function
   | _                       -> None
 
 
+let string_of_loc = function
+  | AustraliaCentral       -> "australiacentral"
+  | AustraliaCentral2      -> "australiacentral2"
+  | AustraliaEast          -> "australiaeast"
+  | AustraliaSoutheast     -> "australiasoutheast"
+  | AustriaEast            -> "austriaeast"
+  | BelgiumCentral         -> "belgiumcentral"
+  | Brazilsouth            -> "brazilsouth"
+  | Brazilsoutheast        -> "brazilsoutheast"
+  | CanadaCentral          -> "canadacentral"
+  | CanadaEast             -> "canadaeast"
+  | CentralIndia           -> "centralindia"
+  | CentralUs              -> "centralus"
+  | ChileCentral           -> "chilecentral"
+  | EastAsia               -> "eastasia"
+  | EastUs                 -> "eastus"
+  | EastUs2                -> "eastus2"
+  | FranceCentral          -> "francecentral"
+  | FranceSouth            -> "francesouth"
+  | GermanyNorth           -> "germanynorth"
+  | GermanyWestCentral     -> "germanywestcentral"
+  | IndonesiaCentral       -> "indonesiacentral"
+  | IsraelCentral          -> "israelcentral"
+  | ItalyNorth             -> "italynorth"
+  | JapanEast              -> "japaneast"
+  | JapanWest              -> "japanwest"
+  | KoreaCentral           -> "koreacentral"
+  | KoreaSouth             -> "koreasouth"
+  | MalaysiaWest           -> "malaysiawest"
+  | MexicoCentral          -> "mexicocentral"
+  | NewZealandNorth        -> "newzealandnorth"
+  | NorthCentralUs         -> "northcentralus"
+  | NorthEurope            -> "northeurope"
+  | NorwayEast             -> "norwayeast"
+  | NorwayWest             -> "norwaywest"
+  | PolandCentral          -> "polandcentral"
+  | QatarCentral           -> "qatarcentral"
+  | SouthAfricaNorth       -> "southafricanorth"
+  | SouthAfricaWest        -> "southafricawest"
+  | SouthCentralUs         -> "southcentralus"
+  | SouthIndia             -> "southindia"
+  | SoutheastAsia          -> "southeastasia"
+  | SpainCentral           -> "spaincentral"
+  | SwedenCentral          -> "swedencentral"
+  | SwedenSouth            -> "swedensouth"
+  | SwitzerlandNorth       -> "switzerlandnorth"
+  | SwitzerlandWest        -> "switzerlandwest"
+  | UaeCentral             -> "uaecentral"
+  | UaeNorth               -> "uaenorth"
+  | UkSouth                -> "uksouth"
+  | UkWest                 -> "ukwest"
+  | WestCentralUs          -> "westcentralus"
+  | WestEurope             -> "westeurope"
+  | WestIndia              -> "westindia"
+  | WestUs                 -> "westus"
+  | WestUs2                -> "westus2"
+  | WestUs3                -> "westus3"
+
 type azure_address_prefix =
   | ActionGroup
   | ApiManagement
@@ -140,18 +198,3 @@ type tag = {
 }
 
 let make_tag k v = {key = k; value = v}
-
-
-type azure_resource_group = {
-  name : string;
-  location : azure_location;
-  managed_by : string;
-  tags : tag list
-}
-
-let make_rg name location managed_by tags = {
-  name = name;
-  location = location;
-  managed_by = managed_by;
-  tags = tags
-}

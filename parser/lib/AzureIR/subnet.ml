@@ -12,7 +12,7 @@ end
 
 type t = {  
     name : string;
-    resource_group : azure_resource_group;
+    resource_group : Rg.t;
     addresses : CIDR.t list
   }
 

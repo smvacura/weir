@@ -11,7 +11,7 @@ end
 type t = {
   name : string;
   location : azure_location;
-  resource_group : azure_resource_group;
+  resource_group : Rg.t;
   subnets : string list
 }
 

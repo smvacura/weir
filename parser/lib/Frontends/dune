@@ -1,0 +1,4 @@
+(library
+ (name frontends)
+ (libraries yojson parser azureir)
+ (flags (:standard -w -a)))
