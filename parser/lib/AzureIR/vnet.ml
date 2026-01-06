@@ -12,7 +12,14 @@ type t = {
   name : string;
   location : azure_location;
   resource_group : Rg.t;
-  subnets : string list
 }
+
+let get_name vnet = vnet.name
+
+let make_vnet name loc rg = { 
+  name = name;
+  location = loc;
+  resource_group = rg;
+  }
 
 module Map = Map.Make(Id)
