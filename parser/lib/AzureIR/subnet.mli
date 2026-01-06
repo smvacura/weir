@@ -5,6 +5,7 @@ module Id : sig
 
     val compare : t -> t -> int
 
+    val of_string : string -> t
 end
 
 
@@ -12,6 +13,6 @@ type t
 
 val get_name : t -> Id.t
 
-val make_subnet : string -> Rg.t -> CIDR.t list -> t
+val make_subnet : string -> Id.t -> Rg.t -> CIDR.t list -> t
 
 module Map : Map.S with type key = Id.t 

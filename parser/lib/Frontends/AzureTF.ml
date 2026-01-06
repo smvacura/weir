@@ -72,6 +72,9 @@ module AzureTFParser = struct
     let* name = Safe.Util.member "name" values 
       |> parse_json_string_opt 
       |> generate_parse_result "name" "" "resource_group" in
+    let* id = Safe.Util.member "id" values
+      |> parse_json_string_opt
+      |> generate_parse_result "id" name "resource_group" in
     let* managed_by = Safe.Util.member "managed_by" values 
       |> parse_json_string_opt 
       |> generate_parse_result "managed_by" name "resource_group" in
@@ -81,7 +84,7 @@ module AzureTFParser = struct
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type resource group")
     in
 
-    Ok (Rg.make_rg name location managed_by tags)
+    Ok (Rg.make_rg name (Rg.Id.of_string id) location managed_by tags)
 
   let vnet_of_json world json =
     let values = Safe.Util.member "values" json in
@@ -89,6 +92,9 @@ module AzureTFParser = struct
     let* name = Safe.Util.member "name" values 
       |> parse_json_string_opt 
       |> generate_parse_result "name" "" "vnet" in
+    let* id = Safe.Util.member "id" values
+      |> parse_json_string_opt
+      |> generate_parse_result "id" name "vnet" in
     let* location = match Safe.Util.member "location" values with
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "vnet"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type vnet")
@@ -100,7 +106,7 @@ module AzureTFParser = struct
     let* rg = World.get_resource_group world rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet " ^ name)
     in
-    Ok (Vnet.make_vnet name location rg)
+    Ok (Vnet.make_vnet name (Vnet.Id.of_string id) location rg)
 
   let parse_subnet json =
     let values = Safe.Util.member "values" json in

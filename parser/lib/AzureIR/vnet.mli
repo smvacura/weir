@@ -4,6 +4,7 @@ module Id : sig
 
     val compare : t -> t -> int
 
+    val of_string : string -> t
 end
 
 
@@ -11,6 +12,6 @@ type t
 
 val get_name : t -> Id.t
 
-val make_vnet : string -> Parser.Azure_types.azure_location -> Rg.t -> t
+val make_vnet : string -> Id.t -> Parser.Azure_types.azure_location -> Rg.t -> t
 
 module Map : Map.S with type key = Id.t 
