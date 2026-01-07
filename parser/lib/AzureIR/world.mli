@@ -5,4 +5,6 @@ type t = {
   vnets : Vnet.t Vnet.Map.t
 }
 
+val empty : t
+
 val get_resource_group : t -> string -> Rg.t option
