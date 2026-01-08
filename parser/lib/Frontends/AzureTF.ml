@@ -5,18 +5,16 @@ module AzureTFParser = struct
 
   type t = string list
 
-  module RawMap = Map.Make(String)
-
   type raw_world = {
-    rgs : Safe.t RawMap.t;
-    vnets : Safe.t RawMap.t;
-    subnets : Safe.t RawMap.t
+    rgs : Safe.t list;
+    vnets : Safe.t list;
+    subnets : Safe.t list;
   }
 
   let raw_world_empty = {
-    rgs = RawMap.empty;
-    vnets = RawMap.empty;
-    subnets = RawMap.empty
+    rgs = [];
+    vnets = [];
+    subnets = [];
   }
 
   let parse_json_string_opt (json : Safe.t) =
@@ -156,14 +154,20 @@ module AzureTFParser = struct
     | Some "azurerm_resource_group" ->
       let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
       match name with
-      | Some s -> let rgs' = RawMap.add s json_resource world.rgs in
+      | Some s -> let rgs' = json_resource::world.rgs in
         ({world with rgs = rgs'}, err)
       | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
     | Some "azurerm_virtual_network" ->
       let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
       match name with
-      | Some s -> let vnets' = RawMap.add s json_resource world.vnets in
+      | Some s -> let vnets' = json_resource::world.vnets in
         ({world with vnets = vnets'}, err)
+      | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
+    | Some "azurerm_subnet" ->
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some s -> let subnets' = json_resource::world.subnets in
+        ({world with subnets = subnets'}, err)
       | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
     | None -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
