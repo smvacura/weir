@@ -2,6 +2,9 @@ import LeanNetworking.Util
 
 abbrev IP := BitVec 32
 
+instance : LinearOrder IP :=
+  sorry
+
 /-- An IPv4 decimal block, which is a `Nat` bounded by `0` and `255`, inclusive -/
 abbrev IPDecimalBlock := Util.BoundedNat 0 255
 
