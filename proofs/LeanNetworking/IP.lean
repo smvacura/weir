@@ -2,8 +2,9 @@ import LeanNetworking.Util
 
 abbrev IP := BitVec 32
 
-instance : LinearOrder IP :=
-  sorry
+instance {w : Nat} : LinearOrder (BitVec w) :=
+  LinearOrder.lift' (·.toNat) (fun _ _ h => BitVec.eq_of_toNat_eq h)
+
 
 /-- An IPv4 decimal block, which is a `Nat` bounded by `0` and `255`, inclusive -/
 abbrev IPDecimalBlock := Util.BoundedNat 0 255
@@ -12,14 +13,17 @@ abbrev IPDecimalBlock := Util.BoundedNat 0 255
 def intOfIP (ip : IP) : Int :=
   BitVec.toInt ip
 
-instance : LE IP where
-  le a b := intOfIP a ≤ intOfIP b
 
-instance : LT IP where
-  lt a b := intOfIP a < intOfIP b
+instance : LinearOrder IP := inferInstance
 
-instance : Min IP where
-  min a b := if a < b then a else b
+-- instance : LE IP where
+--   le a b := intOfIP a ≤ intOfIP b
+
+-- instance : LT IP where
+--   lt a b := intOfIP a < intOfIP b
+
+-- instance : Min IP where
+--   min a b := if a < b then a else b
 
 
 namespace IPDecimalBlock
