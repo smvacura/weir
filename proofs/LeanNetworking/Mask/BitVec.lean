@@ -18,6 +18,14 @@ theorem bitvec_and_right_idempotence (n : Nat) (u v : BitVec n) :
   rw [BitVec.and_assoc]
   rw [BitVec.and_self]
 
+theorem and_le_left {n : Nat} (a b : BitVec n) : a &&& b ≤ a := by
+  simp only [BitVec.le_def, BitVec.toNat_and]
+  exact Nat.and_le_left
+
+theorem or_le_right {n : Nat} (u v : BitVec n) : u ≤ u ||| v := by
+  rw [BitVec.or_comm]
+  simp only [BitVec.le_def, BitVec.toNat_or]
+  exact Nat.right_le_or
 
 /-- If two bitvectors are elementwise equal, the vectors are equal-/
 lemma bitvec_eq_of_forall_bits {w} {u v : BitVec w}
@@ -205,5 +213,13 @@ lemma bit_xor_decide {w : Nat} {u v : BitVec w} {i : Nat}
   rw [BitVec.getElem_xor]
   rw [h]
   exact Bool.xor_false u[i]
+
+theorem bitvec_and_or_distrib_right (a b c : BitVec n) : (a ||| b) &&& c = (a &&& c) ||| (b &&& c) := by
+  ext i
+  simp [Bool.and_or_distrib_right]
+
+theorem bitvec_or_and_distrib_right (u v w : BitVec n) : (u &&& v) ||| w = (u ||| w) &&& (v ||| w) := by
+  ext i
+  simp [Bool.or_and_distrib_right]
 
 end BitVecUtil
