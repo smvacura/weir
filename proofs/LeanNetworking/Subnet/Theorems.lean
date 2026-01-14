@@ -338,6 +338,11 @@ lemma base_le_upper_bound {a : IP} {m : SubnetMask} :
   apply Finset.le_max'
   exact hin
 
+lemma lower_le_upper {a : IP} {m : SubnetMask} :
+  subnetLowerBound a m ≤ subnetUpperBound a m := by
+
+  exact le_trans base_ge_lower_bound base_le_upper_bound
+
 lemma lower_bound_is_base {a : IP} {m : SubnetMask} :
   subnetLowerBound a m = applySubnetMask a m := by
 
@@ -459,15 +464,54 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
     exact hm
     exact hm
 
-
-
-
-
-
-
-
-
 theorem subnet_mem_iff_bounds (ip a : IP) (m : SubnetMask) :
   ip ∈ subnet a m ↔ subnetLowerBound a m ≤ ip ∧ ip ≤ subnetUpperBound a m := by
 
   rw [subnet_eq_interval, Set.mem_Icc]
+
+
+/-- Subnet overlap--two subnets overlap iff the lower bound of one
+subnet is greater than the upper bound of the other-/
+theorem subnet_overlap {a b : IP} {m₁ m₂ : SubnetMask} :
+  overlappingSubnets a b m₁ m₂  ↔
+  subnetLowerBound a m₁ ≤ subnetUpperBound b m₂ ∧  subnetLowerBound b m₂ ≤ subnetUpperBound a m₁ := by
+
+  apply Iff.intro
+  unfold overlappingSubnets
+  intro h
+  rcases h with ⟨ip, ha, hb⟩
+
+  apply And.intro
+  · have ⟨ha_low, ha_high⟩ := (subnet_mem_iff_bounds ip a m₁).mp ha
+    have hb_high := ip_in_subnet_imp_le_upper hb
+    exact le_trans ha_low hb_high
+  · have ⟨hb_low, hb_high⟩ := (subnet_mem_iff_bounds ip b m₂).mp hb
+    have ha_high := ip_in_subnet_imp_le_upper ha
+    exact le_trans hb_low ha_high
+
+  unfold overlappingSubnets
+  intro h
+
+  let ip' := max (subnetLowerBound a m₁) (subnetLowerBound b m₂)
+  use ip'
+  apply And.intro
+  · have hlowa : subnetLowerBound a m₁ ≤ ip' := by
+      unfold ip'
+      simp_all only [le_sup_left]
+    have hhigha : ip' ≤ subnetUpperBound a m₁ := by
+        unfold ip'
+        simp only [sup_le_iff]
+        exact ⟨lower_le_upper, h.right⟩
+
+    exact (subnet_mem_iff_bounds ip' a m₁).mpr ⟨hlowa, hhigha⟩
+
+  · have hlowb : subnetLowerBound b m₂ ≤ ip' := by
+      unfold ip'
+      simp only [le_sup_right]
+    have hhighb : ip' ≤ subnetUpperBound b m₂ := by
+      unfold ip'
+      simp only [sup_le_iff]
+
+      exact ⟨h.left, lower_le_upper⟩
+
+    exact (subnet_mem_iff_bounds  ip' b m₂).mpr ⟨hlowb, hhighb⟩
