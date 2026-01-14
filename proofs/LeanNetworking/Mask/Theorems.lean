@@ -77,6 +77,18 @@ lemma mask_vec_decide {w : Nat} {m i : Nat} (hi : i < w):
     Bool.and_true, ge_iff_le, Bool.not_eq_eq_eq_not]
   simp only [←decide_not, not_le]
 
+
+/-- The index `i` of the inverse of a mask vector is false iff `i ≥ m`-/
+lemma mask_vec_inverse_decide {w : Nat} {m i : Nat} (hi : i < w) :
+  (~~~(BitVec.allOnes w <<< m))[i] = !decide (i ≥ m) := by
+  simp_all only
+    [BitVec.getElem_not, BitVec.getElem_shiftLeft, BitVec.getElem_allOnes,
+    Bool.and_true, ge_iff_le, Bool.not_eq_eq_eq_not]
+
+  simp only [Bool.not_not]
+  rw [←decide_not]
+  simp only [not_le]
+
 /-- The index `i` of a host vector is true iff `i < w - m`-/
 lemma host_vec_decide {w : Nat} {m i : Nat} (hi : i < w):
   (BitVec.allOnes w >>> m)[i] = decide (i < w - m) := by
@@ -316,3 +328,41 @@ theorem apply_absorb_right_of_le
 
   rw [mask_composition]
   rw [SubnetMask.min_eq_right h]
+
+
+theorem applySubnetMask_le
+  {ip : IP} {m : SubnetMask} :
+  applySubnetMask ip m ≤ ip := by
+
+  simp only [applySubnetMask, maskVec]
+  exact BitVecUtil.and_le_left ip (BitVec.allOnes 32 <<< (32 - ↑m))
+
+
+theorem applyMaskInverse_ge
+  {ip : IP} {m : SubnetMask} :
+  ip ≤ ip ||| ~~~maskVec m := by
+
+  simp only [maskVec]
+  exact BitVecUtil.or_le_right ip (~~~(BitVec.allOnes 32 <<< (32 - ↑m)))
+
+theorem applyMask_high_bits_preserved
+  {ip : IP} {m : SubnetMask} {i : Nat}
+  (hi : i < 32) (hm : i ≥ 32 - m): (applySubnetMask ip m)[i] = ip[i] := by
+
+  simp only [applySubnetMask, maskVec]
+  simp only [BitVec.and_eq,
+    BitVec.getElem_and, Bool.and_eq_left_iff_imp]
+  intro a
+  rw [mask_vec_decide]
+  simp_all only [ge_iff_le, Nat.sub_le_iff_le_add, decide_true]
+
+theorem network_prefix_high_bits_preserved
+  {ip : IP} {m : SubnetMask} {i : Nat}
+  (hi : i < 32) (hm : i ≥ 32 - m): (ip ||| ~~~maskVec m)[i] = ip[i] := by
+
+  simp only [maskVec]
+  simp only [BitVec.getElem_or]
+  rw [mask_vec_inverse_decide]
+  rw [decide_eq_true hm]
+  rw [Bool.not]
+  rw [Bool.or_false]
