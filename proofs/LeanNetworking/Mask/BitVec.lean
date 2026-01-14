@@ -222,4 +222,10 @@ theorem bitvec_or_and_distrib_right (u v w : BitVec n) : (u &&& v) ||| w = (u ||
   ext i
   simp [Bool.or_and_distrib_right]
 
+theorem bitvec_squeeze {w i : Nat} {lb v ub : BitVec w}
+  (hlb : lb ≤ v) (hub : v ≤ ub) (hi : i < w) (heq : lb[i]'hi = ub[i]'hi):
+  lb[i]'hi = v[i]'hi := by
+  sorry
+
+
 end BitVecUtil

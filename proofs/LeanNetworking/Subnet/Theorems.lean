@@ -1,3 +1,4 @@
+import Init.Data.BitVec.Lemmas
 import LeanNetworking.Subnet.Defs
 
 open BitVecUtil
@@ -59,9 +60,20 @@ theorem subnet_align_base {a b : IP} {m : SubnetMask}
 /-- The IP formed by applying `m` to `a` is a member of the subnet defined by `a, m`-/
 theorem subnet_contains_self
   (a : IP) (m : SubnetMask) :
-  applySubnetMask a m ∈ subnet a m := by
-  have h : m ≤ m := by simp [SubnetMask.eq_impl_le]
-  exact apply_absorb_left_of_le h
+  a ∈ subnet a m := by
+  unfold subnet
+  simp only [Set.mem_setOf_eq]
+
+
+theorem base_is_lowest
+  {a ip : IP} {m : SubnetMask} :
+  ip ∈ subnet a m → applySubnetMask a m ≤ ip := by
+
+  simp only [mem_subnet]
+  intro h
+  rw [←h]
+  simp only [applySubnetMask_le]
+
 
 
 /-- Subnet subsets with the same base `a` implies the subset mask is lesser than the superset mask-/
@@ -248,3 +260,214 @@ theorem subnet_eq_iff_mask_network_eq {a b : IP} {m₁ m₂ : SubnetMask} :
   rw [hip.symm] at hb
   nth_rw 2 [hmask]
   exact hb
+
+lemma lower_bound_in_subnet {a : IP} {m : SubnetMask} :
+  subnetLowerBound a m ∈ subnet a m := by
+
+  simp only [subnetLowerBound]
+  apply Set.mem_toFinset.mp
+  apply Finset.min'_mem
+
+
+lemma upper_bound_in_subnet {a : IP} {m : SubnetMask} :
+  subnetUpperBound a m ∈ subnet a m := by
+
+  simp only [subnetUpperBound]
+  apply Set.mem_toFinset.mp
+  apply Finset.max'_mem
+
+
+lemma ip_in_subnet_imp_ge_lower {a ip : IP} {m₁ : SubnetMask} :
+  ip ∈ subnet a m₁ → subnetLowerBound a m₁ ≤ ip := by
+
+  intro h
+  simp only [subnetLowerBound]
+  rw [←Set.mem_toFinset] at h
+  apply Finset.min'_le
+  exact h
+
+
+lemma ip_in_subnet_imp_le_upper {a ip : IP} {m₁ : SubnetMask} :
+  ip ∈ subnet a m₁ → ip ≤ subnetUpperBound a m₁ := by
+
+  intro h
+  simp only [subnetUpperBound]
+  rw [←Set.mem_toFinset] at h
+  apply Finset.le_max'
+  exact h
+
+
+lemma subnet_eq_imp_lower_bound_eq {a b : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ = subnet b m₂ → subnetLowerBound a m₁ = subnetLowerBound b m₂ := by
+
+  intro h
+  apply le_antisymm
+  · apply Finset.min'_le
+    rw [Set.mem_toFinset, h]
+    exact lower_bound_in_subnet
+  · apply Finset.min'_le
+    rw [Set.mem_toFinset, ←h]
+    exact lower_bound_in_subnet
+
+
+lemma subnet_eq_imp_upper_bound_eq {a b : IP} {m₁ m₂ : SubnetMask} :
+  subnet a m₁ = subnet b m₂ → subnetUpperBound a m₁ = subnetUpperBound b m₂ := by
+
+  intro h
+  apply le_antisymm
+  · apply Finset.le_max'
+    rw [Set.mem_toFinset, ←h]
+    exact upper_bound_in_subnet
+  · apply Finset.le_max'
+    rw [Set.mem_toFinset, h]
+    exact upper_bound_in_subnet
+
+lemma base_ge_lower_bound {a : IP} {m : SubnetMask} :
+  subnetLowerBound a m ≤ a := by
+
+  simp only [subnetLowerBound]
+  have hin := ip_in_subnet_imp_in_finset (subnet_contains_self a m)
+  apply Finset.min'_le
+  exact hin
+
+lemma base_le_upper_bound {a : IP} {m : SubnetMask} :
+  a ≤ subnetUpperBound a m := by
+
+  simp only [subnetUpperBound]
+  have hin := ip_in_subnet_imp_in_finset (subnet_contains_self a m)
+  apply Finset.le_max'
+  exact hin
+
+lemma lower_bound_is_base {a : IP} {m : SubnetMask} :
+  subnetLowerBound a m = applySubnetMask a m := by
+
+  simp only [subnetLowerBound]
+  apply le_antisymm
+  · apply Finset.min'_le
+    apply Set.mem_toFinset.mpr
+    simp only [mem_subnet]
+    apply mask_idempotence
+  · apply Finset.le_min'
+    intro y h
+    replace h := Set.mem_toFinset.mp h
+    exact base_is_lowest h
+
+
+lemma TODO_NAME_LATER_2 {a : IP} {m : SubnetMask} :
+  applySubnetMask a m ||| ~~~maskVec m = a ||| ~~~maskVec m := by
+
+  rw [applySubnetMask]
+  rw [BitVec.and_eq]
+  rw [BitVecUtil.bitvec_or_and_distrib_right]
+  rw [BitVec.or_not_self]
+  rw [BitVec.and_allOnes]
+
+
+lemma TODO_NAME_LATER {a ip : IP} {m : SubnetMask}:
+  ip ∈ subnet a m → ip ≤ a ||| ~~~maskVec m := by
+  rw [← TODO_NAME_LATER_2]
+  intro h
+  simp only [mem_subnet] at h
+  rw [← h]
+  have hle := applySubnetMask_le (ip:=ip) (m:=m)
+  rw [applySubnetMask]
+  rw [BitVec.and_eq]
+  rw [BitVec.and_comm]
+  rw [bitvec_or_and_distrib_right]
+  nth_rw 2 [BitVec.or_comm]
+  rw [BitVec.or_not_self]
+  rw [BitVec.and_comm]
+  rw [BitVec.and_allOnes]
+  rw [BitVec.or_comm]
+  simp only [applyMaskInverse_ge]
+
+
+
+lemma upper_bound_is_network_prefix {a : IP} {m : SubnetMask} :
+  subnetUpperBound a m = a ||| ~~~(maskVec m):= by
+
+  simp only [subnetUpperBound]
+  apply le_antisymm
+  · apply Finset.max'_le
+    intro y h
+    replace h := Set.mem_toFinset.mp h
+    exact TODO_NAME_LATER h
+  · apply Finset.le_max'
+    apply Set.mem_toFinset.mpr
+    simp only [mem_subnet]
+    rw [applySubnetMask]
+    rw [BitVec.and_eq]
+    rw [bitvec_and_or_distrib_right]
+    nth_rw 2 [BitVec.and_comm]
+    rw [BitVec.and_not_self]
+    rw [BitVec.or_comm]
+    show (0#32) ||| a &&& maskVec m = applySubnetMask a m
+    rw [BitVec.zero_or]
+    rfl
+
+
+theorem bounds_same_prefix {a : IP} {m : SubnetMask} {i : Nat}
+    (hi : i < 32) (hm : i ≥ 32 - m) :
+    (subnetLowerBound a m)[i] = (subnetUpperBound a m)[i] := by
+    rw [lower_bound_is_base]
+    rw [upper_bound_is_network_prefix]
+    rw [applyMask_high_bits_preserved]
+    rw [network_prefix_high_bits_preserved]
+    exact hm
+    exact hm
+
+
+theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
+  subnet a m = Set.Icc (subnetLowerBound a m) (subnetUpperBound a m) := by
+  unfold Set.Icc
+  unfold subnet
+  apply Set.ext
+  intro x
+  simp only [Set.mem_setOf_eq]
+  show applySubnetMask x m = applySubnetMask a m ↔ subnetLowerBound a m ≤ x ∧ x ≤ subnetUpperBound a m
+
+  apply Iff.intro
+  intro h
+  apply And.intro
+  · have hmask : m = m := by rfl
+    replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
+    rw [subnet_eq_imp_lower_bound_eq h]
+    exact base_ge_lower_bound
+  · have hmask : m = m := by rfl
+    replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
+    rw [subnet_eq_imp_upper_bound_eq h]
+    exact base_le_upper_bound
+
+  intro h
+  rcases h with ⟨hlow, hup⟩
+
+  ext i hi
+
+  by_cases hm : i ≥ 32 - m
+  · have ha := (bitvec_squeeze hlow hup hi)
+    have hsqueeze := bounds_same_prefix hi hm (a:=a)
+    have h' := ha hsqueeze
+    rw [lower_bound_is_base] at h'
+    rw [←applyMask_high_bits_preserved (ip:=x) (m:=m)] at h'
+    exact h'.symm
+    exact hm
+  · replace hm : i < 32 - m := by
+      simp only [ge_iff_le, Nat.sub_le_iff_le_add, not_le] at hm
+      rw [Nat.lt_sub_iff_add_lt]
+      exact hm
+    repeat rw [applyMask_low_bits_zeroed]
+    exact hm
+    exact hm
+
+
+
+
+
+
+
+
+
+theorem subnet_mem_iff_bounds (ip a : IP) (m : SubnetMask) :
+  ip ∈ subnet a m ↔ subnetLowerBound a m ≤ ip ∧ ip ≤ subnetUpperBound a m := by
+
+  rw [subnet_eq_interval, Set.mem_Icc]

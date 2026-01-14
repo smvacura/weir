@@ -356,6 +356,22 @@ theorem applyMask_high_bits_preserved
   rw [mask_vec_decide]
   simp_all only [ge_iff_le, Nat.sub_le_iff_le_add, decide_true]
 
+theorem applyMask_low_bits_zeroed
+  {ip : IP} {m : SubnetMask} {i : Nat}
+  (hi : i < 32) (hm : i < 32 - m): (applySubnetMask ip m)[i] = false := by
+
+  simp only [applySubnetMask, maskVec]
+  simp only [BitVec.and_eq,
+    BitVec.getElem_and]
+  rw [mask_vec_decide]
+  simp_all only [ge_iff_le, Nat.sub_le_iff_le_add]
+  simp_all only [Bool.and_eq_false_imp, decide_eq_false_iff_not, not_le]
+  intro a
+  rw [Nat.lt_sub_iff_add_lt] at hm
+  exact hm
+
+
+
 theorem network_prefix_high_bits_preserved
   {ip : IP} {m : SubnetMask} {i : Nat}
   (hi : i < 32) (hm : i ≥ 32 - m): (ip ||| ~~~maskVec m)[i] = ip[i] := by
