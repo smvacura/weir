@@ -515,3 +515,10 @@ theorem subnet_overlap {a b : IP} {m₁ m₂ : SubnetMask} :
       exact ⟨h.left, lower_le_upper⟩
 
     exact (subnet_mem_iff_bounds  ip' b m₂).mpr ⟨hlowb, hhighb⟩
+
+
+theorem subnet_overlap_comm {a b : IP} {m₁ m₂ : SubnetMask} :
+  overlappingSubnets a b m₁ m₂ = overlappingSubnets b a m₂ m₁ := by
+
+  repeat rw [subnet_overlap]
+  rw [and_comm]

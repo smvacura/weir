@@ -15,10 +15,6 @@ def subnet (a : IP) (m : SubnetMask) : Set IP :=
 instance {a : IP} {m : SubnetMask} : DecidablePred (·  ∈ subnet a m) :=
   fun ip => BitVec.decEq (applySubnetMask ip m) (applySubnetMask a m)
 
-instance : Fintype (BitVec 32) := Fintype.ofEquiv (Fin (2^32)) (BitVec.equivFin (m:=32).symm)
-
-instance : Fintype IP := (inferInstance : Fintype (BitVec 32))
-
 instance {a : IP} {m : SubnetMask} : Fintype (subnet a m) := inferInstance
 
 theorem all_subnets_nonempty {a : IP} {m : SubnetMask} :
@@ -60,3 +56,7 @@ def overlappingSubnets (a b : IP) (m₁ m₂ : SubnetMask) : Prop :=
   ∃ ip : IP,
   ip ∈ subnet a m₁ ∧
   ip ∈ subnet b m₂
+
+
+def covers (range : Set IP) (subnets : List (Set IP)) :=
+  ∀ip ∈ range, ∃ s ∈ subnets, ip ∈ s

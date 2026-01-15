@@ -1,6 +1,15 @@
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.BitVec
+
 import LeanNetworking.Util
 
 abbrev IP := BitVec 32
+
+
+instance : Fintype (BitVec 32) := Fintype.ofEquiv (Fin (2^32)) (BitVec.equivFin (m:=32).symm)
+
+instance : Fintype IP := (inferInstance : Fintype (BitVec 32))
 
 instance {w : Nat} : LinearOrder (BitVec w) :=
   LinearOrder.lift' (·.toNat) (fun _ _ h => BitVec.eq_of_toNat_eq h)
@@ -15,15 +24,6 @@ def intOfIP (ip : IP) : Int :=
 
 
 instance : LinearOrder IP := inferInstance
-
--- instance : LE IP where
---   le a b := intOfIP a ≤ intOfIP b
-
--- instance : LT IP where
---   lt a b := intOfIP a < intOfIP b
-
--- instance : Min IP where
---   min a b := if a < b then a else b
 
 
 namespace IPDecimalBlock
@@ -55,3 +55,5 @@ def ipFromDecimal (w x y z : IPDecimalBlock) : IP :=
   let block_four := BitVec.ofNat 8 z.val
 
   0#0 ++ block_one ++ block_two ++ block_three ++ block_four
+
+def ipRange (min max : IP) := Set.Icc min max
