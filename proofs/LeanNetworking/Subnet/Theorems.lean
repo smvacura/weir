@@ -522,3 +522,53 @@ theorem subnet_overlap_comm {a b : IP} {m₁ m₂ : SubnetMask} :
 
   repeat rw [subnet_overlap]
   rw [and_comm]
+
+
+theorem subnet_cover_eq_interval_cover {subnets : List (IP × SubnetMask)} {range : Set IP} :
+  subnets_cover range subnets ↔ interval_cover range (subnetListToIntervals subnets) := by
+
+  unfold subnets_cover
+  unfold interval_cover
+
+  apply Iff.intro
+
+  intro h ip hin
+  replace h := (h ip) hin
+  obtain ⟨wip, wm, hw⟩ := h
+
+  use subnetLowerBound wip wm, subnetUpperBound wip wm
+
+  apply And.intro
+
+  · unfold subnetListToIntervals
+    unfold subnetToInterval
+
+    simp only [List.mem_map, Prod.mk.injEq, Prod.exists]
+    use wip, wm
+
+    exact ⟨hw.left, (by rfl), (by rfl)⟩
+
+  · exact (subnet_mem_iff_bounds ip wip wm).mp hw.right
+
+  intro h ip hin
+  replace h := (h ip) hin
+
+  obtain ⟨wlo, whi, hw⟩ := h
+  obtain ⟨hwin, hwlo, hwhi⟩ := hw
+
+  unfold subnetListToIntervals at hwin
+  unfold subnetToInterval at hwin
+
+  rw [List.mem_map] at hwin
+  obtain ⟨⟨a, m⟩, hamin, heq⟩ := hwin
+
+  use a, m
+
+  simp only [] at heq
+  simp only [Prod.mk.injEq] at heq
+  obtain ⟨ha, hm⟩ := heq
+
+  rw [←ha] at hwlo
+  rw [←hm] at hwhi
+
+  exact ⟨hamin, (subnet_mem_iff_bounds ip a m).mpr ⟨hwlo, hwhi⟩⟩

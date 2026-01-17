@@ -58,5 +58,15 @@ def overlappingSubnets (a b : IP) (m₁ m₂ : SubnetMask) : Prop :=
   ip ∈ subnet b m₂
 
 
-def covers (range : Set IP) (subnets : List (Set IP)) :=
-  ∀ip ∈ range, ∃ s ∈ subnets, ip ∈ s
+def subnetToInterval (a : IP) (m : SubnetMask) :=
+  ((subnetLowerBound a m), (subnetUpperBound a m))
+
+def subnetListToIntervals (subnets : List (IP × SubnetMask)) :=
+  List.map (fun (a, m) => subnetToInterval a m) subnets
+
+def subnets_cover (range : Set IP) (subnets : List (IP × SubnetMask)) :=
+  ∀ip ∈ range, ∃ a m, (a,m) ∈ subnets ∧ ip ∈ subnet a m
+
+
+def interval_cover (range : Set IP) (intervals : List (IP × IP)) :=
+  ∀ip ∈ range, ∃ lo hi, (lo, hi) ∈ intervals ∧ lo ≤ ip ∧ ip ≤ hi
