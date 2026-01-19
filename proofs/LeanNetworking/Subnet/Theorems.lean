@@ -325,7 +325,7 @@ lemma subnet_eq_imp_upper_bound_eq {a b : IP} {m₁ m₂ : SubnetMask} :
 lemma base_ge_lower_bound {a : IP} {m : SubnetMask} :
   subnetLowerBound a m ≤ a := by
 
-  simp only [subnetLowerBound]
+  rw [subnetLowerBound]
   have hin := ip_in_subnet_imp_in_finset (subnet_contains_self a m)
   apply Finset.min'_le
   exact hin
@@ -333,10 +333,9 @@ lemma base_ge_lower_bound {a : IP} {m : SubnetMask} :
 lemma base_le_upper_bound {a : IP} {m : SubnetMask} :
   a ≤ subnetUpperBound a m := by
 
-  simp only [subnetUpperBound]
+  rw [subnetUpperBound]
   have hin := ip_in_subnet_imp_in_finset (subnet_contains_self a m)
-  apply Finset.le_max'
-  exact hin
+  exact Finset.le_max' (subnet a m).toFinset a hin
 
 lemma lower_le_upper {a : IP} {m : SubnetMask} :
   subnetLowerBound a m ≤ subnetUpperBound a m := by
@@ -428,10 +427,13 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
   unfold subnet
   apply Set.ext
   intro x
-  simp only [Set.mem_setOf_eq]
-  show applySubnetMask x m = applySubnetMask a m ↔ subnetLowerBound a m ≤ x ∧ x ≤ subnetUpperBound a m
+  repeat rw [Set.mem_setOf_eq]
 
   apply Iff.intro
+  /- (→) from the mask-based subnet to the interval-based subnet
+          to do this, we get equality of subnets from `h`, rewrwite
+          the goal to `subnetLowerBound x m ≤ x`/`x ≤ subnetUpperBound x m`
+          and the rest is trivial -/
   intro h
   apply And.intro
   · have hmask : m = m := by rfl
@@ -443,6 +445,16 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
     rw [subnet_eq_imp_upper_bound_eq h]
     exact base_le_upper_bound
 
+  /- (←) from the interval-based subnet to the mask based subnet
+         to do this, we have to:
+         1. prove the bounds have the same prefix
+         2. then from that prove that the prefix bits of `x` and `subnetLowerBound a`
+            are equal using a squeeze lemma
+         3. then, from that and the fact that masking preserves high bits,
+            the masks `m` on `x` and `a` are equal
+
+          For the below-prefix case, it suffices to show masking destroys
+          all bits-/
   intro h
   rcases h with ⟨hlow, hup⟩
 
@@ -451,18 +463,15 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
   by_cases hm : i ≥ 32 - m
   · have ha := (bitvec_squeeze hlow hup hi)
     have hsqueeze := bounds_same_prefix hi hm (a:=a)
-    have h' := ha hsqueeze
-    rw [lower_bound_is_base] at h'
-    rw [←applyMask_high_bits_preserved (ip:=x) (m:=m)] at h'
-    exact h'.symm
-    exact hm
+    have halb_eq_x := ha hsqueeze
+    rw [lower_bound_is_base] at halb_eq_x
+    repeat rw [applyMask_high_bits_preserved (ip:=x) (m:=m) (hm:=hm)]
+    exact halb_eq_x.symm
   · replace hm : i < 32 - m := by
       simp only [ge_iff_le, Nat.sub_le_iff_le_add, not_le] at hm
       rw [Nat.lt_sub_iff_add_lt]
       exact hm
-    repeat rw [applyMask_low_bits_zeroed]
-    exact hm
-    exact hm
+    repeat rw [applyMask_low_bits_zeroed (hm:=hm)]
 
 theorem subnet_mem_iff_bounds (ip a : IP) (m : SubnetMask) :
   ip ∈ subnet a m ↔ subnetLowerBound a m ≤ ip ∧ ip ≤ subnetUpperBound a m := by
