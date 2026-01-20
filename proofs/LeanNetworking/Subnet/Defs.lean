@@ -57,6 +57,13 @@ def overlappingSubnets (a b : IP) (m₁ m₂ : SubnetMask) : Prop :=
   ip ∈ subnet a m₁ ∧
   ip ∈ subnet b m₂
 
+def overlappingSubnets_pair (s t : IP × SubnetMask) : Prop :=
+  ∃ ip : IP,
+  ip ∈ subnet s.fst s.snd ∧
+  ip ∈ subnet t.fst t.snd
+
+def subnets_disjoint (subnets : List (IP × SubnetMask)) :=
+  subnets.Pairwise (¬overlappingSubnets_pair · ·)
 
 def subnetToInterval (a : IP) (m : SubnetMask) :=
   ((subnetLowerBound a m), (subnetUpperBound a m))
