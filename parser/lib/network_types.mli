@@ -19,4 +19,6 @@ module CIDR : sig
   val make : IPv4.t -> IPv4Mask.t -> t
 
   val of_string_opt : string -> t option
+
+  val of_list_opt_strict : string option list -> t list option
 end

@@ -80,4 +80,34 @@ module CIDR = struct
       | Some ip, Some m -> Some {ip=ip; mask=m}
       | _ -> None
     | _ -> None
+  
+  let of_opt_string_opt s_opt = 
+    match s_opt with
+    | Some s -> of_string_opt s
+    | None -> None
+  
+  let of_list_res l = 
+    let rec aux l acc =
+      match l with
+      | h::t -> begin
+        match of_string_opt h with
+        | Some cidr -> aux t (cidr::acc)
+        | None -> Error "Malformed CIDR block"
+      end
+      | [] -> Ok acc
+      in
+      aux l []
+
+  let of_list_opt_strict l = 
+    let rec aux l acc =
+      match l with
+      | h::t -> begin
+        match of_opt_string_opt h with
+        | Some cidr -> aux t (cidr::acc)
+        | None -> None
+      end
+      | [] -> Some acc
+      in
+      aux l []
+
 end
