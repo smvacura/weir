@@ -19,6 +19,8 @@ type t = {
 
 let get_name vnet = vnet.name
 
+let get_rg vnet = vnet.resource_group
+
 let make_vnet name id loc rg = { 
   name = name;
   id = id;

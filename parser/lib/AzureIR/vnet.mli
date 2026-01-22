@@ -12,6 +12,8 @@ type t
 
 val get_name : t -> Id.t
 
+val get_rg : t -> Rg.t
+
 val make_vnet : string -> Id.t -> Parser.Azure_types.azure_location -> Rg.t -> t
 
 module Map : Map.S with type key = Id.t 
