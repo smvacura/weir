@@ -12,6 +12,8 @@ type t
 
 val get_name : t -> Id.t
 
+val get_name_string : t -> string
+
 val get_rg : t -> Rg.t
 
 val make_vnet : string -> Id.t -> Parser.Azure_types.azure_location -> Rg.t -> t
