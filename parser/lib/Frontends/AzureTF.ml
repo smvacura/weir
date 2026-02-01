@@ -17,10 +17,10 @@ module AzureTFParser = struct
     subnets = [];
   }
 
-  module StringMap = Map.Make(String)
-  type subnet_inv_idx = Subnet.Id.t StringMap.t
+  module SubnetIdMap = Map.Make(Subnet.Id)
+  type subnet_inv_idx = Vnet.Id.t SubnetIdMap.t
 
-  let subnet_inv_idx_empty : subnet_inv_idx = StringMap.empty
+  let subnet_inv_idx_empty : subnet_inv_idx = SubnetIdMap.empty
 
   
   let partition_results rs =
@@ -107,6 +107,11 @@ module AzureTFParser = struct
     | `List a -> Some (List.map Safe.Util.to_string_option a)
     | _ -> None
   
+  let parse_address_block_opt addresses = 
+    match string_list_of_json_opt addresses with
+    | Some l -> Parser.Network_types.CIDR.of_list_opt_strict l
+    | None -> None
+    
   let inline_subnets_of_json vnet subnet_json = 
     let get_subnet_cidr_block subnet_name subnet_block =
       match Parser.Network_types.CIDR.of_list_opt_strict subnet_block with
@@ -142,6 +147,11 @@ module AzureTFParser = struct
   
 
   let vnet_of_json world json =
+    let get_vnet_cidr_block vnet_name vnet_block =
+      match Parser.Network_types.CIDR.of_list_opt_strict vnet_block with
+      | Some l -> Ok l
+      | None -> Error  ("Malformed addresses for subnet " ^ vnet_name)
+    in
     let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in 
     let* name = Safe.Util.member "name" values 
@@ -161,6 +171,11 @@ module AzureTFParser = struct
     let* rg = World.get_resource_group world rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet " ^ name)
     in
+    let addresses = Safe.Util.member "addresses" values
+    in
+    let* cidr_list = parse_address_block_opt addresses
+      |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
+    in
     let vnet = Vnet.make_vnet name (Vnet.Id.of_string id) location rg in
     let inline_subnets = begin
     match Safe.Util.member "subnet" values with
@@ -168,11 +183,36 @@ module AzureTFParser = struct
     end in
     Ok (vnet, inline_subnets)
 
-  let parse_subnet json =
+  let subnet_of_json world index json =
     let values = Safe.Util.member "values" json in
-    let name = Safe.Util.member "name" values in
-    let rg_name = Safe.Util.member "resource_group_name" values in
-    Subnet.make_subnet
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values 
+      |> parse_json_string_opt
+      |> generate_parse_result "name" "" "subnet"
+    in
+    let* id = Safe.Util.member "id" values
+      |> parse_json_string_opt
+      |> generate_parse_result "id" name "subnet" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "subnet"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type subnet")
+    in
+    let* rg_name = Safe.Util.member "resource_group" values
+      |> parse_json_string_opt
+      |> generate_parse_result "resource_group" name "subnet"
+    in
+    let* rg = World.get_resource_group world rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
+    in
+    let* vnet = SubnetIdMap.find_opt (Subnet.Id.of_string id) index
+      |> Option.to_result ~none:("Cannot find vnet required by subnet " ^ id)
+    in
+    let addresses = Safe.Util.member "addresses" values
+    in
+    let* cidr_list = parse_address_block_opt addresses
+      |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
+    in
+    Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg cidr_list)
 
   let json_resources file = 
     match Safe.from_file file
@@ -195,7 +235,7 @@ module AzureTFParser = struct
   let add_to_index (vnet: Vnet.t) (subnets: Subnet.t list) (index : subnet_inv_idx) =
     let rec aux vnet_name subnets index = 
       match subnets with
-      | h::t -> aux vnet_name t (StringMap.add vnet_name (Subnet.get_name h) index)
+      | h::t -> aux vnet_name t (SubnetIdMap.add (Subnet.get_name h) (Vnet.Id.of_string vnet_name)  index)
       | [] -> index
     in
     aux (Vnet.get_name_string vnet) subnets index
@@ -224,6 +264,14 @@ module AzureTFParser = struct
       | Error e -> (world, e::err, index)
     in
     List.fold_left parse_vnet (world, err, index) vnets
+
+  let parse_subnets (world, err) index subnets = 
+    let parse_subnet (world, err, index) subnet_json =
+      match subnet_of_json world index subnet_json with
+      | Ok subnet -> (add_subnet world subnet, err, index)
+      | Error e -> (world, e::err, index)
+    in
+    List.fold_left parse_subnet (world, err, index) subnets
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
