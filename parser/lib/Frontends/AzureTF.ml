@@ -135,7 +135,7 @@ module AzureTFParser = struct
           | None -> (Ok []))
       in
       let rg = Vnet.get_rg vnet in
-      Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg subnet_block)
+      Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg vnet subnet_block)
     
     in let rec aux json_list acc =
     match json_list with
@@ -176,7 +176,7 @@ module AzureTFParser = struct
     let* cidr_list = parse_address_block_opt addresses
       |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
     in
-    let vnet = Vnet.make_vnet name (Vnet.Id.of_string id) location rg in
+    let vnet = Vnet.make_vnet name (Vnet.Id.of_string id) location rg cidr_list in
     let inline_subnets = begin
     match Safe.Util.member "subnet" values with
     | `List subnet_json -> inline_subnets_of_json vnet subnet_json
@@ -212,7 +212,7 @@ module AzureTFParser = struct
     let* cidr_list = parse_address_block_opt addresses
       |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
     in
-    Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg cidr_list)
+    Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg vnet cidr_list)
 
   let json_resources file = 
     match Safe.from_file file
