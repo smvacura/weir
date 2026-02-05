@@ -1,7 +1,5 @@
 module AzureTFParser : sig
 
-    type t
-
-    val get_resources : string -> t
+    val get_resources : string -> Azureir.World.t
 
 end

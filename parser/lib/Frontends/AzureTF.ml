@@ -3,7 +3,6 @@ module AzureTFParser = struct
   open Parser.Azure_types
   open Azureir
 
-  type t = string list
 
   type raw_world = {
     rgs : Safe.t list;
@@ -318,7 +317,7 @@ module AzureTFParser = struct
     let raw_world, err = raw_parse_resources json in
     let world, err = parse_resource_groups (World.empty, err) raw_world.rgs in
     let world, err, vnet_inv_index = parse_vnets (world, err) subnet_inv_idx_empty raw_world.vnets in
-    [""]
+    world
 
 
 
