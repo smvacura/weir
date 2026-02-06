@@ -23,3 +23,6 @@ _dune/
 
 #TF plan files
 *.json
+
+#test plan directory
+**/test_plans
