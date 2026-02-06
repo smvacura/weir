@@ -21,8 +21,10 @@ _dune/
 # generated smt files
 *.smt2
 
-#TF plan files
-*.json
+#test plan directory terraform artifacts
+**/.terraform
+**/.terraform.lock.hcl
+**/*.tfplan
 
-#test plan directory
-**/test_plans
+#providers
+**/test_plans/**/providers.tf

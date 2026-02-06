@@ -17,5 +17,5 @@ let single_rg_world =
   { world with resource_groups = rgs' }
 
 let basic_tests = "test suite for simple graphs" >::: [
-  "single_rg" >:: (fun _ -> assert_equal single_rg_world (AzureTFParser.get_resources "test_plans/single_rg.json"))
+  "single_rg" >:: (fun _ -> assert_equal single_rg_world (AzureTFParser.get_resources "test_plans/single_rg/plan.json"))
 ]
