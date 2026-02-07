@@ -3,6 +3,7 @@ module IPv4 : sig
   type t
   val of_octets_opt : int -> int -> int -> int -> t option
   val of_string_opt : string -> t option
+  val of_int32 : int32 -> t
 end
 
 module IPv4Mask : sig
@@ -10,7 +11,9 @@ module IPv4Mask : sig
 
   val of_string_opt : string -> t option
 
-  val mask_of_prefix : t -> int32
+  val mask_of_prefix : int -> t
+
+  val of_int32 : int32 -> t
 end
 
 module CIDR : sig

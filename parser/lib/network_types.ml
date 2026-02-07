@@ -6,14 +6,13 @@ module IPv4 = struct
   let ( -% ) = Int32.sub
   let ( *% ) = Int32.mul
 
-
   type t = int32
 
   let in_bounds w =
     w >= 0 && w < 256
 
   let octet_to_int32 o pos = 
-    o lsl (8 * pos) 
+    o lsl (24 - (8 * pos)) 
     |> of_int
 
   let of_octets_opt w x y z =
@@ -34,12 +33,12 @@ module IPv4 = struct
     | [Some w; Some x; Some y; Some z] -> of_octets_opt w x y z
     | _ -> None
     
+  let of_int32 (i : int32) : t = i
 end
 
 module IPv4Mask = struct
-  open Int32
 
-  type t = int
+  type t = int32
 
   let mask_of_prefix n =
   if n < 0 || n > 32 then invalid_arg "mask_of_prefix: 0 <= n <= 32";
@@ -50,15 +49,20 @@ module IPv4Mask = struct
     logand (shift_left 0xffffffffl shift) 0xffffffffl
 
   
-  let make_opt m =
-    if m >= 0 && m <= 32
-    then Some m
-    else None
+ let make_opt prefix =
+  if prefix >= 0 && prefix <= 32
+  then 
+    let mask = Int32.shift_left 0xFFFFFFFFl (32 - prefix) in
+    Some mask
+  else None
 
   let of_string_opt s =
     match int_of_string_opt s with
     | Some m -> make_opt m
     | None -> None
+
+  let of_int32 (i : int32) : t =
+    i
   
 end
 
@@ -75,10 +79,11 @@ module CIDR = struct
 
   let of_string_opt s = 
     match String.split_on_char '/' s with
-    | [s_ip; s_m] -> 
+    | [s_ip; s_m] -> begin
       match IPv4.of_string_opt s_ip, IPv4Mask.of_string_opt s_m with
       | Some ip, Some m -> Some {ip=ip; mask=m}
       | _ -> None
+    end
     | _ -> None
   
   let of_opt_string_opt s_opt = 
