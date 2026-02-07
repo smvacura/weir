@@ -42,6 +42,7 @@ let file_tests = "test suite for writing to file" >::: [
   "term" >:: (fun _ -> test_file_write "(declare-const x (_ BitVec 8))\n" [DeclareConst ("x", BitVec 8);]);
 ]
 
-let () = 
-  run_test_tt_main basic_tests;
-  run_test_tt_main file_tests;
+let suite = "smt_gen_suite" >::: [
+    basic_tests;
+    file_tests
+]

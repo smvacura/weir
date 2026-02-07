@@ -1,7 +1,8 @@
 (test
- (name test_parser)
+ (name test)
  (libraries 
   parser
   frontends
   azureir
-  ounit2))
+  ounit2)
+  (deps (source_tree test_plans)))
