@@ -10,3 +10,5 @@ val empty : t
 val equal : t -> t-> bool
 
 val get_resource_group : t -> string -> Rg.t option
+
+val show : t -> string

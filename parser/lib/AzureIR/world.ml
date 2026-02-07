@@ -18,3 +18,8 @@ let empty = {
 
 let get_resource_group world name = 
   Rg.Map.find_opt (Rg.Id.of_string name) world.resource_groups
+
+let show world = 
+  "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
+  "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^
+  "Subntes: " ^ Subnet.show_subnet_map world.subnets ^ "\n"

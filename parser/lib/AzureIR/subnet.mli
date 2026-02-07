@@ -15,4 +15,8 @@ val get_name : t -> Id.t
 
 val make_subnet : string -> Id.t -> Rg.t -> Vnet.t -> CIDR.t list -> t
 
+val show : t -> string
+
 module Map : Map.S with type key = Id.t 
+
+val show_subnet_map : t Map.t -> string

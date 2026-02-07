@@ -13,8 +13,12 @@ type t
 
 val get_name : t -> Id.t
 
+val get_name_string : t -> string
+
 val make_rg : string -> Id.t -> azure_location -> string option -> tag list -> t
 
-val pretty_print : t -> string
+val show : t -> string
 
 module Map : Map.S with type key = Id.t 
+
+val show_rg_map : t Map.t -> string

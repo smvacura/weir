@@ -20,6 +20,8 @@ type t = {
 
 let get_name rg = rg.name
 
+let get_name_string rg = rg.name
+
 let make_rg name id location managed_by tags = {
   name = name;
   id = id;
@@ -28,7 +30,7 @@ let make_rg name id location managed_by tags = {
   tags = tags
 }
 
-let pretty_print { name; id; location; managed_by; tags } =
+let show { name; id; location; managed_by; tags } =
   let managed_str = Option.fold ~none:"None" ~some:(fun s -> s) managed_by in
   let tags_str = String.concat ", " (List.map Parser.Azure_types.string_of_tag tags) in
   Printf.sprintf 
@@ -36,3 +38,12 @@ let pretty_print { name; id; location; managed_by; tags } =
     name (Id.to_string id) (Parser.Azure_types.string_of_loc location) managed_str tags_str
 
 module Map = Map.Make(Id)
+
+let show_rg_map m =
+  "{" ^ 
+  (m
+  |> Map.bindings
+  |> List.map (fun (k,v) -> k ^ ":" ^ show v)
+  |> String.concat ",")
+  ^
+  "}"
