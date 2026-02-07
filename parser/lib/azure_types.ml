@@ -198,3 +198,6 @@ type tag = {
 }
 
 let make_tag k v = {key = k; value = v}
+
+
+let string_of_tag tag = "{key: " ^ tag.key ^ ", value: " ^ tag.value ^ "}"

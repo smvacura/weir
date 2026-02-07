@@ -58,8 +58,12 @@ type azure_location =
 
 val loc_of_string_opt : string -> azure_location option
 
+val string_of_loc : azure_location -> string
+
 type azure_address_prefix
 
 type tag
 
 val make_tag : string -> string -> tag
+
+val string_of_tag : tag -> string

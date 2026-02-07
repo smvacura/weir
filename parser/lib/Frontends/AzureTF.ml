@@ -35,16 +35,28 @@ module AzureTFParser = struct
     | _ -> None
       
   
-  let generate_parse_result field_name resource_name resource_type res =
-    match res with
-    | Some s -> Ok s
-    | None -> Error 
+  let generate_parse_string_result field_name resource_name resource_type (json : Safe.t) =
+    match json with
+    | `String s -> Ok (Some s)
+    | `Null -> Ok None
+    | _ -> Error 
       ("Error: Could not parse field " 
       ^ field_name
       ^ " of resource "
       ^ resource_name
       ^ " of type "
       ^ resource_type)
+  
+  let generate_parse_string_result_required field_name resource_name resource_type (json : Safe.t) =
+  match json with
+  | `String s -> Ok s
+  | _ -> Error 
+    ("Error: Could not parse field " 
+    ^ field_name
+    ^ " of resource "
+    ^ resource_name
+    ^ " of type "
+    ^ resource_type)
 
   let generate_loc_parse_result resource_name resource_type res = 
     match res with
@@ -79,22 +91,21 @@ module AzureTFParser = struct
   let rg_of_json json = 
     let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in
+    let* address = Safe.Util.member "address" json 
+      |> generate_parse_string_result_required "name" "" "resource_group" in
     let* name = Safe.Util.member "name" values 
-      |> parse_json_string_opt 
-      |> generate_parse_result "name" "" "resource_group" in
-    let* id = Safe.Util.member "id" values
-      |> parse_json_string_opt
-      |> generate_parse_result "id" name "resource_group" in
+      |> generate_parse_string_result_required "name" "" "resource_group" in
     let* managed_by = Safe.Util.member "managed_by" values 
-      |> parse_json_string_opt 
-      |> generate_parse_result "managed_by" name "resource_group" in
-    let tags = parse_tags_lenient json |> fst in 
+      |> generate_parse_string_result "managed_by" name "resource_group" in
+    let tags = Safe.Util.member "tags" json 
+      |> parse_tags_lenient 
+      |> fst in 
     let* location = match Safe.Util.member "location" values with
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "resource_group"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type resource group")
     in
 
-    Ok (Rg.make_rg name (Rg.Id.of_string id) location managed_by tags)
+    Ok (Rg.make_rg name (Rg.Id.of_string address) location managed_by tags)
 
   let list_of_json_opt (json_list : Safe.t) =
     match json_list with 
@@ -121,11 +132,9 @@ module AzureTFParser = struct
     let single_inline_of_json json = 
       let (let*) = Result.bind in 
       let* name = Safe.Util.member "name" json 
-        |> parse_json_string_opt 
-        |> generate_parse_result "name" "" "subnet" in
+        |> generate_parse_string_result_required "name" "" "subnet" in
       let* id = Safe.Util.member "id" json
-        |> parse_json_string_opt
-        |> generate_parse_result "id" name "subnet" in
+        |> generate_parse_string_result_required "id" name "subnet" in
       let* subnet_block = Safe.Util.member "subnet" json
         |> string_list_of_json_opt
         |> (fun l_opt -> 
@@ -154,18 +163,15 @@ module AzureTFParser = struct
     let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in 
     let* name = Safe.Util.member "name" values 
-      |> parse_json_string_opt 
-      |> generate_parse_result "name" "" "vnet" in
+      |> generate_parse_string_result_required "name" "" "vnet" in
     let* id = Safe.Util.member "id" values
-      |> parse_json_string_opt
-      |> generate_parse_result "id" name "vnet" in
+      |> generate_parse_string_result_required "id" name "vnet" in
     let* location = match Safe.Util.member "location" values with
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "vnet"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type vnet")
     in
     let* rg_name = Safe.Util.member "resource_group" values
-      |> parse_json_string_opt
-      |> generate_parse_result "resource_group" name "vnet"
+      |> generate_parse_string_result_required "resource_group" name "vnet"
     in
     let* rg = World.get_resource_group world rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet " ^ name)
@@ -186,19 +192,16 @@ module AzureTFParser = struct
     let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in
     let* name = Safe.Util.member "name" values 
-      |> parse_json_string_opt
-      |> generate_parse_result "name" "" "subnet"
+      |> generate_parse_string_result_required "name" "" "subnet"
     in
     let* id = Safe.Util.member "id" values
-      |> parse_json_string_opt
-      |> generate_parse_result "id" name "subnet" in
+      |> generate_parse_string_result_required "id" name "subnet" in
     let* location = match Safe.Util.member "location" values with
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "subnet"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type subnet")
     in
     let* rg_name = Safe.Util.member "resource_group" values
-      |> parse_json_string_opt
-      |> generate_parse_result "resource_group" name "subnet"
+      |> generate_parse_string_result_required "resource_group" name "subnet"
     in
     let* rg = World.get_resource_group world rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
@@ -213,8 +216,19 @@ module AzureTFParser = struct
     in
     Ok (Subnet.make_subnet name (Subnet.Id.of_string id) rg vnet cidr_list)
 
+
+  let from_file_robust path =
+    let content = In_channel.with_open_bin path In_channel.input_all in
+    let content = 
+      if String.length content >= 3 && 
+        content.[0] = '\xEF' && content.[1] = '\xBB' && content.[2] = '\xBF'
+      then String.sub content 3 (String.length content - 3)
+      else content
+    in
+    Yojson.Safe.from_string content
+  
   let json_resources file = 
-    match Safe.from_file file
+    match from_file_robust file
     |> Safe.Util.member "planned_values"
     |> Safe.Util.member "root_module"
     |> Safe.Util.member "resources"
