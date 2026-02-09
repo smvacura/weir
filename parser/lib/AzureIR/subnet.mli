@@ -5,15 +5,21 @@ module Id : sig
 
     val compare : t -> t -> int
 
-    val of_string : string -> t
+    val of_strings : string -> string -> string -> t
+    
+    val to_strings : t -> string * string * string
+
+    val to_string : t -> string
 end
 
 
 type t
 
-val get_name : t -> Id.t
+val get_name : t -> string
 
-val make_subnet : string -> Id.t -> Rg.t -> Vnet.t -> CIDR.t list -> t
+val get_id : t -> Id.t
+
+val make_subnet : string -> string -> string -> Rg.t -> Vnet.t -> CIDR.t list -> t
 
 val show : t -> string
 

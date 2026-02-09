@@ -33,7 +33,15 @@ module IPv4 = struct
     | [Some w; Some x; Some y; Some z] -> of_octets_opt w x y z
     | _ -> None
     
-  let of_int32 (i : int32) : t = i
+  let show ip =
+    let open Int32 in
+    let a = to_int (shift_right_logical ip 24) land 0xFF in
+    let b = to_int (shift_right_logical ip 16) land 0xFF in
+    let c = to_int (shift_right_logical ip 8) land 0xFF in
+    let d = to_int ip land 0xFF in
+    Printf.sprintf "%d.%d.%d.%d" a b c d
+
+    let of_int32 (i : int32) : t = i
 end
 
 module IPv4Mask = struct
@@ -64,6 +72,13 @@ module IPv4Mask = struct
   let of_int32 (i : int32) : t =
     i
   
+  let show mask =
+  (* count leading 1s *)
+    let rec count_bits m acc =
+      if m = 0l then acc
+      else count_bits (Int32.shift_left m 1) (acc + 1)
+    in
+    string_of_int (count_bits mask 0)
 end
 
 module CIDR = struct
@@ -115,4 +130,6 @@ module CIDR = struct
       in
       aux l []
 
+  let show cidr =
+    Printf.sprintf "%s/%s" (IPv4.show cidr.ip) (IPv4Mask.show cidr.mask)
 end

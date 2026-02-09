@@ -4,18 +4,20 @@ module Id : sig
 
     val compare : t -> t -> int
 
-    val of_string : string -> t
+    val of_strings : string -> string -> string -> t
+
+    val to_strings : t -> (string * string * string)
 
 end
 
 
 type t
 
-val get_name : t -> Id.t
+val get_name : t -> string
 
-val get_name_string : t -> string
+val get_id : t -> Id.t
 
-val make_rg : string -> Id.t -> azure_location -> string option -> tag list -> t
+val make_rg : string -> string -> string -> azure_location -> string option -> tag list -> t
 
 val show : t -> string
 

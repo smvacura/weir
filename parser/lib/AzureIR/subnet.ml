@@ -2,20 +2,23 @@ open Parser.Network_types
 
 module Id = struct
 
-  type t = string
+  type t = string * string * string
 
-  let compare = String.compare
+  let compare = compare
 
-  let of_string s = s
+  let of_strings sub rg name : t = (sub, rg, name)
 
-  let to_string id = id
+  let to_strings ((sub, rg, name) : t) = sub, rg, name
+
+  let to_string ((sub, rg, name) : t) = sub ^ rg ^ name 
 
 end
 
 
 type t = {  
     name : string;
-    id : Id.t;
+    subscription : string;
+    address : string;
     resource_group : Rg.t;
     vnet : Vnet.t;
     addresses : CIDR.t list
@@ -23,9 +26,13 @@ type t = {
 
 let get_name subnet = subnet.name
 
-let make_subnet name id rg vnet addresses = {
+let get_id subnet : Id.t  = 
+  (subnet.subscription, (Rg.get_name (subnet.resource_group)), subnet.name)
+
+let make_subnet name subscription address rg vnet addresses = {
   name = name;
-  id = id;
+  subscription = subscription;
+  address = address;
   resource_group = rg;
   vnet = vnet;
   addresses = addresses
@@ -40,10 +47,10 @@ let show_address_block addresses =
   "[" ^ String.concat "," (aux addresses []) ^ "]"
 
 
-let show { name; id; resource_group; vnet; addresses } = 
+let show { name; address; resource_group; vnet; addresses } = 
   Printf.sprintf 
     "{ name = %s; id = %s; location = %s; resource_group = %s; address_space = [%s] }"
-    name (Id.to_string id) (Rg.get_name_string resource_group) (Vnet.get_name_string vnet) (show_address_block addresses)
+    name address (Rg.get_name resource_group) (Vnet.get_name_string vnet) (show_address_block addresses)
 
 module Map = Map.Make(Id) 
 
@@ -51,7 +58,7 @@ let show_subnet_map m =
   "{" ^ 
   (m
   |> Map.bindings
-  |> List.map (fun (k,v) -> k ^ ":" ^ show v)
+  |> List.map (fun ((sub, rg, name),v) -> sub ^ rg ^ name ^ ":" ^ show v)
   |> String.concat ",")
   ^
   "}"

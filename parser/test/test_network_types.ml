@@ -58,8 +58,14 @@ let cidr_tests = "cidr_tests" >::: [
     assert_equal None (CIDR.of_string_opt "256.1.1.1/24"));
 ]
 
+let cidr_list_tests = "cidr_list_tests" >::: [
+  "zero" >:: (fun _ ->
+    assert_equal (Some [make_cidr 0l 0l]) (CIDR.of_list_opt_strict [Some "0.0.0.0/0"]))
+]
+
 let suite = "network_types_suite" >::: [
   ip_tests;
   mask_tests;
   cidr_tests;
+  cidr_list_tests;
 ]

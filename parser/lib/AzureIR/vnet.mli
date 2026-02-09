@@ -4,13 +4,13 @@ module Id : sig
 
     val compare : t -> t -> int
 
-    val of_string : string -> t
+    val of_strings : string -> string -> string -> t
 end
 
 
 type t
 
-val get_name : t -> Id.t
+val get_name : t -> string
 
 val get_name_string : t -> string
 
@@ -18,7 +18,9 @@ val get_name_string : t -> string
 
 val get_rg : t -> Rg.t
 
-val make_vnet : string -> Id.t -> Parser.Azure_types.azure_location -> Rg.t -> Parser.Network_types.CIDR.t list -> t
+val get_id : t -> Id.t
+
+val make_vnet : string -> string -> string -> Parser.Azure_types.azure_location -> Rg.t -> Parser.Network_types.CIDR.t list -> t
 
 val show : t -> string
 

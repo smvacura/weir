@@ -24,4 +24,6 @@ module CIDR : sig
   val of_string_opt : string -> t option
 
   val of_list_opt_strict : string option list -> t list option
+
+  val show : t -> string
 end
