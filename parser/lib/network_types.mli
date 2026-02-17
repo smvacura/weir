@@ -27,3 +27,7 @@ module CIDR : sig
 
   val show : t -> string
 end
+
+type protocol
+
+type port

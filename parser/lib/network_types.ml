@@ -133,3 +133,14 @@ module CIDR = struct
   let show cidr =
     Printf.sprintf "%s/%s" (IPv4.show cidr.ip) (IPv4Mask.show cidr.mask)
 end
+
+type protocol =
+ | Tcp 
+ | Udp 
+ | Icmp 
+ | Any
+
+type port = 
+ | Single of int 
+ | Range of int * int 
+ | Any
