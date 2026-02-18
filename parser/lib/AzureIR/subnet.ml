@@ -35,7 +35,7 @@ let make_subnet name subscription address rg vnet addresses = {
   address = address;
   resource_group = rg;
   vnet = vnet;
-  addresses = addresses
+  addresses = addresses;
 }
 
 let show_address_block addresses =

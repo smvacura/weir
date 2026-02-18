@@ -1,3 +1,6 @@
+open Parser.Azure_types
+open Parser.Network_types
+
 module Id : sig
     type t
 
@@ -14,6 +17,8 @@ module SecurityRule : sig
 end
 
 type t
+
+val make : string -> string -> string -> azure_location -> Rg.t -> SecurityRule.t list -> tag list -> t
 
 val get_id : t -> Id.t
 

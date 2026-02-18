@@ -233,6 +233,8 @@ module AzureTFParser = struct
     in
     Ok (Subnet.make_subnet name "DEFAULT" address rg vnet cidr_list)
 
+  let nsg_of_json world json = 
+    Ok (Nsg.make "" "" "" EastUs2 (Rg.make_rg "" "" "" EastUs2 None []) [] [])
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in
@@ -278,6 +280,10 @@ module AzureTFParser = struct
   let add_subnet (world : World.t) (subnet : Subnet.t) =
     let subnets' = Subnet.Map.add (Subnet.get_id subnet) subnet world.subnets in
     { world with subnets = subnets'}
+
+  let add_nsg (world : World.t) (nsg : Nsg.t) =
+    let nsgs' = Nsg.Map.add (Nsg.get_id nsg) nsg world.nsgs in
+    { world with nsgs = nsgs'}
   
   let parse_resource_groups (world, err) rgs =
     let parse_rg (world, err) rg_json =
@@ -307,6 +313,14 @@ module AzureTFParser = struct
       | Error e -> (world, e::err, index)
     in
     List.fold_left parse_subnet (world, err, index) subnets
+
+  let parse_nsgs (world, err) nsgs = 
+    let parse_nsg (world, err) nsg_json = 
+      match nsg_of_json world nsg_json with
+      | Ok nsg -> (add_nsg world nsg, err)
+      | Error e -> (world, e::err)
+    in
+    List.fold_left parse_nsg (world, err) nsgs
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
