@@ -15,5 +15,10 @@ end
 
 type t
 
+val get_id : t -> Id.t
+
+val show : t -> string
 
 module Map : Map.S with type key = Id.t 
+
+val show_nsg_map : t Map.t -> string
