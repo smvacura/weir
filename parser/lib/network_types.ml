@@ -132,6 +132,14 @@ module CIDR = struct
 
   let show cidr =
     Printf.sprintf "%s/%s" (IPv4.show cidr.ip) (IPv4Mask.show cidr.mask)
+  let show_list cidrs = 
+    let rec aux cidrs acc =
+    match cidrs with
+    | [] -> (acc ^ "]")
+    | h::t -> aux t (acc ^ (show h) ^ ",")
+    in
+    aux cidrs "["
+
 end
 
 type protocol =
@@ -144,3 +152,8 @@ type port =
  | Single of int 
  | Range of int * int 
  | Any
+
+let show port = 
+  match port with
+  | Single p -> string_of_int p
+  | Range (lo, hi) -> "[" ^ (string_of_int lo) ^ ".." ^ (string_of_int hi) ^ "]"

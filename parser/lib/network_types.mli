@@ -26,8 +26,12 @@ module CIDR : sig
   val of_list_opt_strict : string option list -> t list option
 
   val show : t -> string
+
+  val show_list : t list -> string
 end
 
 type protocol
 
 type port
+
+val show : port -> string
