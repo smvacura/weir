@@ -48,8 +48,8 @@ let make name subscription address location resource_group rule_list tags = {
   tags = tags
 }
 
-let get_id subnet : Id.t  = 
-  (subnet.subscription, (Rg.get_name (subnet.resource_group)), subnet.name)
+let get_id nsg : Id.t  = 
+  (nsg.subscription, (Rg.get_name (nsg.resource_group)), nsg.name)
 
 
 let show { name; subscription; address; location; resource_group; rule_list; tags; } = 
