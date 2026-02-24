@@ -35,3 +35,5 @@ type protocol
 type port
 
 val show : port -> string
+
+val show_list : port list -> string

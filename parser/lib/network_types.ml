@@ -157,3 +157,11 @@ let show port =
   match port with
   | Single p -> string_of_int p
   | Range (lo, hi) -> "[" ^ (string_of_int lo) ^ ".." ^ (string_of_int hi) ^ "]"
+
+let show_list ports = 
+  let rec aux ports acc = 
+    match ports with
+    | [] -> acc
+    | h::t -> aux t (acc ^ (show h ^ ","))
+  in
+  (aux ports "[") ^ "]"
