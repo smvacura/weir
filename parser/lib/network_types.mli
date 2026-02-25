@@ -32,8 +32,10 @@ end
 
 type protocol
 
+val string_of_protocol : protocol -> string
+
 type port
 
-val show : port -> string
+val string_of_port : port -> string
 
-val show_list : port list -> string
+val string_list_of_port : port list -> string

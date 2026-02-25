@@ -148,20 +148,27 @@ type protocol =
  | Icmp 
  | Any
 
+let string_of_protocol protocol = 
+  match protocol with
+  | Tcp -> "TCP"
+  | Udp -> "UDP"
+  | Icmp -> "ICMP"
+  | Any -> "*"
+
 type port = 
  | Single of int 
  | Range of int * int 
  | Any
 
-let show port = 
+let string_of_port port = 
   match port with
   | Single p -> string_of_int p
   | Range (lo, hi) -> "[" ^ (string_of_int lo) ^ ".." ^ (string_of_int hi) ^ "]"
 
-let show_list ports = 
+let string_of_port_list ports = 
   let rec aux ports acc = 
     match ports with
     | [] -> acc
-    | h::t -> aux t (acc ^ (show h ^ ","))
+    | h::t -> aux t (acc ^ (string_of_port h ^ ","))
   in
   (aux ports "[") ^ "]"
