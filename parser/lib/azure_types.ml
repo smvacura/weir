@@ -55,6 +55,7 @@ type azure_location =
   | WestUs
   | WestUs2
   | WestUs3
+  [@@deriving show]
 
 let loc_of_string_opt = function
   | "australiacentral"      -> Some AustraliaCentral
@@ -191,6 +192,7 @@ type azure_address_prefix =
   | Internet
   | VirtualNetwork
   | PrefixList 
+  [@@deriving show]
 
 type tag = {
   key : string;
@@ -200,4 +202,8 @@ type tag = {
 let make_tag k v = {key = k; value = v}
 
 
-let string_of_tag tag = "{key: " ^ tag.key ^ ", value: " ^ tag.value ^ "}"
+let show_tag tag = 
+  "{key: " ^ tag.key ^ ", value: " ^ tag.value ^ "}"
+
+let pp_tag fmt tag = 
+  Format.fprintf fmt "%s" (show_tag tag) 

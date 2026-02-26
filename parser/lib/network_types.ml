@@ -79,6 +79,9 @@ module IPv4Mask = struct
       else count_bits (Int32.shift_left m 1) (acc + 1)
     in
     string_of_int (count_bits mask 0)
+
+  let pp fmt mask = 
+    Format.fprintf fmt "%s" (show mask)
 end
 
 module CIDR = struct
@@ -140,6 +143,8 @@ module CIDR = struct
     in
     aux cidrs "["
 
+  let pp fmt cidr =
+    Format.fprintf fmt "%s" (show cidr)
 end
 
 type protocol =
@@ -148,27 +153,34 @@ type protocol =
  | Icmp 
  | Any
 
-let string_of_protocol protocol = 
+let show_protocol protocol = 
   match protocol with
   | Tcp -> "TCP"
   | Udp -> "UDP"
   | Icmp -> "ICMP"
   | Any -> "*"
 
+let pp_protocol fmt protocol = 
+  Format.fprintf fmt "%s" (show_protocol protocol)
+
+
 type port = 
  | Single of int 
  | Range of int * int 
  | Any
 
-let string_of_port port = 
+let show_port port = 
   match port with
   | Single p -> string_of_int p
   | Range (lo, hi) -> "[" ^ (string_of_int lo) ^ ".." ^ (string_of_int hi) ^ "]"
+
+let pp_port fmt port = 
+  Format.fprintf fmt "%s" (show_port port)
 
 let string_of_port_list ports = 
   let rec aux ports acc = 
     match ports with
     | [] -> acc
-    | h::t -> aux t (acc ^ (string_of_port h ^ ","))
+    | h::t -> aux t (acc ^ (show_port h ^ ","))
   in
   (aux ports "[") ^ "]"

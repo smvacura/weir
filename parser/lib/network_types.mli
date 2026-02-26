@@ -27,15 +27,17 @@ module CIDR : sig
 
   val show : t -> string
 
-  val show_list : t list -> string
+  val pp : Format.formatter -> t -> unit
 end
 
 type protocol
 
-val string_of_protocol : protocol -> string
+val show_protocol : protocol -> string
+
+val pp_protocol : Format.formatter -> protocol -> unit
 
 type port
 
-val string_of_port : port -> string
+val show_port : port -> string
 
-val string_list_of_port : port list -> string
+val pp_port : Format.formatter -> port -> unit
