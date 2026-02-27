@@ -8,12 +8,14 @@ module AzureTFParser = struct
     rgs : Safe.t list;
     vnets : Safe.t list;
     subnets : Safe.t list;
+    nsgs : Safe.t list;
   }
 
   let raw_world_empty = {
     rgs = [];
     vnets = [];
     subnets = [];
+    nsgs = [];
   }
 
 
@@ -355,6 +357,12 @@ module AzureTFParser = struct
       | Some s -> let subnets' = json_resource::world.subnets in
         ({world with subnets = subnets'}, err)
       | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
+    end
+    | Some "azurerm_network_security_group" -> begin
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some s -> let nsgs' = json_resource::world.nsgs in
+      ({world with nsgs = nsgs'}, err)
     end
     | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
