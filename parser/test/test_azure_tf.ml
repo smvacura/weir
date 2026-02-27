@@ -47,6 +47,42 @@ let simple_network_world =
   let subnets' = Subnet.Map.add (Subnet.get_id subnet) subnet Subnet.Map.empty in
   ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = Nsg.Map.empty} : World.t)
 
+let simple_nsg_world = 
+  let rg = Rg.make_rg
+  "nsg-simple-rg"
+  "DEFAULT"
+  "azurerm_resource_group.main"
+  EastUs
+  None
+  []
+  in
+  let rule = Nsg.SecurityRule.make
+  ~name:"allow-ssh"
+  ~description:None
+  ~source_ports:[Any]
+  ~destination_ports:[Single 22]
+  ~protocol:Tcp
+  ~source:Any
+  ~destination:Any
+  ~access:Allow
+  ~priority:100
+  ~direction:Incoming
+  in
+  let nsg = Nsg.make
+  ~name:"main"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_network_security_group.main"
+  ~location:EastUs
+  ~resource_group:rg
+  ~rule_list:[rule]
+  ~tags:[]
+  in
+  let resource_groups = Rg.Map.add (Rg.get_id rg) rg Rg.Map.empty in
+  let vnets = Vnet.Map.empty in
+  let subnets = Subnet.Map.empty in
+  let nsgs = Nsg.Map.add (Nsg.get_id nsg) nsg Nsg.Map.empty in
+  ({resource_groups; vnets; subnets; nsgs} : World.t)
+
 
 
 let sample_rg = 
@@ -83,7 +119,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal 
     ~printer:World.show
     simple_network_world 
-    (AzureTFParser.get_resources "test_plans/simple_network/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_network/plan.json"));
+  "simple_nsg" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    simple_nsg_world
+    (AzureTFParser.get_resources "test_plans/simple_nsg/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [

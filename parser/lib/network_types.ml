@@ -173,6 +173,7 @@ let show_port port =
   match port with
   | Single p -> string_of_int p
   | Range (lo, hi) -> "[" ^ (string_of_int lo) ^ ".." ^ (string_of_int hi) ^ "]"
+  | Any -> "*"
 
 let pp_port fmt port = 
   Format.fprintf fmt "%s" (show_port port)

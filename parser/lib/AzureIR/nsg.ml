@@ -18,6 +18,7 @@ module SecurityRule = struct
   type endpoint = 
   | Addresses of CIDR.t list
   | ApplicationGroups of string list
+  | Any
   [@@deriving show]
 
   type access = 
@@ -42,6 +43,20 @@ module SecurityRule = struct
     priority : int;
     direction : direction;
   } [@@deriving show]
+
+  let make ~name ~description ~protocol ~source_ports ~destination_ports ~source ~destination ~access ~priority ~direction =
+    {
+      name;
+      description;
+      protocol;
+      source_ports;
+      destination_ports;
+      source;
+      destination;
+      access;
+      priority;
+      direction;
+    } 
 end
 
 type t = {
@@ -54,14 +69,14 @@ type t = {
     tags : tag list;
   }
 
-let make name subscription address location resource_group rule_list tags = {
-  name = name;
-  subscription = subscription;
-  address = address;
-  location = location;
-  resource_group = resource_group;
-  rule_list = rule_list;
-  tags = tags
+let make ~name ~subscription ~address ~location ~resource_group ~rule_list ~tags = {
+  name;
+  subscription;
+  address;
+  location;
+  resource_group;
+  rule_list;
+  tags
 }
 
 let get_id nsg : Id.t  = 

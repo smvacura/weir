@@ -13,12 +13,32 @@ module Id : sig
 end
 
 module SecurityRule : sig
+  
   type t
+
+  type endpoint = 
+  | Addresses of CIDR.t list
+  | ApplicationGroups of string list
+  | Any
+  [@@deriving show]
+
+  type access = 
+  | Allow
+  | Deny
+  [@@deriving show]
+
+  type direction = 
+  | Incoming
+  | Outgoing
+  [@@deriving show]
+
+  val make : name:string -> description:string option -> protocol:protocol -> source_ports:port list -> destination_ports:port list -> source:endpoint -> destination:endpoint -> access:access -> priority:int -> direction:direction -> t
+
 end
 
 type t
 
-val make : string -> string -> string -> azure_location -> Rg.t -> SecurityRule.t list -> tag list -> t
+val make : name:string -> subscription:string -> address:string -> location:azure_location -> resource_group:Rg.t -> rule_list:SecurityRule.t list -> tags:tag list -> t
 
 val get_id : t -> Id.t
 

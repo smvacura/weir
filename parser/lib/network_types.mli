@@ -30,13 +30,20 @@ module CIDR : sig
   val pp : Format.formatter -> t -> unit
 end
 
-type protocol
+type protocol =
+ | Tcp 
+ | Udp 
+ | Icmp 
+ | Any
 
 val show_protocol : protocol -> string
 
 val pp_protocol : Format.formatter -> protocol -> unit
 
-type port
+type port = 
+ | Single of int 
+ | Range of int * int 
+ | Any
 
 val show_port : port -> string
 
