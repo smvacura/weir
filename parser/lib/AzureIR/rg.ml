@@ -37,7 +37,7 @@ let make_rg name subscription address location managed_by tags = {
 
 let show { name; subscription; address; location; managed_by; tags } =
   let managed_str = Option.fold ~none:"None" ~some:(fun s -> s) managed_by in
-  let tags_str = String.concat ", " (List.map Parser.Azure_types.string_of_tag tags) in
+  let tags_str = String.concat ", " (List.map Parser.Azure_types.show_tag tags) in
   Printf.sprintf 
     "{ name = %s; subscription = %s; address = %s; location = %s; managed_by = %s; tags = [%s] }"
     name subscription address (Parser.Azure_types.string_of_loc location) managed_str tags_str

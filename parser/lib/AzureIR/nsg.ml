@@ -13,6 +13,22 @@ module Id = struct
 end
 
 module SecurityRule = struct
+
+
+  type endpoint = 
+  | Addresses of CIDR.t list
+  | ApplicationGroups of string list
+  [@@deriving show]
+
+  type access = 
+  | Allow
+  | Deny
+  [@@deriving show]
+
+  type direction = 
+  | Incoming
+  | Outgoing
+  [@@deriving show]
   
   type t = {
     name : string;
@@ -20,12 +36,12 @@ module SecurityRule = struct
     protocol : protocol;
     source_ports : port list;
     destination_ports : port list;
-    source : [ `Addresses of CIDR.t list | `ApplicationGroups of string list ];
-    destination : [ `Addresses of CIDR.t list | `ApplicationGroups of string list ];
-    access : [ `Allow | `Deny ];
+    source : endpoint;
+    destination : endpoint;
+    access : access;
     priority : int;
-    direction : [ `Incoming | `Outgoing ];
-  }
+    direction : direction;
+  } [@@deriving show]
 end
 
 type t = {
@@ -55,7 +71,13 @@ let get_id nsg : Id.t  =
 let show { name; subscription; address; location; resource_group; rule_list; tags; } = 
 Printf.sprintf 
   "{ name = %s; subscription = %s; address = %s; location = %s; resource_group = %s; rule_list = %s tags = %s}"
-  name subscription address  (string_of_loc location) (Rg.get_name resource_group) "" ""
+  name 
+  subscription 
+  address 
+  (string_of_loc location) 
+  (Rg.get_name resource_group) 
+  (Printf.sprintf "[%s]" (String.concat "; " (List.map SecurityRule.show rule_list))) 
+  ""
 
 module Map = Map.Make(Id)
 

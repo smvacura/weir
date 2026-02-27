@@ -37,7 +37,7 @@ let make_vnet name subscription address loc rg addresses = {
   location = loc;
   resource_group = rg;
   addresses = addresses;
-  }
+  } [@@deriving show]
 
 let get_id vnet : Id.t =  
   (vnet.subscription, Rg.get_name (vnet.resource_group), vnet.name)
