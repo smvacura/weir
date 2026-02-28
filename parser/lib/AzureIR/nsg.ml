@@ -21,15 +21,43 @@ module SecurityRule = struct
   | Any
   [@@deriving show]
 
+  let addresses_of_string_list_opt list = 
+    if List.mem (Some "*") list
+    then Some Any
+    else 
+      match CIDR.of_list_opt_strict list with
+      | Some l -> Some (Addresses l)
+      | None -> None
+
+  let endpoint_of_list_opt list name_this = 
+    match name_this with
+    | "application" -> 
+      if (List.length (List.filter (Option.is_none) list) > 0) 
+      then None
+      else Some (ApplicationGroups (List.map (Option.value ~default:"") list))
+    | "addresses" -> addresses_of_string_list_opt list
+
   type access = 
   | Allow
   | Deny
   [@@deriving show]
 
+  let access_of_string_opt str =
+    match str with
+    | "Allow" -> Some Allow
+    | "Deny" -> Some Deny
+    | _ -> None
+
   type direction = 
   | Incoming
   | Outgoing
   [@@deriving show]
+
+  let direction_of_string_otp str = 
+    match str with 
+    | "Incoming" -> Some Incoming
+    | "Outgoing" -> Some Outgoing
+    | _ -> None
   
   type t = {
     name : string;

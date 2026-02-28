@@ -22,15 +22,21 @@ module SecurityRule : sig
   | Any
   [@@deriving show]
 
+  val endpoint_of_list_opt : string option list -> string -> endpoint option
+
   type access = 
   | Allow
   | Deny
   [@@deriving show]
 
+  val access_of_string_opt : string -> access option
+
   type direction = 
   | Incoming
   | Outgoing
   [@@deriving show]
+
+  val direction_of_string_opt : string -> direction option
 
   val make : name:string -> description:string option -> protocol:protocol -> source_ports:port list -> destination_ports:port list -> source:endpoint -> destination:endpoint -> access:access -> priority:int -> direction:direction -> t
 
