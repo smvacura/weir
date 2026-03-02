@@ -13,6 +13,8 @@ depends: [
   "dune" {>= "3.20"}
   "ocaml" {>= "5.0"}
   "subprocess"
+  "ounit2"
+  "yojson"
   "odoc" {with-doc}
 ]
 build: [
