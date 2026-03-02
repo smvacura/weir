@@ -23,7 +23,8 @@
   (ocaml (>= 5.0))
   subprocess
   ounit2
-  yojson)
+  yojson
+  ppx_deriving)
  (tags
   ("add topics" "to describe" your project)))
 
