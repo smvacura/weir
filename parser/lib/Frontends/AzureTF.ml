@@ -1,6 +1,7 @@
 module AzureTFParser = struct
   open Yojson
   open Parser.Azure_types
+  open Parser.Network_types
   open Azureir
 
 
@@ -235,8 +236,163 @@ module AzureTFParser = struct
     in
     Ok (Subnet.make_subnet name "DEFAULT" address rg vnet cidr_list)
 
+  let endpoint_of_element (json : Safe.t) (kind : string) =
+    match json with
+    | `String s -> Nsg.SecurityRule.endpoint_of_list_opt [Some s] kind
+    | `List l -> Nsg.SecurityRule.endpoint_of_list_opt (List.map Safe.Util.to_string_option l) kind
+    | _ -> None
+  
+
+  let is_nonempty_json_list (json : Safe.t) key =
+    match Safe.Util.member key json with
+    | `List l -> List.length l > 0 
+    | _ -> false
+  
+  let is_nonempty_json_string (json : Safe.t) key =
+    match Safe.Util.member key json with
+    | `String s -> String.length s > 0
+    | _ -> false
+  
+  let endpoint_of_json (json : Safe.t) target =
+    if is_nonempty_json_string json (target ^ "_address_prefix")
+    then Nsg.SecurityRule.endpoint_of_list_opt 
+        [(Safe.Util.member (target ^ "_address_prefix") json |> Safe.Util.to_string_option)]
+        "addresses"
+    else if is_nonempty_json_list json (target ^ "_address_prefixes")
+    then Nsg.SecurityRule.endpoint_of_list_opt 
+        (Safe.Util.member (target ^ "_address_prefixes") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
+        "addresses"
+    else if is_nonempty_json_list json (target ^ "_application_security_group_ids")
+    then Nsg.SecurityRule.endpoint_of_list_opt 
+        (Safe.Util.member (target ^ "_application_security_group_ids") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
+        "application"
+    else None
+
+
+  let sequence_rev xs = 
+    List.fold_left (fun acc x ->
+      match acc, x with
+      | Some vs, Some v -> Some (v :: vs)
+      | _ -> None)
+      (Some [])
+      xs
+
+  let sequence_result_rev xs =
+    List.fold_left (fun acc x ->
+      match acc, x with
+      | Ok vs, Ok v -> Ok (v :: vs)
+      | _, Error v -> Error v)
+    (Ok [])
+    xs
+    
+    
+  let port_list_of_json (json : Safe.t) target = 
+    if is_nonempty_json_string json (target ^ "_port_range")
+    then let (let*) = Option.bind in 
+         let* port_range = Safe.Util.member (target ^ "_port_range") json |>
+            Safe.Util.to_string_option in
+          port_list_of_string_list_opt [port_range]
+    else if is_nonempty_json_list json (target ^ "_port_ranges")
+    then let (let*) = Option.bind in 
+         let* port_ranges = Safe.Util.member (target ^ "_port_ranges") json |>
+         Safe.Util.to_list |>
+         List.map Safe.Util.to_string_option |>
+         sequence_rev in
+         port_list_of_string_list_opt port_ranges
+    else None 
+
+  let rule_of_json rule = 
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" rule |>
+      generate_parse_string_result_required "name" "" "security_rule"
+    in
+    let* description = Safe.Util.member "description" rule |>
+      generate_parse_string_result "description" name "security_rule"
+    in
+    let* access = Safe.Util.member "access" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      Nsg.SecurityRule.access_of_string_opt |>
+      Option.to_result ~none:("Could not parse access of rule " ^ name)
+    in
+    let* direction = Safe.Util.member "direction" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      Nsg.SecurityRule.direction_of_string_opt |>
+      Option.to_result ~none:("Could not parse direction of rule " ^ name)
+    in
+    let* protocol = Safe.Util.member "protocol" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      protocol_of_string_opt |>
+      Option.to_result ~none:("Could not parse protocol of rule " ^ name)
+    in
+    let* dest_prefixes = endpoint_of_json rule "destination"|> 
+      Option.to_result ~none:("Could not parse destination of rule " ^ name)
+    in
+    let* source_prefixes = endpoint_of_json rule "source"|> 
+      Option.to_result ~none:("Could not parse source of rule " ^ name)
+    in
+    let* source_ports = port_list_of_json rule "source" |>
+      Option.to_result ~none:("Could not parse source ports of rule " ^ name)
+    in
+    let* dest_ports = port_list_of_json rule "destination" |>
+      Option.to_result ~none:("Could not parse destination ports of rule " ^ name)
+    in
+    let* priority = Safe.Util.member "priority" rule |>
+      Safe.Util.to_int_option |>
+      Option.to_result ~none:("Could not parse priority of rule " ^ name)
+    in
+    Ok (
+      Nsg.SecurityRule.make
+      ~name:name
+      ~description:description
+      ~protocol:protocol
+      ~source_ports:source_ports
+      ~destination_ports:dest_ports
+      ~source:source_prefixes
+      ~destination:dest_prefixes
+      ~access:access
+      ~priority:priority
+      ~direction:direction
+    )
+
+
   let nsg_of_json world json = 
-    Ok (Nsg.make "" "" "" EastUs2 (Rg.make_rg "" "" "" EastUs2 None []) [] [])
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "subnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
+    in
+    let* address = Safe.Util.member "address" json 
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
+    in
+    let* security_rules = Safe.Util.member "security_rule" values |>
+      Safe.Util.to_list |>
+      List.map (rule_of_json) |>
+      sequence_result_rev
+    in
+    let tags = Safe.Util.member "tags" values 
+      |> parse_tags_lenient 
+      |> fst in 
+     Ok 
+     (Nsg.make 
+     ~name:name
+     ~subscription:"DEFAULT"
+     ~address:address
+     ~location:location
+     ~resource_group:rg
+     ~rule_list:security_rules
+     ~tags:tags)
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in
@@ -388,6 +544,8 @@ module AzureTFParser = struct
     let world, err = parse_resource_groups (World.empty, err) raw_world.rgs in
     let world, err, vnet_inv_index = parse_vnets (world, err) subnet_inv_idx_empty raw_world.vnets in
     let world, err, vnet_inv_index = parse_subnets (world, err) vnet_inv_index raw_world.subnets in
+    let world, err = parse_nsgs (world, err) raw_world.nsgs in
+    if List.length err > 0 then print_string_list err; 
     world
 
 

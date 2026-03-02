@@ -32,8 +32,8 @@ module SecurityRule : sig
   val access_of_string_opt : string -> access option
 
   type direction = 
-  | Incoming
-  | Outgoing
+  | Inbound
+  | Outbound
   [@@deriving show]
 
   val direction_of_string_opt : string -> direction option

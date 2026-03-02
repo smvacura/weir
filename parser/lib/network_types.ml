@@ -153,6 +153,14 @@ type protocol =
  | Icmp 
  | Any
 
+let protocol_of_string_opt protocol_string =
+  match protocol_string with
+  | "Tcp" -> Some Tcp
+  | "Udp" -> Some Udp
+  | "Icmp" -> Some Icmp
+  | "*" -> Some Any
+  | _ -> None
+
 let show_protocol protocol = 
   match protocol with
   | Tcp -> "TCP"
@@ -168,6 +176,29 @@ type port =
  | Single of int 
  | Range of int * int 
  | Any
+
+
+let port_of_string_opt port_str =
+  match  String.split_on_char '-' port_str with
+  | ["*"] -> Some Any
+  | [lo; hi] -> 
+    let (let*) = Option.bind in
+    let* ilo = int_of_string_opt lo in
+    let* ihi = int_of_string_opt hi in
+    Some (Range (ilo, ihi))
+  | [port] -> 
+    let (let*) = Option.bind in
+    let* iport = int_of_string_opt port in
+    Some (Single iport)
+
+let port_list_of_string_list_opt port_str_list = 
+  List.fold_left 
+    (fun acc port_str ->
+      match acc, port_of_string_opt port_str with
+      | Some ps, Some Any -> Some [Any]
+      | Some ps, Some p -> Some (p :: ps)
+      | _ -> None)
+    (Some []) port_str_list
 
 let show_port port = 
   match port with

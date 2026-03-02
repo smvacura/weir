@@ -49,14 +49,14 @@ module SecurityRule = struct
     | _ -> None
 
   type direction = 
-  | Incoming
-  | Outgoing
+  | Inbound
+  | Outbound
   [@@deriving show]
 
-  let direction_of_string_otp str = 
+  let direction_of_string_opt str = 
     match str with 
-    | "Incoming" -> Some Incoming
-    | "Outgoing" -> Some Outgoing
+    | "Inbound" -> Some Inbound
+    | "Outbound" -> Some Outbound
     | _ -> None
   
   type t = {

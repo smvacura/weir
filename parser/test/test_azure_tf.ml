@@ -58,7 +58,7 @@ let simple_nsg_world =
   in
   let rule = Nsg.SecurityRule.make
   ~name:"allow-ssh"
-  ~description:None
+  ~description:(Some "")
   ~source_ports:[Any]
   ~destination_ports:[Single 22]
   ~protocol:Tcp
@@ -66,7 +66,7 @@ let simple_nsg_world =
   ~destination:Any
   ~access:Allow
   ~priority:100
-  ~direction:Incoming
+  ~direction:Inbound
   in
   let nsg = Nsg.make
   ~name:"main"

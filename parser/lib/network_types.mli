@@ -36,6 +36,8 @@ type protocol =
  | Icmp 
  | Any
 
+val protocol_of_string_opt : string -> protocol option
+
 val show_protocol : protocol -> string
 
 val pp_protocol : Format.formatter -> protocol -> unit
@@ -44,6 +46,10 @@ type port =
  | Single of int 
  | Range of int * int 
  | Any
+
+val port_of_string_opt : string -> port option
+
+val port_list_of_string_list_opt : string list -> port list option
 
 val show_port : port -> string
 
