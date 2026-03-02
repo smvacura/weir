@@ -21,7 +21,9 @@
  (description "A longer description")
  (depends 
   (ocaml (>= 5.0))
-  subprocess)
+  subprocess
+  ounit2
+  yojson)
  (tags
   ("add topics" "to describe" your project)))
 
