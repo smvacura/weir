@@ -54,3 +54,8 @@ val port_list_of_string_list_opt : string list -> port list option
 val show_port : port -> string
 
 val pp_port : Format.formatter -> port -> unit
+
+type ip_assignment =
+  | Static of IPv4.t
+  | Dynamic of CIDR.t
+  [@@deriving show]

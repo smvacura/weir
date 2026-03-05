@@ -18,7 +18,7 @@ type t = {
     location : azure_location;
     managed_by : string option;
     tags : tag list
-  }
+  } [@@deriving show]
 
 let get_name rg = rg.name
 

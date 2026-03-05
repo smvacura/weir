@@ -7,6 +7,7 @@ module IPv4 = struct
   let ( *% ) = Int32.mul
 
   type t = int32
+  [@@deriving show]
 
   let in_bounds w =
     w >= 0 && w < 256
@@ -216,3 +217,8 @@ let string_of_port_list ports =
     | h::t -> aux t (acc ^ (show_port h ^ ","))
   in
   (aux ports "[") ^ "]"
+
+type ip_assignment =
+  | Static of IPv4.t
+  | Dynamic of CIDR.t
+  [@@deriving show]
