@@ -45,7 +45,7 @@ let simple_network_world =
   let rgs' = Rg.Map.add (Rg.get_id rg) rg Rg.Map.empty in
   let vnets' = Vnet.Map.add (Vnet.get_id vnet) vnet Vnet.Map.empty in
   let subnets' = Subnet.Map.add (Subnet.get_id subnet) subnet Subnet.Map.empty in
-  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = Nsg.Map.empty} : World.t)
+  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = Nsg.Map.empty; pips = Pip.Map.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make_rg
@@ -81,7 +81,7 @@ let simple_nsg_world =
   let vnets = Vnet.Map.empty in
   let subnets = Subnet.Map.empty in
   let nsgs = Nsg.Map.add (Nsg.get_id nsg) nsg Nsg.Map.empty in
-  ({resource_groups; vnets; subnets; nsgs} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; pips = Pip.Map.empty} : World.t)
 
 
 
