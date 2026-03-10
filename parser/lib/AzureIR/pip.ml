@@ -27,5 +27,16 @@ let get_name pip =
 let get_id pip = 
   (pip.name, pip.subscription, Rg.get_name pip.resource_group)
 
-let make name subscription resource_group location allocation =
+let make ~name ~subscription ~resource_group ~location ~allocation =
   { name; subscription; resource_group; location; allocation}
+
+module Map = Map.Make(Id)
+
+let show_pip_map m =
+  "{" ^ 
+  (m
+  |> Map.bindings
+  |> List.map (fun ((sub, rg, name),v) -> sub ^ rg ^ name ^ ":" ^ show v)
+  |> String.concat ",")
+  ^
+  "}"

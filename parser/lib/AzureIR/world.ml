@@ -4,6 +4,7 @@ type t = {
   subnets : Subnet.t Subnet.Map.t;
   vnets : Vnet.t Vnet.Map.t;
   nsgs : Nsg.t Nsg.Map.t;
+  pips : Pip.t Pip.Map.t
 }
 
 let equal t1 t2 =
@@ -16,6 +17,7 @@ let empty = {
   subnets = Subnet.Map.empty;
   vnets = Vnet.Map.empty;
   nsgs = Nsg.Map.empty;
+  pips = Pip.Map.empty;
 }
 
 let get_resource_group world subscription name = 
@@ -25,4 +27,5 @@ let show world =
   "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
   "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^
   "Subnets: " ^ Subnet.show_subnet_map world.subnets ^ "\n" ^
-  "Nsgs: " ^ Nsg.show_nsg_map world.nsgs ^ "\n"
+  "Nsgs: " ^ Nsg.show_nsg_map world.nsgs ^ "\n" ^
+  "Pips: " ^ Pip.show_pip_map world.pips ^ "\n"
