@@ -24,6 +24,8 @@ val make_vnet : string -> string -> string -> Parser.Azure_types.azure_location 
 
 val show : t -> string
 
+val pp : Format.formatter -> t -> unit
+
 module Map : Map.S with type key = Id.t 
 
 val show_vnet_map : t Map.t -> string

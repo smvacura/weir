@@ -4,6 +4,7 @@ type t = {
   subnets : Subnet.t Subnet.Map.t;
   vnets : Vnet.t Vnet.Map.t;
   nsgs : Nsg.t Nsg.Map.t;
+  nics : Nic.t Nic.Map.t;
   pips : Pip.t Pip.Map.t
 }
 
@@ -17,6 +18,7 @@ let empty = {
   subnets = Subnet.Map.empty;
   vnets = Vnet.Map.empty;
   nsgs = Nsg.Map.empty;
+  nics = Nic.Map.empty;
   pips = Pip.Map.empty;
 }
 
@@ -28,4 +30,5 @@ let show world =
   "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^
   "Subnets: " ^ Subnet.show_subnet_map world.subnets ^ "\n" ^
   "Nsgs: " ^ Nsg.show_nsg_map world.nsgs ^ "\n" ^
+  "Nics: " ^ Nic.show_nic_map world.nics ^ "\n" ^
   "Pips: " ^ Pip.show_pip_map world.pips ^ "\n"

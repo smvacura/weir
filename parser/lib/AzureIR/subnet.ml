@@ -22,7 +22,7 @@ type t = {
     resource_group : Rg.t;
     vnet : Vnet.t;
     addresses : CIDR.t list
-  }
+  } [@@deriving show]
 
 let get_name subnet = subnet.name
 

@@ -23,6 +23,8 @@ val make_subnet : string -> string -> string -> Rg.t -> Vnet.t -> CIDR.t list ->
 
 val show : t -> string
 
+val pp : Format.formatter -> t -> unit
+
 module Map : Map.S with type key = Id.t 
 
 val show_subnet_map : t Map.t -> string
