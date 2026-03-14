@@ -5,7 +5,7 @@ type t = {
   subnets : Subnet.t IdKeyMap.t;
   vnets : Vnet.t IdKeyMap.t;
   nsgs : Nsg.t IdKeyMap.t;
-  nics : Nic.t Nic.Map.t;
+  nics : Nic.t IdKeyMap.t;
   pips : Pip.t Pip.Map.t
 }
 
@@ -19,7 +19,7 @@ let empty = {
   subnets = IdKeyMap.empty;
   vnets = IdKeyMap.empty;
   nsgs = IdKeyMap.empty;
-  nics = Nic.Map.empty;
+  nics = IdKeyMap.empty;
   pips = Pip.Map.empty;
 }
 

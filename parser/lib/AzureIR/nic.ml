@@ -1,16 +1,6 @@
 open Parser.Azure_types
 open Parser.Network_types
-
-module Id = struct
-  
-  type t = string * string * string
-
-  let compare = compare
-
-  let of_strings sub rg name : t = (sub, rg, name)
-
-  let to_strings ((sub, rg, name) : t )  = (sub, rg, name)
-end
+open Parser.Tf_types
 
 
 module IpConfiguration = struct
@@ -32,6 +22,7 @@ end
 type t = {
   name : string;
   subscription : string;
+  address : string;
   location : string;
   resource_group : Rg.t;
   ip_configurations : IpConfiguration.t list
@@ -39,26 +30,22 @@ type t = {
 
 let get_name nic = nic.name
 
-let get_name_string nic = nic.name
-
-let get_name_string nic = nic.name
+let get_address nic = nic.address
 
 let get_rg nic = nic.resource_group
 
-let make_nic name subscription location resource_group ip_configurations =
-  {name; subscription; location; resource_group; ip_configurations}
+let make_nic name subscription address location resource_group ip_configurations =
+  {name; subscription; address; location; resource_group; ip_configurations}
 
-let get_id nic : Id.t =  
-  (nic.subscription, Rg.get_name (nic.resource_group), nic.name)
+let get_id nic : IdKey.t =  
+  IdKey.of_strings nic.subscription (Rg.get_name nic.resource_group) nic.name
 
-
-module Map = Map.Make(Id)
 
 let show_nic_map m =
   "{" ^ 
   (m
-  |> Map.bindings
-  |> List.map (fun ((sub, rg, name), nic) -> sub ^ rg ^ name ^ ":" ^ show nic)
+  |> IdKeyMap.bindings
+  |> List.map (fun (id, nic) -> (IdKey.show id) ^ ":" ^ show nic)
   |> String.concat ",")
   ^
   "}"
