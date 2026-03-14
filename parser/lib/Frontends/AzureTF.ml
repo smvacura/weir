@@ -392,6 +392,36 @@ module AzureTFParser = struct
      ~resource_group:rg
      ~rule_list:security_rules
      ~tags:tags)
+    
+  let ip_configuration_of_json = 
+    Error ""
+
+  let nic_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "subnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
+    in
+    let* address = Safe.Util.member "address" json 
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
+    in
+     Ok 
+     (Nic.make 
+     ~name:name
+     ~subscription:"DEFAULT"
+     ~address:address
+     ~resource_group:rg
+     ~location:location
+     ~ip_configurations:[])
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in
@@ -454,6 +484,13 @@ module AzureTFParser = struct
   let index_nsg nsg address_index =
     IdKeyMap.add (Nsg.get_id nsg) (Nsg.get_address nsg) address_index
   
+  let add_nic (world : World.t) (nic : Nic.t) =
+    let nics' = IdKeyMap.add (Nic.get_id nic) nic world.nics in
+    { world with nics = nics' }
+
+  let index_nic nic address_index =
+    IdKeyMap.add (Nic.get_id nic) (Nic.get_address nic) address_index
+  
   let parse_resource_groups (world, address_index, err) rgs =
     let parse_rg (world, address_index, err) rg_json =
       match rg_of_json rg_json with
@@ -490,6 +527,14 @@ module AzureTFParser = struct
       | Error e -> (world, address_index, e::err)
     in
     List.fold_left parse_nsg (world, address_index, err) nsgs
+  
+  let parse_nics (world, address_index, err) nics = 
+    let parse_nic (world, address_index, err) nic_json =
+      match nic_of_json world nic_json with
+      | Ok nic -> (add_nic world nic, index_nic nic address_index, err)
+      | Error e -> (world, address_index, e::err)
+    in
+    List.fold_left parse_nic (world, address_index, err) nics
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -568,7 +613,7 @@ module AzureTFParser = struct
     let world, address_index, err, vnet_inv_index = parse_vnets (world, address_index, err) subnet_inv_idx_empty raw_world.vnets in
     let world, address_index, err, vnet_inv_index = parse_subnets (world, address_index, err) vnet_inv_index raw_world.subnets in
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
-    (* let world, err = parse_nics (world, err) raw_world.nics in *)
+    let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     (* let world, err = parse_pips (world, err) raw_world.pips in *)
     if List.length err > 0 then print_string_list err; 
     world

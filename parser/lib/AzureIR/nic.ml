@@ -23,7 +23,7 @@ type t = {
   name : string;
   subscription : string;
   address : string;
-  location : string;
+  location : azure_location;
   resource_group : Rg.t;
   ip_configurations : IpConfiguration.t list
 } [@@deriving show]
@@ -34,7 +34,7 @@ let get_address nic = nic.address
 
 let get_rg nic = nic.resource_group
 
-let make_nic name subscription address location resource_group ip_configurations =
+let make ~name:name ~subscription:subscription ~address:address ~location:location ~resource_group:resource_group ~ip_configurations:ip_configurations =
   {name; subscription; address; location; resource_group; ip_configurations}
 
 let get_id nic : IdKey.t =  

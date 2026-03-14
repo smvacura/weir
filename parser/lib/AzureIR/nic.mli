@@ -17,7 +17,11 @@ val get_address : t -> string
 
 val get_id : t -> IdKey.t
 
-val make_nic : string -> string -> string -> string -> Rg.t -> IpConfiguration.t list -> t
+val make : name:string ->
+    subscription:string ->
+    address:string ->
+    location:azure_location ->
+    resource_group:Rg.t -> ip_configurations:IpConfiguration.t list -> t
 
 val show : t -> string
 

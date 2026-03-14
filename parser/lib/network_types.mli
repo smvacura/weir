@@ -30,6 +30,13 @@ module CIDR : sig
   val pp : Format.formatter -> t -> unit
 end
 
+type ip_type =
+ | IPv4
+ | IPv6
+ [@@deriving show]
+
+val ip_type_of_string_opt : string -> ip_type option
+
 type protocol =
  | Tcp 
  | Udp 

@@ -148,6 +148,17 @@ module CIDR = struct
     Format.fprintf fmt "%s" (show cidr)
 end
 
+type ip_type =
+ | IPv4
+ | IPv6
+ [@@deriving show]
+
+let ip_type_of_string_opt ip_string =
+  match ip_string with
+  | "IPv4" -> Some IPv4
+  | "IPv6" -> Some IPv6
+  | _ -> None
+
 type protocol =
  | Tcp 
  | Udp 
