@@ -2,6 +2,7 @@ open OUnit2
 open Frontends.AzureTF
 open Azureir
 open Parser.Azure_types
+open Parser.Tf_types
 
 
 let single_rg_world = 
@@ -14,7 +15,7 @@ let single_rg_world =
     None
     []
   in
-  let rgs' = Rg.Map.add (Rg.get_id rg) rg world.resource_groups in
+  let rgs' = IdKeyMap.add (Rg.get_id rg) rg world.resource_groups in
   { world with resource_groups = rgs' }
 
 let simple_network_world = 
@@ -42,10 +43,10 @@ let simple_network_world =
     vnet
     (Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
   in
-  let rgs' = Rg.Map.add (Rg.get_id rg) rg Rg.Map.empty in
-  let vnets' = Vnet.Map.add (Vnet.get_id vnet) vnet Vnet.Map.empty in
-  let subnets' = Subnet.Map.add (Subnet.get_id subnet) subnet Subnet.Map.empty in
-  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = Nsg.Map.empty; pips = Pip.Map.empty} : World.t)
+  let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let subnets' = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = Nic.Map.empty; pips = Pip.Map.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make_rg
@@ -77,11 +78,13 @@ let simple_nsg_world =
   ~rule_list:[rule]
   ~tags:[]
   in
-  let resource_groups = Rg.Map.add (Rg.get_id rg) rg Rg.Map.empty in
-  let vnets = Vnet.Map.empty in
-  let subnets = Subnet.Map.empty in
-  let nsgs = Nsg.Map.add (Nsg.get_id nsg) nsg Nsg.Map.empty in
-  ({resource_groups; vnets; subnets; nsgs; pips = Pip.Map.empty} : World.t)
+  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets = IdKeyMap.empty in
+  let subnets = IdKeyMap.empty in
+  let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
+  let nics = Nic.Map.empty in
+  let pips = Pip.Map.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
 
 
 

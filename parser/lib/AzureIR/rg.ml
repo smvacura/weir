@@ -1,15 +1,6 @@
 open Parser.Azure_types
+open Parser.Tf_types
 
-module Id = struct
-  
-  type t = string * string * string
-
-  let compare = compare
-
-  let of_strings sub rg name : t = (sub, rg, name)
-
-  let to_strings ((sub, rg, name) : t )  = (sub, rg, name)
-end
 
 type t = {
     name : string;
@@ -22,8 +13,10 @@ type t = {
 
 let get_name rg = rg.name
 
-let get_id rg : Id.t  = 
-  (rg.subscription, rg.name, rg.name)
+let get_address rg = rg.address
+
+let get_id rg  = 
+  IdKey.of_strings rg.subscription rg.name rg.name
 
 
 let make_rg name subscription address location managed_by tags = {
@@ -42,13 +35,11 @@ let show { name; subscription; address; location; managed_by; tags } =
     "{ name = %s; subscription = %s; address = %s; location = %s; managed_by = %s; tags = [%s] }"
     name subscription address (Parser.Azure_types.string_of_loc location) managed_str tags_str
 
-module Map = Map.Make(Id)
-
 let show_rg_map m =
   "{" ^ 
   (m
-  |> Map.bindings
-  |> List.map (fun ((sub, rg, name),v) -> sub ^ rg ^ name ^ ":" ^ show v)
+  |> IdKeyMap.bindings
+  |> List.map (fun (id,v) -> (IdKey.show id) ^ ":" ^ show v)
   |> String.concat ",")
   ^
   "}"

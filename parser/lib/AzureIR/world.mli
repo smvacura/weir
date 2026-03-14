@@ -1,9 +1,10 @@
+open Parser.Tf_types
 
 type t = {
-  resource_groups : Rg.t Rg.Map.t;
-  subnets : Subnet.t Subnet.Map.t;
-  vnets : Vnet.t Vnet.Map.t;
-  nsgs : Nsg.t Nsg.Map.t;
+  resource_groups : Rg.t IdKeyMap.t;
+  subnets : Subnet.t IdKeyMap.t;
+  vnets : Vnet.t IdKeyMap.t;
+  nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t Nic.Map.t;
   pips : Pip.t Pip.Map.t
 }

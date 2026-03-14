@@ -2,6 +2,7 @@ module AzureTFParser = struct
   open Yojson
   open Parser.Azure_types
   open Parser.Network_types
+  open Parser.Tf_types
   open Azureir
 
 
@@ -10,6 +11,8 @@ module AzureTFParser = struct
     vnets : Safe.t list;
     subnets : Safe.t list;
     nsgs : Safe.t list;
+    nics : Safe.t list;
+    pips : Safe.t list;
   }
 
   let raw_world_empty = {
@@ -17,26 +20,22 @@ module AzureTFParser = struct
     vnets = [];
     subnets = [];
     nsgs = [];
+    nics = [];
+    pips = [];
   }
 
 
-  type subnet_inv_idx = Vnet.t Subnet.Map.t
+  type subnet_inv_idx = Vnet.t IdKeyMap.t
 
-  module IdKey = struct 
-    type t = string * string * string
-    let compare = compare
-  end
+  type address_index = string IdKeyMap.t
 
-  module IdTupleMap = Map.Make(IdKey)
-  type name_idx = string IdTupleMap.t
-
-  let subnet_inv_idx_empty : subnet_inv_idx = Subnet.Map.empty
+  let subnet_inv_idx_empty : subnet_inv_idx = IdKeyMap.empty
 
   let show_inv_idx (index : subnet_inv_idx) = 
     "{" ^
     (index
-    |> Subnet.Map.bindings
-    |> List.map (fun (k,v) -> (Subnet.Id.to_string k) ^ ":" ^ Vnet.show v)
+    |> IdKeyMap.bindings
+    |> List.map (fun (k,v) -> (IdKey.show k) ^ ":" ^ Vnet.show v)
     |> String.concat ",")
     ^ "}"
 
@@ -226,7 +225,7 @@ module AzureTFParser = struct
     let* rg = World.get_resource_group world "DEFAULT" rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
     in
-    let* vnet = Vnet.Map.find_opt (Vnet.Id.of_strings "DEFAULT" rg_name vnet_name) world.vnets
+    let* vnet = IdKeyMap.find_opt (IdKey.of_strings "DEFAULT" rg_name vnet_name) world.vnets
       |> Option.to_result ~none:("Cannot find vnet required by subnet " ^ address)
     in
     let addresses = Safe.Util.member "address_prefixes" values
@@ -415,70 +414,82 @@ module AzureTFParser = struct
 
   
   let add_rg (world : World.t) (rg : Rg.t) = 
-    let rgs' = Rg.Map.add (Rg.get_id rg) rg world.resource_groups in
+    let rgs' = IdKeyMap.add (Rg.get_id rg) rg world.resource_groups in
     { world with resource_groups = rgs' }
+
+  let index_rg rg address_index = 
+    (IdKeyMap.add (Rg.get_id rg) (Rg.get_address rg) address_index)
   
   let add_vnet (world : World.t) (vnet : Vnet.t) =
-    let vnet_id = Vnet.Id.of_strings
+    let vnet_id = IdKey.of_strings
       "DEFAULT"
       (Rg.get_name (Vnet.get_rg vnet))
       (Vnet.get_name vnet)
     in
-    let vnets' = Vnet.Map.add vnet_id vnet world.vnets in
+    let vnets' = IdKeyMap.add vnet_id vnet world.vnets in
     { world with vnets = vnets' }
+  
+  let index_vnet vnet address_index = 
+    (IdKeyMap.add (Vnet.get_id vnet) (Vnet.get_address vnet) address_index)
 
   let add_to_index (vnet: Vnet.t) (subnets: Subnet.t list) (index : subnet_inv_idx) =
     let rec aux vnet subnets (index : subnet_inv_idx) = 
       match subnets with
-      | h::t -> aux vnet t (Subnet.Map.add (Subnet.get_id h) vnet  index)
+      | h::t -> aux vnet t (IdKeyMap.add (Subnet.get_id h) vnet  index)
       | [] -> index
     in
     aux vnet subnets index
 
   let add_subnet (world : World.t) (subnet : Subnet.t) =
-    let subnets' = Subnet.Map.add (Subnet.get_id subnet) subnet world.subnets in
+    let subnets' = IdKeyMap.add (Subnet.get_id subnet) subnet world.subnets in
     { world with subnets = subnets'}
 
+  let index_subnet subnet address_index =
+    IdKeyMap.add (Subnet.get_id subnet) (Subnet.get_address subnet) address_index
+
   let add_nsg (world : World.t) (nsg : Nsg.t) =
-    let nsgs' = Nsg.Map.add (Nsg.get_id nsg) nsg world.nsgs in
+    let nsgs' = IdKeyMap.add (Nsg.get_id nsg) nsg world.nsgs in
     { world with nsgs = nsgs'}
   
-  let parse_resource_groups (world, err) rgs =
-    let parse_rg (world, err) rg_json =
+  let index_nsg nsg address_index =
+    IdKeyMap.add (Nsg.get_id nsg) (Nsg.get_address nsg) address_index
+  
+  let parse_resource_groups (world, address_index, err) rgs =
+    let parse_rg (world, address_index, err) rg_json =
       match rg_of_json rg_json with
-      | Ok rg -> (add_rg world rg, err)
-      | Error e -> (world, e::err)
+      | Ok rg -> (add_rg world rg, index_rg rg address_index, err)
+      | Error e -> (world, address_index, e::err)
     in
-    List.fold_left parse_rg (world, err) rgs
+    List.fold_left parse_rg (world, address_index, err) rgs
 
   
-  let parse_vnets (world, err) index vnets =
-    let parse_vnet (world, err, index) vnet_json =
+  let parse_vnets (world, address_index, err) index vnets =
+    let parse_vnet (world, address_index, err, subnet_index) vnet_json =
       match vnet_of_json world vnet_json with
       | Ok (vnet, subnets) -> begin
         match partition_results subnets with 
-        |  Ok subnets -> (add_vnet world vnet, err, (add_to_index vnet subnets index))
-        | Error errors -> (add_vnet world vnet, err @ errors, index)
+        |  Ok subnets -> (add_vnet world vnet, (index_vnet vnet address_index), err, (add_to_index vnet subnets index))
+        | Error errors -> (add_vnet world vnet, (index_vnet vnet address_index), err @ errors, index)
       end
-      | Error e -> (world, e::err, index)
+      | Error e -> (world, address_index, e::err, index)
     in
-    List.fold_left parse_vnet (world, err, index) vnets
+    List.fold_left parse_vnet (world, address_index, err, index) vnets
 
-  let parse_subnets (world, err) index subnets = 
-    let parse_subnet (world, err, index) subnet_json =
+  let parse_subnets (world, address_index, err) index subnets = 
+    let parse_subnet (world, address_index, err, index) subnet_json =
       match subnet_of_json world index subnet_json with
-      | Ok subnet -> (add_subnet world subnet, err, index)
-      | Error e -> (world, e::err, index)
+      | Ok subnet -> (add_subnet world subnet, index_subnet subnet address_index, err, index)
+      | Error e -> (world, address_index, e::err, index)
     in
-    List.fold_left parse_subnet (world, err, index) subnets
+    List.fold_left parse_subnet (world, address_index, err, index) subnets
 
-  let parse_nsgs (world, err) nsgs = 
-    let parse_nsg (world, err) nsg_json = 
+  let parse_nsgs (world, address_index, err) nsgs = 
+    let parse_nsg (world, address_index, err) nsg_json = 
       match nsg_of_json world nsg_json with
-      | Ok nsg -> (add_nsg world nsg, err)
-      | Error e -> (world, e::err)
+      | Ok nsg -> (add_nsg world nsg, index_nsg nsg address_index, err)
+      | Error e -> (world, address_index, e::err)
     in
-    List.fold_left parse_nsg (world, err) nsgs
+    List.fold_left parse_nsg (world, address_index, err) nsgs
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -520,6 +531,18 @@ module AzureTFParser = struct
       | Some s -> let nsgs' = json_resource::world.nsgs in
       ({world with nsgs = nsgs'}, err)
     end
+    | Some "azurerm_network_interface" -> begin
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some s -> let nics' = json_resource::world.nics in
+      ({world with nics = nics'}, err)
+    end
+    | Some "azurerm_public_ip" -> begin
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some s -> let pips' = json_resource::world.pips in
+      ({world with pips = pips'}, err)
+    end
     | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
   
@@ -541,10 +564,12 @@ module AzureTFParser = struct
   let get_resources file =
     let json = json_resources file in
     let raw_world, err = raw_parse_resources json in
-    let world, err = parse_resource_groups (World.empty, err) raw_world.rgs in
-    let world, err, vnet_inv_index = parse_vnets (world, err) subnet_inv_idx_empty raw_world.vnets in
-    let world, err, vnet_inv_index = parse_subnets (world, err) vnet_inv_index raw_world.subnets in
-    let world, err = parse_nsgs (world, err) raw_world.nsgs in
+    let world, address_index, err = parse_resource_groups (World.empty, IdKeyMap.empty, err) raw_world.rgs in
+    let world, address_index, err, vnet_inv_index = parse_vnets (world, address_index, err) subnet_inv_idx_empty raw_world.vnets in
+    let world, address_index, err, vnet_inv_index = parse_subnets (world, address_index, err) vnet_inv_index raw_world.subnets in
+    let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
+    (* let world, err = parse_nics (world, err) raw_world.nics in *)
+    (* let world, err = parse_pips (world, err) raw_world.pips in *)
     if List.length err > 0 then print_string_list err; 
     world
 

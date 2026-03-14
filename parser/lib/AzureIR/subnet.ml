@@ -1,18 +1,5 @@
 open Parser.Network_types
-
-module Id = struct
-
-  type t = string * string * string
-
-  let compare = compare
-
-  let of_strings sub rg name : t = (sub, rg, name)
-
-  let to_strings ((sub, rg, name) : t) = sub, rg, name
-
-  let to_string ((sub, rg, name) : t) = sub ^ rg ^ name 
-
-end
+open Parser.Tf_types
 
 
 type t = {  
@@ -26,8 +13,10 @@ type t = {
 
 let get_name subnet = subnet.name
 
-let get_id subnet : Id.t  = 
-  (subnet.subscription, (Rg.get_name (subnet.resource_group)), subnet.name)
+let get_address subnet = subnet.address
+
+let get_id subnet  =
+  IdKey.of_strings subnet.subscription (Rg.get_name subnet.resource_group) subnet.name
 
 let make_subnet name subscription address rg vnet addresses = {
   name = name;
@@ -50,15 +39,13 @@ let show_address_block addresses =
 let show { name; address; resource_group; vnet; addresses } = 
   Printf.sprintf 
     "{ name = %s; id = %s; location = %s; resource_group = %s; address_space = [%s] }"
-    name address (Rg.get_name resource_group) (Vnet.get_name_string vnet) (show_address_block addresses)
-
-module Map = Map.Make(Id) 
+    name address (Rg.get_name resource_group) (Vnet.get_name vnet) (show_address_block addresses)
 
 let show_subnet_map m =
   "{" ^ 
   (m
-  |> Map.bindings
-  |> List.map (fun ((sub, rg, name),v) -> sub ^ rg ^ name ^ ":" ^ show v)
+  |> IdKeyMap.bindings
+  |> List.map (fun (id ,s) -> (IdKey.show id) ^ ":" ^ show s)
   |> String.concat ",")
   ^
   "}"

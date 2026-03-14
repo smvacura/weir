@@ -1,16 +1,6 @@
 open Parser.Azure_types
 open Parser.Network_types
-
-module Id = struct
-  
-  type t = string * string * string
-
-  let compare = compare
-
-  let of_strings sub rg name : t = (sub, rg, name)
-
-  let to_strings ((sub, rg, name) : t )  = (sub, rg, name)
-end
+open Parser.Tf_types
 
 module SecurityRule = struct
 
@@ -107,9 +97,12 @@ let make ~name ~subscription ~address ~location ~resource_group ~rule_list ~tags
   tags
 }
 
-let get_id nsg : Id.t  = 
-  (nsg.subscription, (Rg.get_name (nsg.resource_group)), nsg.name)
+let get_id nsg   = 
+  IdKey.of_strings nsg.subscription (Rg.get_name nsg.resource_group) nsg.name
 
+let get_name nsg = nsg.name
+
+let get_address nsg = nsg.address
 
 let show { name; subscription; address; location; resource_group; rule_list; tags; } = 
 Printf.sprintf 
@@ -122,13 +115,11 @@ Printf.sprintf
   (Printf.sprintf "[%s]" (String.concat "; " (List.map SecurityRule.show rule_list))) 
   ""
 
-module Map = Map.Make(Id)
-
 let show_nsg_map m =
   "{" ^ 
   (m
-  |> Map.bindings
-  |> List.map (fun ((sub, rg, name),v) -> sub ^ rg ^ name ^ ":" ^ show v)
+  |> IdKeyMap.bindings
+  |> List.map (fun (id , nsg) -> (IdKey.show id) ^ ":" ^ show nsg)
   |> String.concat ",")
   ^
   "}"

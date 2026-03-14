@@ -1,29 +1,30 @@
+open Parser.Tf_types
 
 type t = {
-  resource_groups : Rg.t Rg.Map.t;
-  subnets : Subnet.t Subnet.Map.t;
-  vnets : Vnet.t Vnet.Map.t;
-  nsgs : Nsg.t Nsg.Map.t;
+  resource_groups : Rg.t IdKeyMap.t;
+  subnets : Subnet.t IdKeyMap.t;
+  vnets : Vnet.t IdKeyMap.t;
+  nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t Nic.Map.t;
   pips : Pip.t Pip.Map.t
 }
 
 let equal t1 t2 =
-  Rg.Map.equal (=) t1.resource_groups t2.resource_groups &&
-  Subnet.Map.equal (=) t1.subnets t2.subnets &&
-  Vnet.Map.equal (=) t1.vnets t2.vnets
+  IdKeyMap.equal (=) t1.resource_groups t2.resource_groups &&
+  IdKeyMap.equal (=) t1.subnets t2.subnets &&
+  IdKeyMap.equal (=) t1.vnets t2.vnets
 
 let empty = {
-  resource_groups = Rg.Map.empty;
-  subnets = Subnet.Map.empty;
-  vnets = Vnet.Map.empty;
-  nsgs = Nsg.Map.empty;
+  resource_groups = IdKeyMap.empty;
+  subnets = IdKeyMap.empty;
+  vnets = IdKeyMap.empty;
+  nsgs = IdKeyMap.empty;
   nics = Nic.Map.empty;
   pips = Pip.Map.empty;
 }
 
 let get_resource_group world subscription name = 
-  Rg.Map.find_opt (Rg.Id.of_strings subscription name name) world.resource_groups
+  IdKeyMap.find_opt (IdKey.of_strings subscription name name) world.resource_groups
 
 let show world = 
   "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
