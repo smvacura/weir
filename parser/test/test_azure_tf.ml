@@ -47,7 +47,7 @@ let simple_network_world =
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
   let subnets' = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
-  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = Pip.Map.empty} : World.t)
+  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = IdKeyMap.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make
@@ -84,7 +84,7 @@ let simple_nsg_world =
   let subnets = IdKeyMap.empty in
   let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
   let nics = IdKeyMap.empty in
-  let pips = Pip.Map.empty in
+  let pips = IdKeyMap.empty in
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
 
 let simple_nic_world = 
@@ -134,7 +134,7 @@ let simple_nic_world =
   let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
-  let pips = Pip.Map.empty in 
+  let pips = IdKeyMap.empty in 
   let world =
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
   in world
@@ -186,7 +186,7 @@ let static_nic_world =
   let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
-  let pips = Pip.Map.empty in 
+  let pips = IdKeyMap.empty in 
   let world =
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
   in world

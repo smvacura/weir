@@ -6,7 +6,7 @@ type t = {
   vnets : Vnet.t IdKeyMap.t;
   nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t IdKeyMap.t;
-  pips : Pip.t Pip.Map.t
+  pips : Pip.t IdKeyMap.t
 }
 
 let equal t1 t2 =
@@ -22,7 +22,7 @@ let empty = {
   vnets = IdKeyMap.empty;
   nsgs = IdKeyMap.empty;
   nics = IdKeyMap.empty;
-  pips = Pip.Map.empty;
+  pips = IdKeyMap.empty;
 }
 
 let get_resource_group world subscription name = 

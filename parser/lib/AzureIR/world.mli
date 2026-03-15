@@ -6,7 +6,7 @@ type t = {
   vnets : Vnet.t IdKeyMap.t;
   nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t IdKeyMap.t;
-  pips : Pip.t Pip.Map.t
+  pips : Pip.t IdKeyMap.t
 }
 
 val empty : t

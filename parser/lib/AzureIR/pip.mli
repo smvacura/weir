@@ -13,6 +13,4 @@ val show : t -> string
 
 val pp : Format.formatter -> t -> unit
 
-module Map : Map.S with type key = IdKey.t 
-
 val show_pip_map : t IdKeyMap.t -> string
