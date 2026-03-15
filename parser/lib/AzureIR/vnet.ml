@@ -18,7 +18,7 @@ let get_address vnet = vnet.address
 
 let get_rg vnet = vnet.resource_group
 
-let make_vnet name subscription address loc rg addresses = { 
+let make ~name:name ~subscription:subscription ~address:address ~location:loc ~resource_group:rg ~addresses:addresses = { 
   name = name;
   subscription = subscription;
   address = address;

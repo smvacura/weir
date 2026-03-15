@@ -27,13 +27,13 @@ let simple_network_world =
     ~managed_by:None
     ~tags:[]
   in
-  let vnet = Vnet.make_vnet
-    "main-vnet"
-    "DEFAULT"
-    "azurerm_virtual_network.main"
-    WestUs2
-    rg
-    (Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  let vnet = Vnet.make
+    ~name:"main-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.main"
+    ~location:WestUs2
+    ~resource_group:rg
+    ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
   in
   let subnet = Subnet.make_subnet
     "internal-subnet"
@@ -50,12 +50,12 @@ let simple_network_world =
 
 let simple_nsg_world = 
   let rg = Rg.make
-  "nsg-simple-rg"
-  "DEFAULT"
-  "azurerm_resource_group.main"
-  EastUs
-  None
-  []
+  ~name:"nsg-simple-rg"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_resource_group.main"
+  ~location:EastUs
+  ~managed_by:None
+  ~tags:[]
   in
   let rule = Nsg.SecurityRule.make
   ~name:"allow-ssh"
@@ -97,8 +97,8 @@ let simple_nic_world =
   ~managed_by:None
   ~tags:[]
   in
-  []
-
+  rg
+  
 let sample_rg = 
   Rg.make 
     ~name:"example-resources"

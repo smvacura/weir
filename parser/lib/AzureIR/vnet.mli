@@ -1,4 +1,6 @@
 open Parser.Tf_types
+open Parser.Azure_types
+open Parser.Network_types
 
 type t
 
@@ -10,7 +12,14 @@ val get_id : t -> IdKey.t
 
 val get_rg : t -> Rg.t
 
-val make_vnet : string -> string -> string -> Parser.Azure_types.azure_location -> Rg.t -> Parser.Network_types.CIDR.t list -> t
+val make : 
+    name:string ->
+    subscription:string ->
+    address:string ->
+    location:azure_location -> 
+    resource_group:Rg.t -> 
+    addresses:CIDR.t list -> 
+    t
 
 val show : t -> string
 

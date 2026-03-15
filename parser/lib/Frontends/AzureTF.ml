@@ -205,7 +205,13 @@ module AzureTFParser = struct
     let* cidr_list = parse_address_block_opt addresses
       |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
     in
-    let vnet = Vnet.make_vnet name "DEFAULT" address location rg cidr_list in
+    let vnet = (Vnet.make 
+      ~name:name 
+      ~subscription:"DEFAULT" 
+      ~address:address 
+      ~location:location 
+      ~resource_group:rg 
+      ~addresses:cidr_list) in
     let inline_subnets = begin
     match Safe.Util.member "subnet" values with
     | `List subnet_json -> inline_subnets_of_json vnet subnet_json
