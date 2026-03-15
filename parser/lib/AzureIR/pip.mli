@@ -5,7 +5,7 @@ type t
 
 val get_name : t -> string
 
-val get_id : t -> Id.t
+val get_id : t -> IdKey.t
 
 val make : name:string -> subscription:string -> resource_group:Rg.t -> location:azure_location -> allocation:ip_assignment -> t
 
@@ -13,6 +13,6 @@ val show : t -> string
 
 val pp : Format.formatter -> t -> unit
 
-module Map : Map.S with type key = Id.t 
+module Map : Map.S with type key = IdKey.t 
 
 val show_pip_map : t IdKeyMap.t -> string
