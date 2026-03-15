@@ -1,9 +1,12 @@
 $ErrorActionPreference = "Stop"
 
 $basePath = "../parser/test/test_plans"
+$providersSrc = Join-Path $PWD "providers.tf"
 
 Get-ChildItem -Path $basePath -Directory | ForEach-Object {
     Write-Host "Processing $($_.FullName)"
+    
+    Copy-Item $providersSrc -Destination $_.FullName
     
     Push-Location $_.FullName
     
@@ -13,6 +16,7 @@ Get-ChildItem -Path $basePath -Directory | ForEach-Object {
     
     # Clean up
     Remove-Item -Recurse -Force .terraform, .terraform.lock.hcl, tfplan -ErrorAction SilentlyContinue
+    Remove-Item providers.tf -ErrorAction SilentlyContinue
     
     Pop-Location
 }
