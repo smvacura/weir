@@ -123,7 +123,13 @@ module AzureTFParser = struct
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type resource group")
     in
 
-    Ok (Rg.make_rg name "DEFAULT" address location managed_by tags)
+    Ok (Rg.make 
+      ~name:name 
+      ~subscription:"DEFAULT" 
+      ~address:address 
+      ~location:location 
+      ~managed_by:managed_by 
+      ~tags:tags)
 
   let list_of_json_opt (json_list : Safe.t) =
     match json_list with 

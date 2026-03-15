@@ -19,7 +19,7 @@ let get_id rg  =
   IdKey.of_strings rg.subscription rg.name rg.name
 
 
-let make_rg name subscription address location managed_by tags = {
+let make ~name:name ~subscription:subscription ~address:address ~location:location ~managed_by:managed_by ~tags:tags = {
   name = name;
   subscription = subscription;
   address = address;

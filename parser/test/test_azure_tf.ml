@@ -7,25 +7,25 @@ open Parser.Tf_types
 
 let single_rg_world = 
   let world = World.empty in
-  let rg = Rg.make_rg 
-    "example-resources"
-    "DEFAULT"
-    "azurerm_resource_group.example"
-    EastUs
-    None
-    []
+  let rg = Rg.make 
+    ~name:"example-resources"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.example"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
   in
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg world.resource_groups in
   { world with resource_groups = rgs' }
 
 let simple_network_world = 
-  let rg = Rg.make_rg
-    "network-rg"
-    "DEFAULT"
-    "azurerm_resource_group.main"
-    WestUs2
-    None
-    []
+  let rg = Rg.make
+    ~name:"network-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:WestUs2
+    ~managed_by:None
+    ~tags:[]
   in
   let vnet = Vnet.make_vnet
     "main-vnet"
@@ -49,7 +49,7 @@ let simple_network_world =
   ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = Pip.Map.empty} : World.t)
 
 let simple_nsg_world = 
-  let rg = Rg.make_rg
+  let rg = Rg.make
   "nsg-simple-rg"
   "DEFAULT"
   "azurerm_resource_group.main"
@@ -88,22 +88,33 @@ let simple_nsg_world =
 
 
 
+let simple_nic_world = 
+  let rg = Rg.make
+  ~name:"main-rg"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_resource_group.main"
+  ~location:EastUs
+  ~managed_by:None
+  ~tags:[]
+  in
+  []
+
 let sample_rg = 
-  Rg.make_rg 
-    "example-resources"
-    "DEFAULT"
-    "azurerm_resource_group.example"
-    EastUs
-    None
-    []
+  Rg.make 
+    ~name:"example-resources"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.example"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
 let rg_helper_tests = "rg_helper" >::: [
-  "eq_true" >:: (fun _ -> assert_bool "rg_eq_true" (sample_rg = (Rg.make_rg 
-    "example-resources"
-    "DEFAULT"
-    "azurerm_resource_group.example"
-    EastUs
-    None
-    [])));
+  "eq_true" >:: (fun _ -> assert_bool "rg_eq_true" (sample_rg = (Rg.make 
+    ~name:"example-resources"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.example"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[])));
 ]
 let world_helper_tests = "world_helper" >::: [
   "eq_true" >:: (fun _ -> assert_bool "" (World.equal single_rg_world single_rg_world));

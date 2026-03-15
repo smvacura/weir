@@ -9,7 +9,14 @@ val get_address : t -> string
 
 val get_id : t -> IdKey.t
 
-val make_rg : string -> string -> string -> azure_location -> string option -> tag list -> t
+val make : 
+    name:string ->
+    subscription:string ->
+    address:string ->
+    location:azure_location -> 
+    managed_by:string option -> 
+    tags:tag list -> 
+    t
 
 val show : t -> string
 
