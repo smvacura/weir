@@ -3,6 +3,7 @@ open Frontends.AzureTF
 open Azureir
 open Parser.Azure_types
 open Parser.Tf_types
+open Parser.Network_types
 
 
 let single_rg_world = 
@@ -33,7 +34,7 @@ let simple_network_world =
     ~address:"azurerm_virtual_network.main"
     ~location:WestUs2
     ~resource_group:rg
-    ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
   in
   let subnet = Subnet.make
     ~name:"internal-subnet"
@@ -41,7 +42,7 @@ let simple_network_world =
     ~address:"azurerm_subnet.internal"
     ~resource_group:rg
     ~vnet:vnet
-    ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
   in
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
@@ -86,8 +87,6 @@ let simple_nsg_world =
   let pips = Pip.Map.empty in
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
 
-
-
 let simple_nic_world = 
   let rg = Rg.make
   ~name:"main-rg"
@@ -103,7 +102,7 @@ let simple_nic_world =
   ~address:"azurerm_virtual_network.main"
   ~location:EastUs
   ~resource_group:rg
-  ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
   in
   let subnet = Subnet.make
   ~name:"main-subnet"
@@ -111,7 +110,7 @@ let simple_nic_world =
   ~address:"azurerm_subnet.main"
   ~resource_group:rg
   ~vnet:vnet
-  ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
   in
   let ipconfig = Nic.IpConfiguration.make
     ~name:"internal"
@@ -140,6 +139,57 @@ let simple_nic_world =
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
   in world
 
+let static_nic_world = 
+  let rg = Rg.make
+  ~name:"main-rg"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_resource_group.main"
+  ~location:EastUs
+  ~managed_by:None
+  ~tags:[]
+  in
+  let vnet = Vnet.make
+  ~name:"main-vnet"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_virtual_network.main"
+  ~location:EastUs
+  ~resource_group:rg
+  ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+  ~name:"main-subnet"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_subnet.main"
+  ~resource_group:rg
+  ~vnet:vnet
+  ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let ipconfig = Nic.IpConfiguration.make
+    ~name:"internal"
+    ~subscription:"DEFAULT"
+    ~subnet:Unresolved
+    ~ip_address_version:IPv4
+    ~pip:Unresolved
+    ~private_address_allocation:(Resolved (Static (Option.get (IPv4.of_string_opt "10.0.1.10"))))
+    ~primary:Unresolved
+  in
+  let nic = Nic.make
+  ~name:"main-nic"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_network_interface.main"
+  ~location:EastUs
+  ~resource_group:rg
+  ~ip_configurations:[ipconfig]
+  in
+  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let nsgs =  IdKeyMap.empty in
+  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
+  let pips = Pip.Map.empty in 
+  let world =
+  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  in world
 
 let sample_rg = 
   Rg.make 
@@ -187,7 +237,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     simple_nic_world
-    (AzureTFParser.get_resources "test_plans/simple_nic/plan.json" ))
+    (AzureTFParser.get_resources "test_plans/simple_nic/plan.json" ));
+  "static_nic" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    static_nic_world
+    (AzureTFParser.get_resources "test_plans/static_nic/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [
