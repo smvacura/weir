@@ -12,7 +12,9 @@ type t = {
 let equal t1 t2 =
   IdKeyMap.equal (=) t1.resource_groups t2.resource_groups &&
   IdKeyMap.equal (=) t1.subnets t2.subnets &&
-  IdKeyMap.equal (=) t1.vnets t2.vnets
+  IdKeyMap.equal (=) t1.vnets t2.vnets &&
+  IdKeyMap.equal (=) t1.nsgs t2.nsgs &&
+  IdKeyMap.equal (=) t1.nics t2.nics 
 
 let empty = {
   resource_groups = IdKeyMap.empty;

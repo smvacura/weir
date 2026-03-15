@@ -97,7 +97,49 @@ let simple_nic_world =
   ~managed_by:None
   ~tags:[]
   in
-  rg
+  let vnet = Vnet.make
+  ~name:"main-vnet"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_virtual_network.main"
+  ~location:EastUs
+  ~resource_group:rg
+  ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+  ~name:"main-subnet"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_subnet.main"
+  ~resource_group:rg
+  ~vnet:vnet
+  ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let ipconfig = Nic.IpConfiguration.make
+    ~name:"internal"
+    ~subscription:"DEFAULT"
+    ~subnet:Unresolved
+    ~ip_address_version:IPv4
+    ~pip:Unresolved
+    ~private_address_allocation:Unresolved
+    ~primary:Unresolved
+  in
+  let nic = Nic.make
+  ~name:"main-nic"
+  ~subscription:"DEFAULT"
+  ~address:"azurerm_network_interface.main"
+  ~location:EastUs
+  ~resource_group:rg
+  ~ip_configurations:[ipconfig]
+  in
+  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let nsgs =  IdKeyMap.empty in
+  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
+  let pips = Pip.Map.empty in 
+  let world =
+  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  in world
+
 
 let sample_rg = 
   Rg.make 
@@ -139,7 +181,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     simple_nsg_world
-    (AzureTFParser.get_resources "test_plans/simple_nsg/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_nsg/plan.json"));
+  "simple_nic" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    simple_nic_world
+    (AzureTFParser.get_resources "test_plans/simple_nic/plan.json" ))
 ]
 
 let suite = "azure_tf_tests" >::: [
