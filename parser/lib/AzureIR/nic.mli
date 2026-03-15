@@ -6,7 +6,13 @@ module IpConfiguration : sig
 
     type t
 
-    val make : string -> string -> Subnet.t -> [ `Ipv4 | `Ipv6 ] -> Pip.t option -> ip_assignment -> bool -> t
+    val make : name:string ->
+        subscription:string ->
+        subnet:Subnet.t resolvable ->
+        ip_address_version:ip_type ->
+        pip:Pip.t option resolvable ->
+        private_address_allocation:ip_assignment resolvable ->
+        primary:bool resolvable -> t
 end
 
 type t

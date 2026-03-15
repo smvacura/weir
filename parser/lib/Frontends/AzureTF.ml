@@ -393,8 +393,46 @@ module AzureTFParser = struct
      ~rule_list:security_rules
      ~tags:tags)
     
-  let ip_configuration_of_json = 
-    Error ""
+  let ip_configuration_of_json ip_config_json = 
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" ip_config_json |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* ip_type_string = Safe.Util.member "private_ip_address_version" ip_config_json |>
+      generate_parse_string_result_required "private_ip_address_version" name "ip_configuration"
+    in 
+    let* ip_type = 
+      ip_type_of_string_opt ip_type_string |>
+      Option.to_result ~none:("Could not parse private_ip_address_version of configuration" ^ name)
+    in
+    let* ip_allocation_string = Safe.Util.member "private_address_allocation" ip_config_json |>
+      generate_parse_string_result_required "private_address_allocation" name "ip_configuratin"
+    in
+    let* ip_string = Safe.Util.member "private_ip_address" ip_config_json |> 
+      generate_parse_string_result "" "" "" 
+    in
+    let ip = match ip_allocation_string, ip_string with
+     | "Static", Some ip -> IPv4.of_string_opt ip
+     | _ -> None
+    in
+    let allocation = match ip with
+      | Some ip -> Resolved (Static ip)
+      | _ -> Unresolved
+    in
+    Ok (Nic.IpConfiguration.make
+    ~name:name
+    ~subscription:"DEFAULT"
+    ~subnet:Unresolved
+    ~ip_address_version:ip_type
+    ~pip:Unresolved
+    ~private_address_allocation:allocation
+    ~primary:Unresolved)
+
+  (* TODO: tighten up into one pass *)
+  let ip_config_block_of_json (ip_config_json : Safe.t) =
+    match ip_config_json with
+    | `List ell -> sequence_result_rev @@ List.map ip_configuration_of_json ell  
+    | _ -> Error "Could not parse IP configuration list"
 
   let nic_of_json world json =
     let values = Safe.Util.member "values" json in
@@ -414,6 +452,9 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
     in
+    let* ip_configurations = Safe.Util.member "ip_configurations" values |>
+      ip_config_block_of_json
+    in
      Ok 
      (Nic.make 
      ~name:name
@@ -421,7 +462,7 @@ module AzureTFParser = struct
      ~address:address
      ~resource_group:rg
      ~location:location
-     ~ip_configurations:[])
+     ~ip_configurations:ip_configurations)
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in

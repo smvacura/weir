@@ -1,6 +1,7 @@
 type 'a resolvable =
 | Resolved of 'a
 | Unresolved
+[@@deriving show]
 
 module IdKey = struct 
   type t = string * string * string
