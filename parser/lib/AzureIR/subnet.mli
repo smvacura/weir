@@ -9,7 +9,14 @@ val get_address : t -> string
 
 val get_id : t -> IdKey.t
 
-val make_subnet : string -> string -> string -> Rg.t -> Vnet.t -> CIDR.t list -> t
+val make : 
+    name:string ->
+    subscription:string ->
+    address:string ->
+    resource_group:Rg.t -> 
+    vnet:Vnet.t -> 
+    addresses:CIDR.t list -> 
+    t
 
 val show : t -> string
 

@@ -167,7 +167,13 @@ module AzureTFParser = struct
           | None -> (Ok []))
       in
       let rg = Vnet.get_rg vnet in
-      Ok (Subnet.make_subnet name "DEFAULT" address rg vnet subnet_block)
+      Ok (Subnet.make 
+      ~name:name 
+      ~subscription:"DEFAULT" 
+      ~address:address 
+      ~resource_group:rg 
+      ~vnet:vnet 
+      ~addresses:subnet_block)
     
     in let rec aux json_list acc =
     match json_list with
@@ -245,7 +251,13 @@ module AzureTFParser = struct
     let* cidr_list = parse_address_block_opt addresses
       |> Option.to_result ~none:("Cannot parse address block of subnet " ^ name)
     in
-    Ok (Subnet.make_subnet name "DEFAULT" address rg vnet cidr_list)
+    Ok (Subnet.make 
+      ~name:name 
+      ~subscription:"DEFAULT" 
+      ~address:address 
+      ~resource_group:rg 
+      ~vnet:vnet 
+      ~addresses:cidr_list)
 
   let endpoint_of_element (json : Safe.t) (kind : string) =
     match json with

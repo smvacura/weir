@@ -35,13 +35,13 @@ let simple_network_world =
     ~resource_group:rg
     ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
   in
-  let subnet = Subnet.make_subnet
-    "internal-subnet"
-    "DEFAULT"
-    "azurerm_subnet.internal"
-    rg
-    vnet
-    (Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
+  let subnet = Subnet.make
+    ~name:"internal-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.internal"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (Parser.Network_types.CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
   in
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
@@ -98,7 +98,7 @@ let simple_nic_world =
   ~tags:[]
   in
   rg
-  
+
 let sample_rg = 
   Rg.make 
     ~name:"example-resources"
