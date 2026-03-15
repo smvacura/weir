@@ -70,7 +70,7 @@ let simple_nsg_world =
   ~direction:Inbound
   in
   let nsg = Nsg.make
-  ~name:"main"
+  ~name:"main-nsg"
   ~subscription:"DEFAULT"
   ~address:"azurerm_network_security_group.main"
   ~location:EastUs

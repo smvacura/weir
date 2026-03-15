@@ -429,8 +429,8 @@ module AzureTFParser = struct
       ip_type_of_string_opt ip_type_string |>
       Option.to_result ~none:("Could not parse private_ip_address_version of configuration" ^ name)
     in
-    let* ip_allocation_string = Safe.Util.member "private_address_allocation" ip_config_json |>
-      generate_parse_string_result_required "private_address_allocation" name "ip_configuratin"
+    let* ip_allocation_string = Safe.Util.member "private_ip_address_allocation" ip_config_json |>
+      generate_parse_string_result_required "private_ip_address_allocation" name "ip_configuration"
     in
     let* ip_string = Safe.Util.member "private_ip_address" ip_config_json |> 
       generate_parse_string_result "" "" "" 
@@ -476,7 +476,7 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
     in
-    let* ip_configurations = Safe.Util.member "ip_configurations" values |>
+    let* ip_configurations = Safe.Util.member "ip_configuration" values |>
       ip_config_block_of_json
     in
      Ok 
