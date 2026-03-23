@@ -440,7 +440,7 @@ module AzureTFParser = struct
      | _ -> None
     in
     let allocation = match ip with
-      | Some ip -> Resolved (Static ip)
+      | Some ip -> Resolved (Static ip : private_ip_assignment)
       | _ -> Unresolved
     in
     Ok (Nic.IpConfiguration.make
@@ -487,6 +487,40 @@ module AzureTFParser = struct
      ~resource_group:rg
      ~location:location
      ~ip_configurations:ip_configurations)
+
+  let pip_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "pip"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "pip"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by pip " ^ name)
+    in
+    let* address = Safe.Util.member "address" json 
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type pip")
+    in
+    let* ip_allocation_string = Safe.Util.member "allocation_method" json 
+      |> generate_parse_string_result_required "allocation method" name "resource_group" in
+    let* ip_allocation = match ip_allocation_string with
+      | "Static" -> Ok (Static)
+      | "Dynamic" -> Ok (Dynamic)
+      | _ -> Error ("Cannot parse field allocation_method in resource " ^ name ^ " of type pip")
+    in
+    Ok (Pip.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~resource_group:rg
+      ~location:location
+      ~allocation:ip_allocation)
+
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in
@@ -555,6 +589,13 @@ module AzureTFParser = struct
 
   let index_nic nic address_index =
     IdKeyMap.add (Nic.get_id nic) (Nic.get_address nic) address_index
+
+  let add_pip (world : World.t) (pip : Pip.t) =
+    let pips' = IdKeyMap.add (Pip.get_id pip) pip world.pips in
+    { world with pips = pips'}
+  
+  let index_pip pip address_index =
+    IdKeyMap.add (Pip.get_id pip) (Pip.get_address pip) address_index
   
   let parse_resource_groups (world, address_index, err) rgs =
     let parse_rg (world, address_index, err) rg_json =
@@ -600,6 +641,14 @@ module AzureTFParser = struct
       | Error e -> (world, address_index, e::err)
     in
     List.fold_left parse_nic (world, address_index, err) nics
+
+  let parse_pips (world, address_index, err) pips =
+    let parse_pip (world, address_index, err) pip_json =
+      match pip_of_json world pip_json with
+      | Ok pip -> (add_pip world pip, index_pip pip address_index, err)
+      | Error e -> (world, address_index, e::err)
+    in
+    List.fold_left parse_pip (world, address_index, err) pips
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -679,7 +728,7 @@ module AzureTFParser = struct
     let world, address_index, err, vnet_inv_index = parse_subnets (world, address_index, err) vnet_inv_index raw_world.subnets in
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
-    (* let world, err = parse_pips (world, err) raw_world.pips in *)
+    let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
     if List.length err > 0 then print_string_list err; 
     world
 

@@ -74,3 +74,9 @@ val make_tag : string -> string -> tag
 val show_tag : tag -> string
 
 val pp_tag : Format.formatter -> tag -> unit
+
+type next_hop
+
+val show_next_hop : next_hop -> string
+
+val pp_next_hop : Format.formatter -> next_hop -> unit

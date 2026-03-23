@@ -229,7 +229,12 @@ let string_of_port_list ports =
   in
   (aux ports "[") ^ "]"
 
-type ip_assignment =
+type private_ip_assignment =
   | Static of IPv4.t
   | Dynamic of CIDR.t
+  [@@deriving show]
+
+type public_ip_assignment =
+  | Static
+  | Dynamic
   [@@deriving show]

@@ -4,6 +4,8 @@ module IPv4 : sig
   val of_octets_opt : int -> int -> int -> int -> t option
   val of_string_opt : string -> t option
   val of_int32 : int32 -> t
+  val pp : Format.formatter -> t -> unit
+  val show : t -> string
 end
 
 module IPv4Mask : sig
@@ -62,7 +64,12 @@ val show_port : port -> string
 
 val pp_port : Format.formatter -> port -> unit
 
-type ip_assignment =
+type private_ip_assignment =
   | Static of IPv4.t
   | Dynamic of CIDR.t
+  [@@deriving show]
+
+type public_ip_assignment =
+  | Static
+  | Dynamic
   [@@deriving show]

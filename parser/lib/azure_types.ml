@@ -1,3 +1,5 @@
+open Network_types
+
 type azure_location =
   | AustraliaCentral
   | AustraliaCentral2
@@ -207,3 +209,11 @@ let show_tag tag =
 
 let pp_tag fmt tag = 
   Format.fprintf fmt "%s" (show_tag tag) 
+
+type next_hop = 
+ | Internet
+ | VirtualNetwork
+ | VirtualAppliance of IPv4.t
+ | VirtualGateway
+ | Drop
+ [@@deriving show]

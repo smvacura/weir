@@ -11,7 +11,7 @@ module IpConfiguration = struct
     subnet: Subnet.t resolvable;
     ip_address_version: ip_type;
     pip: Pip.t option resolvable;
-    private_address_allocation: ip_assignment resolvable;
+    private_address_allocation: private_ip_assignment resolvable;
     primary: bool resolvable;
   } [@@deriving show]
 
