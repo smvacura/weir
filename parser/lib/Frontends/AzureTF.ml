@@ -506,7 +506,7 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type pip")
     in
-    let* ip_allocation_string = Safe.Util.member "allocation_method" json 
+    let* ip_allocation_string = Safe.Util.member "allocation_method" values 
       |> generate_parse_string_result_required "allocation method" name "resource_group" in
     let* ip_allocation = match ip_allocation_string with
       | "Static" -> Ok (Static)

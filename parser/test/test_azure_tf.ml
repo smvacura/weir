@@ -191,6 +191,88 @@ let static_nic_world =
   ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
   in world
 
+
+let pip_nic_world =
+  let rg = Rg.make
+    ~name:"rg-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.this"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let vnet = Vnet.make
+    ~name:"vnet-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.this"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+    ~name:"snet-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.this"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let rule = Nsg.SecurityRule.make
+    ~name:"allow-ssh"
+    ~description:(Some "")
+    ~source_ports:[Any]
+    ~destination_ports:[Single 22]
+    ~protocol:Tcp
+    ~source:Any
+    ~destination:Any
+    ~access:Allow
+    ~priority:100
+    ~direction:Inbound
+  in
+  let nsg = Nsg.make
+    ~name:"nsg-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_network_security_group.this"
+    ~location:EastUs
+    ~resource_group:rg
+    ~rule_list:[rule]
+    ~tags:[]
+  in
+  let pip = Pip.make
+    ~name:"pip-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_public_ip.this"
+    ~location:EastUs
+    ~resource_group:rg
+    ~allocation:Static
+  in
+  let ipconfig = Nic.IpConfiguration.make
+    ~name:"internal"
+    ~subscription:"DEFAULT"
+    ~subnet:Unresolved
+    ~ip_address_version:IPv4
+    ~pip:Unresolved
+    ~private_address_allocation:Unresolved
+    ~primary:Unresolved
+  in
+  let nic = Nic.make
+    ~name:"nic-jumpbox"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_network_interface.this"
+    ~location:EastUs
+    ~resource_group:rg
+    ~ip_configurations:[ipconfig]
+  in
+  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
+  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
+  let pips = IdKeyMap.add (Pip.get_id pip) pip IdKeyMap.empty in
+  let world =
+    ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  in world
+
 let sample_rg = 
   Rg.make 
     ~name:"example-resources"
@@ -243,7 +325,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     static_nic_world
-    (AzureTFParser.get_resources "test_plans/static_nic/plan.json"))
+    (AzureTFParser.get_resources "test_plans/static_nic/plan.json"));
+  "simple_pip" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    pip_nic_world
+    (AzureTFParser.get_resources "test_plans/simple_nic_pip/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [
