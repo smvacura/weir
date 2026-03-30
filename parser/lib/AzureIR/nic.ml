@@ -12,11 +12,20 @@ module IpConfiguration = struct
     ip_address_version: ip_type;
     pip: Pip.t option resolvable;
     private_address_allocation: private_ip_assignment resolvable;
-    primary: bool resolvable;
+    primary: bool option
   } [@@deriving show]
 
   let make ~name:name ~subscription:subscription ~subnet:subnet ~ip_address_version:ip_address_version ~pip:pip ~private_address_allocation:private_address_allocation ~primary:primary =
     {name; subscription; subnet; ip_address_version; pip; private_address_allocation; primary}
+
+let unresolved_fields r =
+  List.filter_map Fun.id [
+    (match r.subnet with Unresolved -> Some "subnet_id" | _ -> None);
+    (match r.pip with Unresolved -> Some "public_ip_address_id" | _ -> None);
+    (match r.private_address_allocation with Unresolved -> Some "private_ip_address_allocation" | _ -> None);
+  ]
+
+  let resolve_subnet subnet' ip_config = { ip_config with subnet = Resolved subnet' }
 end
 
 type t = {
@@ -25,7 +34,7 @@ type t = {
   address : string;
   location : azure_location;
   resource_group : Rg.t;
-  ip_configurations : IpConfiguration.t list
+  ip_configurations : IpConfiguration.t list;
 } [@@deriving show]
 
 let get_name nic = nic.name

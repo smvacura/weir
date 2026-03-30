@@ -12,7 +12,11 @@ module IpConfiguration : sig
         ip_address_version:ip_type ->
         pip:Pip.t option resolvable ->
         private_address_allocation:private_ip_assignment resolvable ->
-        primary:bool resolvable -> t
+        primary:bool option -> t
+    
+    val unresolved_fields : t -> string list
+
+    val resolve_subnet : Subnet.t -> t -> t
 end
 
 type t
