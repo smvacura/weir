@@ -14,3 +14,5 @@ module IdKey = struct
 end
 
 module IdKeyMap = Map.Make(IdKey)
+
+module AddressKey = Map.Make(String)
