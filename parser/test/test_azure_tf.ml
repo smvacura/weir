@@ -46,7 +46,7 @@ let simple_network_world =
   in
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
-  let subnets' = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let subnets' = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
   ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = IdKeyMap.empty} : World.t)
 
 let simple_nsg_world = 
@@ -81,7 +81,7 @@ let simple_nsg_world =
   in
   let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets = IdKeyMap.empty in
-  let subnets = IdKeyMap.empty in
+  let subnets = AddressMap.empty in
   let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
   let nics = IdKeyMap.empty in
   let pips = IdKeyMap.empty in
@@ -119,7 +119,7 @@ let simple_nic_world =
     ~ip_address_version:IPv4
     ~pip:Unresolved
     ~private_address_allocation:Unresolved
-    ~primary:Unresolved
+    ~primary:None
   in
   let nic = Nic.make
   ~name:"main-nic"
@@ -131,7 +131,7 @@ let simple_nic_world =
   in
   let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
-  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = IdKeyMap.empty in 
@@ -171,7 +171,7 @@ let static_nic_world =
     ~ip_address_version:IPv4
     ~pip:Unresolved
     ~private_address_allocation:(Resolved (Static (Option.get (IPv4.of_string_opt "10.0.1.10"))))
-    ~primary:Unresolved
+    ~primary:None
   in
   let nic = Nic.make
   ~name:"main-nic"
@@ -183,7 +183,7 @@ let static_nic_world =
   in
   let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
-  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = IdKeyMap.empty in 
@@ -253,7 +253,7 @@ let pip_nic_world =
     ~ip_address_version:IPv4
     ~pip:Unresolved
     ~private_address_allocation:Unresolved
-    ~primary:Unresolved
+    ~primary:None
   in
   let nic = Nic.make
     ~name:"nic-jumpbox"
@@ -265,7 +265,7 @@ let pip_nic_world =
   in
   let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
-  let subnets = IdKeyMap.add (Subnet.get_id subnet) subnet IdKeyMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
   let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = IdKeyMap.add (Pip.get_id pip) pip IdKeyMap.empty in

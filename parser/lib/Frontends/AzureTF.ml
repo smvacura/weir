@@ -450,7 +450,7 @@ module AzureTFParser = struct
     ~ip_address_version:ip_type
     ~pip:Unresolved
     ~private_address_allocation:allocation
-    ~primary:Unresolved)
+    ~primary:None)
 
   (* TODO: tighten up into one pass *)
   let ip_config_block_of_json (ip_config_json : Safe.t) =
@@ -570,7 +570,7 @@ module AzureTFParser = struct
     aux vnet subnets index
 
   let add_subnet (world : World.t) (subnet : Subnet.t) =
-    let subnets' = IdKeyMap.add (Subnet.get_id subnet) subnet world.subnets in
+    let subnets' = AddressMap.add (Subnet.get_address subnet) subnet world.subnets in
     { world with subnets = subnets'}
 
   let index_subnet subnet address_index =
@@ -711,6 +711,80 @@ module AzureTFParser = struct
       List.fold_left (fun (world, err) r -> raw_parse_resource r world err) (raw_world_empty, []) arr
     | None -> (raw_world_empty, ["Could not parse resource array"])
 
+
+  let is_resolvable json =
+    let is_id_field address = 
+      let address_list = String.split_on_char '.' address in
+      match List.rev address_list with
+      | "id"::t -> true
+      | _ -> false
+    in
+    let get_id_ref json =
+      let string_list_json = List.map Safe.Util.to_string_option json in
+      ""
+    in
+    let resources = Safe.Util.member "references" json in
+    match resources with
+    | `List l -> begin 
+      match List.filter is_id_field (Safe.Util.filter_string l) with 
+      | h::t -> true
+      | [] -> false
+    end
+    | _ -> false
+
+  let resolve_ip_config_dependencies json = 
+    let (let*) = Result.bind in
+    Ok ""
+  
+
+  let get_configuration_resource address json_list =
+    let rec aux address ell =
+    match ell with
+    | h::t -> 
+      if Safe.Util.member "address" h |> Safe.Util.to_string = address
+      then Some h 
+      else aux address t
+    | [] -> None
+    in
+    aux address json_list
+
+  let resolve_ip_config_dependencies ip_config (world : World.t) ip_config_json =
+    let resolve_subnet ip_config = 
+      let subnet_references = Safe.Util.member "subnet_id" ip_config_json |>
+        Safe.Util.member "references" |> 
+        Safe.Util.to_list |>
+        Safe.Util.filter_string in
+      match subnet_references with
+      | [id; address] -> AddressMap.find_opt address world.subnets
+      | _ -> None
+    in
+    let resolve_value value_name =
+      match value_name with
+      | "subnet" -> 
+        begin match resolve_subnet ip_config with
+        | Some subnet -> Ok (Nic.IpConfiguration.resolve_subnet subnet ip_config)
+        | None -> Error "Subnet not found"
+      end
+      | _ -> Error "wrong"
+    in
+    let unresolved_values = Nic.IpConfiguration.unresolved_fields ip_config in
+    let rec aux values ip_config =
+      match values with
+      | h::t -> aux t (resolve_value h)
+      | [] -> ip_config
+    in
+    aux unresolved_values (Ok ip_config)
+  let resolve_nic_dependencies nic world config_json = 
+    let resolve_dependency nic resource world = 
+      let expressions = Safe.Util.member "expressions" resource in
+      let ip_config = Safe.Util.member "ip_configuration" expressions in
+    let address = Nic.get_address nic in
+    nic
+    in
+    nic
+
+
+  let resolve_dependency json = ""
 
   let print_string_list ell =
     let rec aux = function

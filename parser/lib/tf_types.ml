@@ -15,4 +15,4 @@ end
 
 module IdKeyMap = Map.Make(IdKey)
 
-module AddressKey = Map.Make(String)
+module AddressMap = Map.Make(String)

@@ -22,4 +22,4 @@ val show : t -> string
 
 val pp : Format.formatter -> t -> unit
 
-val show_subnet_map : t IdKeyMap.t -> string
+val show_subnet_map : t AddressMap.t -> string

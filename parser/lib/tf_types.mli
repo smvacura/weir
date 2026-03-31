@@ -13,3 +13,5 @@ module IdKey : sig
 end
 
 module IdKeyMap : Map.S with type key = IdKey.t 
+
+module AddressMap : Map.S with type key = string

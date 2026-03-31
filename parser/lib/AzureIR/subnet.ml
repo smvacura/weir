@@ -44,8 +44,8 @@ let show { name; address; resource_group; vnet; addresses } =
 let show_subnet_map m =
   "{" ^ 
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id ,s) -> (IdKey.show id) ^ ":" ^ show s)
+  |> AddressMap.bindings
+  |> List.map (fun (id ,s) -> id ^ ":" ^ show s)
   |> String.concat ",")
   ^
   "}"

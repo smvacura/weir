@@ -2,7 +2,7 @@ open Parser.Tf_types
 
 type t = {
   resource_groups : Rg.t IdKeyMap.t;
-  subnets : Subnet.t IdKeyMap.t;
+  subnets : Subnet.t AddressMap.t;
   vnets : Vnet.t IdKeyMap.t;
   nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t IdKeyMap.t;
@@ -11,14 +11,14 @@ type t = {
 
 let equal t1 t2 =
   IdKeyMap.equal (=) t1.resource_groups t2.resource_groups &&
-  IdKeyMap.equal (=) t1.subnets t2.subnets &&
+  AddressMap.equal (=) t1.subnets t2.subnets &&
   IdKeyMap.equal (=) t1.vnets t2.vnets &&
   IdKeyMap.equal (=) t1.nsgs t2.nsgs &&
   IdKeyMap.equal (=) t1.nics t2.nics 
 
 let empty = {
   resource_groups = IdKeyMap.empty;
-  subnets = IdKeyMap.empty;
+  subnets = AddressMap.empty;
   vnets = IdKeyMap.empty;
   nsgs = IdKeyMap.empty;
   nics = IdKeyMap.empty;
