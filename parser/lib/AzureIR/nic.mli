@@ -13,6 +13,8 @@ module IpConfiguration : sig
         pip:Pip.t option resolvable ->
         private_address_allocation:private_ip_assignment resolvable ->
         primary:bool option -> t
+
+    val get_name : t -> string
     
     val unresolved_fields : t -> string list
 
@@ -27,11 +29,15 @@ val get_address : t -> string
 
 val get_id : t -> IdKey.t
 
+val get_ipconfigs : t -> IpConfiguration.t list
+
 val make : name:string ->
     subscription:string ->
     address:string ->
     location:azure_location ->
     resource_group:Rg.t -> ip_configurations:IpConfiguration.t list -> t
+
+val resolve_ipconfigs : t -> IpConfiguration.t list -> t
 
 val show : t -> string
 

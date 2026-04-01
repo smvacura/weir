@@ -719,10 +719,6 @@ module AzureTFParser = struct
       | "id"::t -> true
       | _ -> false
     in
-    let get_id_ref json =
-      let string_list_json = List.map Safe.Util.to_string_option json in
-      ""
-    in
     let resources = Safe.Util.member "references" json in
     match resources with
     | `List l -> begin 
@@ -731,10 +727,6 @@ module AzureTFParser = struct
       | [] -> false
     end
     | _ -> false
-
-  let resolve_ip_config_dependencies json = 
-    let (let*) = Result.bind in
-    Ok ""
   
 
   let get_configuration_resource address json_list =
@@ -774,14 +766,50 @@ module AzureTFParser = struct
       | [] -> ip_config
     in
     aux unresolved_values (Ok ip_config)
-  let resolve_nic_dependencies nic world config_json = 
-    let resolve_dependency nic resource world = 
+
+  let find_ip_config_json ipconfig json =
+    let is_name json name = 
+      match Safe.Util.member "name" json |> Safe.Util.member "constant_value" with
+      | `String s -> s = name
+      | _ -> false
+    in
+    let rec aux json_list name = 
+      match json_list with
+      | h::t -> if is_name h name then Some h else aux t name
+      | [] -> None
+    in
+    let name = Nic.IpConfiguration.get_name ipconfig in
+    aux json name
+
+  let resolve_ip_configurations ipconfigs world json = 
+    let (let*) = Result.bind in
+    let rec aux ipconfigs acc =
+      match ipconfigs with
+      | h::t -> 
+        let* ipconfig_json = find_ip_config_json h json |> Option.to_result ~none:"Missing IPconfig" in
+        let* resolved_ipconfig = resolve_ip_config_dependencies h world ipconfig_json in
+        aux t (resolved_ipconfig::acc)
+      | [] -> Ok acc
+    in
+    aux ipconfigs []
+  
+  let resolve_nic_dependencies nics world config_json = 
+    let resolve_nic_dependency nic resource = 
       let expressions = Safe.Util.member "expressions" resource in
       let ip_config = Safe.Util.member "ip_configuration" expressions in
-    let address = Nic.get_address nic in
-    nic
+      match ip_config with 
+      | `List l -> begin
+        match resolve_ip_configurations (Nic.get_ipconfigs nic) world l with
+        | Ok l -> Ok (Nic.resolve_ipconfigs nic l)
+        | Error e -> Error e
+      end
+      | _ -> Error "Malformed NIC in configuration"
     in
-    nic
+    IdKeyMap.fold (fun id nic (ok_map, err_list) -> 
+      match resolve_nic_dependency nic config_json with
+      | Ok nic' -> (IdKeyMap.add id nic' ok_map, err_list)
+      | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, [])
+    
 
 
   let resolve_dependency json = ""
