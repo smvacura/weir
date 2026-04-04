@@ -26,8 +26,8 @@ let make ~name ~subscription ~address ~resource_group ~location ~allocation =
 let show_pip_map m =
   "{" ^ 
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id,pip) -> (IdKey.show id) ^ ":" ^ show pip)
+  |> AddressMap.bindings
+  |> List.map (fun (address,pip) -> address ^ ":" ^ show pip)
   |> String.concat ",")
   ^
   "}"

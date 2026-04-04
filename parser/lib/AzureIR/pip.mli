@@ -15,4 +15,4 @@ val show : t -> string
 
 val pp : Format.formatter -> t -> unit
 
-val show_pip_map : t IdKeyMap.t -> string
+val show_pip_map : t AddressMap.t -> string

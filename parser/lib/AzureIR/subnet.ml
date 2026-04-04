@@ -18,6 +18,9 @@ let get_address subnet = subnet.address
 let get_id subnet  =
   IdKey.of_strings subnet.subscription (Rg.get_name subnet.resource_group) subnet.name
 
+let get_cidrs subnet =
+  subnet.addresses
+
 let make ~name:name ~subscription:subscription ~address:address ~resource_group:rg ~vnet:vnet ~addresses:addresses = {
   name = name;
   subscription = subscription;

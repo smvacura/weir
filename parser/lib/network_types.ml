@@ -231,7 +231,7 @@ let string_of_port_list ports =
 
 type private_ip_assignment =
   | Static of IPv4.t
-  | Dynamic of CIDR.t
+  | Dynamic
   [@@deriving show]
 
 type public_ip_assignment =

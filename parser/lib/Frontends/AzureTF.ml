@@ -440,8 +440,8 @@ module AzureTFParser = struct
      | _ -> None
     in
     let allocation = match ip with
-      | Some ip -> Resolved (Static ip : private_ip_assignment)
-      | _ -> Unresolved
+      | Some ip -> (Static ip : private_ip_assignment)
+      | _ -> Dynamic
     in
     Ok (Nic.IpConfiguration.make
     ~name:name
@@ -600,7 +600,7 @@ module AzureTFParser = struct
     IdKeyMap.add (Nic.get_id nic) (Nic.get_address nic) address_index
 
   let add_pip (world : World.t) (pip : Pip.t) =
-    let pips' = IdKeyMap.add (Pip.get_id pip) pip world.pips in
+    let pips' = AddressMap.add (Pip.get_address pip) pip world.pips in
     { world with pips = pips'}
   
   let index_pip pip address_index =
@@ -749,8 +749,8 @@ module AzureTFParser = struct
     in
     aux address json_list
 
-  let resolve_ip_config_dependencies ip_config (world : World.t) ip_config_json =
-    let resolve_subnet ip_config = 
+  let resolve_ip_config_dependencies ipconfig (world : World.t) ip_config_json =
+    let resolved_subnet = 
       let subnet_references = Safe.Util.member "subnet_id" ip_config_json |>
         Safe.Util.member "references" |> 
         Safe.Util.to_list |>
@@ -759,14 +759,26 @@ module AzureTFParser = struct
       | [id; address] -> AddressMap.find_opt address world.subnets
       | _ -> None
     in
-    let resolve_value value_name =
+    let resolved_pip =
+      let pip_references = Safe.Util.member "public_ip_address_id" ip_config_json |>
+      Safe.Util.member "references" |> 
+      Safe.Util.to_list |>
+      Safe.Util.filter_string in
+    match pip_references with
+    | [id; address] -> AddressMap.find_opt address world.pips
+    | _ -> None
+    in
+    match resolved_subnet with
+    | Some subnet -> Ok (Nic.IpConfiguration.resolve ipconfig ~subnet:subnet ~pip:resolved_pip)
+    | None -> Error ("Could not resolve subnet for NIC " ^ (Nic.IpConfiguration.get_name ipconfig))
+    (* let resolve_value value_name =
       match value_name with
-      | "subnet" -> 
+      | "subnet_id" -> 
         begin match resolve_subnet ip_config with
-        | Some subnet -> Ok (Nic.IpConfiguration.resolve_subnet subnet ip_config)
+        | Some subnet -> Ok (Nic.IpConfiguration.resolve_subnet subnet ipconfig)
         | None -> Error "Subnet not found"
       end
-      | _ -> Error "wrong"
+      | _ -> Error ("Cannot resolve value " ^ value_name ^ " for IP configuration: Not found") 
     in
     let unresolved_values = Nic.IpConfiguration.unresolved_fields ip_config in
     let rec aux values ip_config =
@@ -774,7 +786,7 @@ module AzureTFParser = struct
       | h::t -> aux t (resolve_value h)
       | [] -> ip_config
     in
-    aux unresolved_values (Ok ip_config)
+    aux unresolved_values (Ok ip_config) *)
 
   let find_ip_config_json ipconfig json =
     let is_name json name = 
@@ -802,7 +814,7 @@ module AzureTFParser = struct
     in
     aux ipconfigs []
   
-  let resolve_nic_dependencies nics world config_json = 
+  let resolve_nic_dependencies nics world config_json err = 
     let resolve_nic_dependency nic = 
       let (let*) = Result.bind in
       let* resource = get_configuration_resource (Nic.get_address nic) config_json 
@@ -817,10 +829,13 @@ module AzureTFParser = struct
       end
       | _ -> Error "Malformed NIC in configuration"
     in
+    let nics', err = begin
     IdKeyMap.fold (fun id nic (ok_map, err_list) -> 
       match resolve_nic_dependency nic with
       | Ok nic' -> (IdKeyMap.add id nic' ok_map, err_list)
-      | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, [])
+      | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, err)
+    end
+    in ({world with nics = nics'}, err)
     
 
 
@@ -844,9 +859,9 @@ module AzureTFParser = struct
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
-    let nics', err = resolve_nic_dependencies world.nics world (Option.get config_json) in
+    let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
     if List.length err > 0 then print_string_list err; 
-    {world with nics = nics'}
+    world
 
 
 
