@@ -844,9 +844,9 @@ module AzureTFParser = struct
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
-    let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) in
+    let nics', err = resolve_nic_dependencies world.nics world (Option.get config_json) in
     if List.length err > 0 then print_string_list err; 
-    world
+    {world with nics = nics'}
 
 
 
