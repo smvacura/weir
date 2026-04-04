@@ -760,13 +760,16 @@ module AzureTFParser = struct
       | _ -> None
     in
     let resolved_pip =
-      let pip_references = Safe.Util.member "public_ip_address_id" ip_config_json |>
-      Safe.Util.member "references" |> 
-      Safe.Util.to_list |>
-      Safe.Util.filter_string in
-    match pip_references with
-    | [id; address] -> AddressMap.find_opt address world.pips
-    | _ -> None
+      let pip_references = 
+      match Safe.Util.member "public_ip_address_id" ip_config_json with
+      | `Null -> []
+      | json -> Safe.Util.member "references" json |> 
+                Safe.Util.to_list |>
+                Safe.Util.filter_string
+      in 
+      match pip_references with
+      | [id; address] -> AddressMap.find_opt address world.pips
+      | _ -> None
     in
     match resolved_subnet with
     | Some subnet -> Ok (Nic.IpConfiguration.resolve ipconfig ~subnet:subnet ~pip:resolved_pip)
