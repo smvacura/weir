@@ -115,9 +115,9 @@ let simple_nic_world =
   let ipconfig = Nic.IpConfiguration.make
     ~name:"internal"
     ~subscription:"DEFAULT"
-    ~subnet:Unresolved
+    ~subnet:(Resolved subnet)
     ~ip_address_version:IPv4
-    ~pip:Unresolved
+    ~pip:(Resolved None)
     ~private_address_allocation:Dynamic
     ~primary:None
   in
@@ -167,9 +167,9 @@ let static_nic_world =
   let ipconfig = Nic.IpConfiguration.make
     ~name:"internal"
     ~subscription:"DEFAULT"
-    ~subnet:Unresolved
+    ~subnet:(Resolved subnet)
     ~ip_address_version:IPv4
-    ~pip:Unresolved
+    ~pip:(Resolved None)
     ~private_address_allocation:(Static (Option.get (IPv4.of_string_opt "10.0.1.10")))
     ~primary:None
   in
@@ -249,9 +249,9 @@ let pip_nic_world =
   let ipconfig = Nic.IpConfiguration.make
     ~name:"internal"
     ~subscription:"DEFAULT"
-    ~subnet:Unresolved
+    ~subnet:(Resolved subnet)
     ~ip_address_version:IPv4
-    ~pip:Unresolved
+    ~pip:(Resolved (Some pip))
     ~private_address_allocation:Dynamic
     ~primary:None
   in
