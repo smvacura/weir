@@ -540,6 +540,15 @@ module AzureTFParser = struct
     with
     | `Null -> None
     | arr -> Some (Safe.Util.to_list arr)
+  
+    let json_config file = 
+    match from_file_robust file
+    |> Safe.Util.member "configuration"
+    |> Safe.Util.member "root_module"
+    |> Safe.Util.member "resources"
+    with
+    | `Null -> None
+    | arr -> Some (Safe.Util.to_list arr)
 
   
   let add_rg (world : World.t) (rg : Rg.t) = 
@@ -794,7 +803,10 @@ module AzureTFParser = struct
     aux ipconfigs []
   
   let resolve_nic_dependencies nics world config_json = 
-    let resolve_nic_dependency nic resource = 
+    let resolve_nic_dependency nic = 
+      let (let*) = Result.bind in
+      let* resource = get_configuration_resource (Nic.get_address nic) config_json 
+        |> Option.to_result ~none:("Could not resolve ids for nic " ^ (Nic.get_name nic)) in
       let expressions = Safe.Util.member "expressions" resource in
       let ip_config = Safe.Util.member "ip_configuration" expressions in
       match ip_config with 
@@ -806,7 +818,7 @@ module AzureTFParser = struct
       | _ -> Error "Malformed NIC in configuration"
     in
     IdKeyMap.fold (fun id nic (ok_map, err_list) -> 
-      match resolve_nic_dependency nic config_json with
+      match resolve_nic_dependency nic with
       | Ok nic' -> (IdKeyMap.add id nic' ok_map, err_list)
       | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, [])
     
@@ -824,6 +836,7 @@ module AzureTFParser = struct
 
   let get_resources file =
     let json = json_resources file in
+    let config_json = json_config file in
     let raw_world, err = raw_parse_resources json in
     let world, address_index, err = parse_resource_groups (World.empty, IdKeyMap.empty, err) raw_world.rgs in
     let world, address_index, err, vnet_inv_index = parse_vnets (world, address_index, err) subnet_inv_idx_empty raw_world.vnets in
@@ -831,6 +844,7 @@ module AzureTFParser = struct
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
+    let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) in
     if List.length err > 0 then print_string_list err; 
     world
 
