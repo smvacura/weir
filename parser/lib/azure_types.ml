@@ -217,3 +217,13 @@ type next_hop =
  | VirtualGateway
  | Drop
  [@@deriving show]
+
+let next_hop_of_string_opt s ?(ip=None) = 
+  match s with
+  | "Internet" -> Some Internet
+  | "VirtualNetwork" -> Some VirtualNetwork
+  | "VirtualAppliance" -> Option.map (fun ip -> VirtualAppliance ip) ip
+  | "VirtualGateway" -> Some VirtualGateway
+  | "Drop" -> Some Drop
+  | _ -> None
+

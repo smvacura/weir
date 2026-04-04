@@ -1,3 +1,5 @@
+open Network_types
+
 type azure_location =
   | AustraliaCentral
   | AustraliaCentral2
@@ -75,8 +77,12 @@ val show_tag : tag -> string
 
 val pp_tag : Format.formatter -> tag -> unit
 
-type next_hop
+type next_hop = 
+ | Internet
+ | VirtualNetwork
+ | VirtualAppliance of IPv4.t
+ | VirtualGateway
+ | Drop
+ [@@deriving show]
 
-val show_next_hop : next_hop -> string
-
-val pp_next_hop : Format.formatter -> next_hop -> unit
+val next_hop_of_string_opt : string -> ?ip:IPv4.t option -> next_hop option

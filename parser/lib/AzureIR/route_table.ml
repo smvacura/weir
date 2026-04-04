@@ -7,8 +7,12 @@ module Route = struct
   type t = {
     name : string;
     address_prefix : CIDR.t;
-    next_hop : next_hop
+    next_hop : next_hop;
+    next_hop_in_ip_address : IPv4.t option;
   }
+
+  let make ~name ~address_prefix ~next_hop ~next_hop_in_ip_address =
+    { name; address_prefix; next_hop; next_hop_in_ip_address }
 end
 
 type t = {
@@ -18,5 +22,15 @@ type t = {
   location : azure_location;
   resource_group : Rg.t;
   disable_bgp_route_propagation : bool;
+  routes : Route.t list;
   tags : tag list;
 }
+
+let get_name rt = 
+  rt.name
+
+let get_address rt = 
+  rt.address
+
+let make ~name ~subscription ~address ~location ~resource_group ?(disable_bgp_route_propagation = true) ~routes ~tags =
+  { name; subscription; address; location; resource_group; disable_bgp_route_propagation; routes; tags } 

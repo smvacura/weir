@@ -13,6 +13,7 @@ module AzureTFParser = struct
     nsgs : Safe.t list;
     nics : Safe.t list;
     pips : Safe.t list;
+    route_tables : Safe.t list;
   }
 
   let raw_world_empty = {
@@ -22,6 +23,7 @@ module AzureTFParser = struct
     nsgs = [];
     nics = [];
     pips = [];
+    route_tables = [];
   }
 
 
@@ -521,6 +523,76 @@ module AzureTFParser = struct
       ~location:location
       ~allocation:ip_allocation)
 
+  let route_of_json json = 
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" json |>
+      generate_parse_string_result_required "name" "" "route"
+    in
+    let* prefix = match Safe.Util.member "address_prefix" json with
+    | `String s -> CIDR.of_string_opt s |> Option.to_result ~none:("Could not parse resource " ^ name ^ " of type route")
+    | _ -> Error ("Could not parse resource " ^ name ^ " of type route")
+    in
+    let next_hop_in_ip_address = match Safe.Util.member "next_hop_in_ip_address" json with
+    | `String s -> IPv4.of_string_opt s
+    | _ -> None
+    in
+    let* next_hop = match Safe.Util.member "next_hop_type" json with
+    | `String s -> next_hop_of_string_opt s ~ip:next_hop_in_ip_address |>
+      Option.to_result ~none:("Could not parse next hop of route " ^ name)
+    | _ -> Error ("Could not parse next hop of route " ^ name)
+    in
+    Ok (
+      Route_table.Route.make
+        ~name:name
+        ~address_prefix:prefix
+        ~next_hop:next_hop
+        ~next_hop_in_ip_address:next_hop_in_ip_address
+    )
+    
+
+  let route_table_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "pip"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "pip"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by route table " ^ name)
+    in
+    let* address = Safe.Util.member "address" json 
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type route table")
+    in
+    let* disable_bgp_route_propagation = match Safe.Util.member "disable_bgp_route_propagation" values with
+    | `Bool b -> Ok b 
+    | _ -> Ok true
+    in
+    let tags = Safe.Util.member "tags" values 
+      |> parse_tags_lenient 
+      |> fst in 
+    let* routes = match Safe.Util.member "route" values with
+      | `List l -> List.map route_of_json l |> sequence_result_rev
+      | _ -> Error ("Could not parse field routes of resource " ^ name ^ " of type route table")
+    in
+    Ok (
+      Route_table.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~resource_group:rg
+      ~disable_bgp_route_propagation:disable_bgp_route_propagation
+      ~routes:routes
+      ~tags:tags
+    )
+    
+
+
 
   let from_file_robust path =
     let content = In_channel.with_open_bin path In_channel.input_all in
@@ -605,6 +677,10 @@ module AzureTFParser = struct
   
   let index_pip pip address_index =
     IdKeyMap.add (Pip.get_id pip) (Pip.get_address pip) address_index
+
+  let add_route_table (world : World.t) (rt : Route_table.t) =
+  let route_tables' = AddressMap.add (Route_table.get_address rt) rt world.route_tables in
+  { world with route_tables = route_tables' }
   
   let parse_resource_groups (world, address_index, err) rgs =
     let parse_rg (world, address_index, err) rg_json =
@@ -658,6 +734,14 @@ module AzureTFParser = struct
       | Error e -> (world, address_index, e::err)
     in
     List.fold_left parse_pip (world, address_index, err) pips
+
+  let parse_route_tables (world, err) route_tables =
+    let parse_route_table (world, err) rt_json =
+      match route_table_of_json world rt_json with
+      | Ok route_table -> (add_route_table world route_table, err)
+      | Error e -> (world, e::err)
+    in
+    List.fold_left parse_route_table (world, err) route_tables
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -710,6 +794,12 @@ module AzureTFParser = struct
       match name with
       | Some s -> let pips' = json_resource::world.pips in
       ({world with pips = pips'}, err)
+    end
+    | Some "azurerm_route_table" -> begin
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some s -> let route_tables' = json_resource::world.route_tables in
+      ({world with route_tables = route_tables'}, err)
     end
     | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
@@ -774,22 +864,7 @@ module AzureTFParser = struct
     match resolved_subnet with
     | Some subnet -> Ok (Nic.IpConfiguration.resolve ipconfig ~subnet:subnet ~pip:resolved_pip)
     | None -> Error ("Could not resolve subnet for NIC " ^ (Nic.IpConfiguration.get_name ipconfig))
-    (* let resolve_value value_name =
-      match value_name with
-      | "subnet_id" -> 
-        begin match resolve_subnet ip_config with
-        | Some subnet -> Ok (Nic.IpConfiguration.resolve_subnet subnet ipconfig)
-        | None -> Error "Subnet not found"
-      end
-      | _ -> Error ("Cannot resolve value " ^ value_name ^ " for IP configuration: Not found") 
-    in
-    let unresolved_values = Nic.IpConfiguration.unresolved_fields ip_config in
-    let rec aux values ip_config =
-      match values with
-      | h::t -> aux t (resolve_value h)
-      | [] -> ip_config
-    in
-    aux unresolved_values (Ok ip_config) *)
+
 
   let find_ip_config_json ipconfig json =
     let is_name json name = 
@@ -862,6 +937,7 @@ module AzureTFParser = struct
     let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
+    let world, err = parse_route_tables (world, err) raw_world.route_tables in
     let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
     if List.length err > 0 then print_string_list err; 
     world

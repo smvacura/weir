@@ -6,7 +6,8 @@ type t = {
   vnets : Vnet.t IdKeyMap.t;
   nsgs : Nsg.t IdKeyMap.t;
   nics : Nic.t IdKeyMap.t;
-  pips : Pip.t AddressMap.t
+  pips : Pip.t AddressMap.t;
+  route_tables : Route_table.t AddressMap.t
 }
 
 let equal t1 t2 =
@@ -15,7 +16,8 @@ let equal t1 t2 =
   IdKeyMap.equal (=) t1.vnets t2.vnets &&
   IdKeyMap.equal (=) t1.nsgs t2.nsgs &&
   IdKeyMap.equal (=) t1.nics t2.nics &&
-  AddressMap.equal (=) t1.pips t2.pips
+  AddressMap.equal (=) t1.pips t2.pips &&
+  AddressMap.equal (=) t1.route_tables t2.route_tables
 
 let empty = {
   resource_groups = IdKeyMap.empty;
@@ -24,6 +26,7 @@ let empty = {
   nsgs = IdKeyMap.empty;
   nics = IdKeyMap.empty;
   pips = AddressMap.empty;
+  route_tables = AddressMap.empty;
 }
 
 let get_resource_group world subscription name = 

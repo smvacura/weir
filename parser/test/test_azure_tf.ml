@@ -47,7 +47,7 @@ let simple_network_world =
   let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
   let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
   let subnets' = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = AddressMap.empty} : World.t)
+  ({ resource_groups = rgs'; vnets = vnets'; subnets = subnets'; nsgs = IdKeyMap.empty; nics = IdKeyMap.empty; pips = AddressMap.empty; route_tables = AddressMap.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make
@@ -85,7 +85,8 @@ let simple_nsg_world =
   let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
   let nics = IdKeyMap.empty in
   let pips = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  let route_tables = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables} : World.t)
 
 let simple_nic_world = 
   let rg = Rg.make
@@ -135,8 +136,9 @@ let simple_nic_world =
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = AddressMap.empty in 
+  let route_tables = AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables} : World.t)
   in world
 
 let static_nic_world = 
@@ -187,8 +189,9 @@ let static_nic_world =
   let nsgs =  IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = AddressMap.empty in 
+  let route_tables = AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables} : World.t)
   in world
 
 
@@ -269,8 +272,61 @@ let pip_nic_world =
   let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
   let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
   let pips = AddressMap.add (Pip.get_address pip) pip AddressMap.empty in
+  let route_tables = AddressMap.empty in
   let world =
-    ({resource_groups; vnets; subnets; nsgs; nics; pips} : World.t)
+    ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables} : World.t)
+  in world
+
+let route_table_world =
+  let rg = Rg.make
+    ~name:"test-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.rg"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let vnet = Vnet.make
+    ~name:"test-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.vnet"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+    ~name:"test-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.subnet"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/24"]))
+  in
+  let route = Route_table.Route.make
+    ~name:"default"
+    ~address_prefix:(Option.get (CIDR.of_string_opt "0.0.0.0/0"))
+    ~next_hop:Internet
+    ~next_hop_in_ip_address:None
+  in
+  let rt = Route_table.make
+    ~name:"test-rt"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_route_table.rt"
+    ~location:EastUs
+    ~resource_group:rg
+    ~routes:[route]
+    ~disable_bgp_route_propagation:true
+    ~tags:[]
+  in
+  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
+  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
+  let nsgs = IdKeyMap.empty in
+  let nics = IdKeyMap.empty in
+  let pips = AddressMap.empty in
+  let route_tables = AddressMap.add (Route_table.get_address rt) rt AddressMap.empty in
+  let world =
+    ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables} : World.t)
   in world
 
 let sample_rg = 
@@ -331,7 +387,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     pip_nic_world
-    (AzureTFParser.get_resources "test_plans/simple_nic_pip/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_nic_pip/plan.json"));
+  "simple_route_table" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    route_table_world
+    (AzureTFParser.get_resources "test_plans/simple_route_table/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [
