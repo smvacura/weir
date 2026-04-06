@@ -14,6 +14,7 @@ module AzureTFParser = struct
     nics : Safe.t list;
     pips : Safe.t list;
     route_tables : Safe.t list;
+    route_table_associations : Safe.t list;
   }
 
   let raw_world_empty = {
@@ -24,6 +25,7 @@ module AzureTFParser = struct
     nics = [];
     pips = [];
     route_tables = [];
+    route_table_associations = [];
   }
 
 
@@ -801,6 +803,10 @@ module AzureTFParser = struct
       | Some s -> let route_tables' = json_resource::world.route_tables in
       ({world with route_tables = route_tables'}, err)
     end
+    | Some "azurerm_subnet_route_table_association" -> begin
+      let route_table_associations' = json_resource::world.route_table_associations in
+      ({world with route_table_associations = route_table_associations'}, err)
+    end
     | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
   
@@ -914,10 +920,70 @@ module AzureTFParser = struct
       | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, err)
     end
     in ({world with nics = nics'}, err)
+  
+  let add_route_table_association assoc (world : World.t) = 
+    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.route_table_associations in
+    { world with route_table_associations = associations'}
+
+  let resolve_association  ~first_id_type:first_id_type ~address:address ~second_id_type:second_id_type ~json:config_json = 
+    let (let*) = Result.bind in
+    let* resource = get_configuration_resource address config_json 
+      |> Option.to_result ~none:("Could not resolve ids for route table association " ^ address) in
+    let expressions = Safe.Util.member "expressions" resource in
+    let* first_resolved = begin
+      let first_references = Safe.Util.member first_id_type expressions |>
+        Safe.Util.member "references" |> 
+        Safe.Util.to_list |>
+        Safe.Util.filter_string in
+      match first_references with
+      | [id; address] -> Some address
+      | _ -> None
+    end
+      |> Option.to_result ~none:("Could not resolve " ^ first_id_type ^ " of association " ^ address)
+    in
+    let* second_resolved = begin
+      let second_references = Safe.Util.member second_id_type expressions |>
+        Safe.Util.member "references" |> 
+        Safe.Util.to_list |>
+        Safe.Util.filter_string in
+      match second_references with
+      | [id; address] -> Some address
+      | _ -> None
+    end
+      |> Option.to_result ~none:("Could not resolve " ^ second_id_type ^ " of association " ^ address)
+    in
+    Ok (first_resolved, second_resolved)
     
-
-
-  let resolve_dependency json = ""
+  let resolve_route_table_associations ((world : World.t), err) config_json rt_associations  =
+    let (let*) = Result.bind in
+    let resolve_route_table_association rt_association_json = 
+      let values = Safe.Util.member "values" rt_association_json in
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" rt_association_json 
+        |> generate_parse_string_result_required "address" "" "route_table_association" in
+      let* first_address, second_address =
+      resolve_association 
+        ~address:address
+        ~first_id_type:"route_table_id"
+        ~second_id_type:"subnet_id"
+        ~json:config_json
+      in
+      let* route_table = AddressMap.find_opt first_address world.route_tables 
+        |> Option.to_result ~none:("Could not find route table " ^ first_address ^ " required by association " ^ address) in
+      let* subnet = AddressMap.find_opt second_address world.subnets
+        |> Option.to_result ~none:("Could not find subnet " ^ first_address ^ " required by association " ^ address) in
+      Ok (Association.BinaryAssociation.make route_table subnet address)
+    in
+    List.fold_left (
+      fun (world, err) assoc_json -> begin
+        match resolve_route_table_association assoc_json with
+        | Ok rt_assoc -> (add_route_table_association rt_assoc world, err)
+        | Error e -> (world, e::err)
+      end
+    ) 
+    (world, err) 
+    rt_associations
+    
 
   let print_string_list ell =
     let rec aux = function
@@ -939,6 +1005,7 @@ module AzureTFParser = struct
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
     let world, err = parse_route_tables (world, err) raw_world.route_tables in
     let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
+    let world, err = resolve_route_table_associations (world, err) (Option.get config_json) raw_world.route_table_associations in
     if List.length err > 0 then print_string_list err; 
     world
 
