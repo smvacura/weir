@@ -1,4 +1,4 @@
-name: "dune test"
+name: "lean test"
 
 on: 
     push:
@@ -11,4 +11,6 @@ jobs:
        steps:
        - uses: actions/checkout@v4
        - uses: leanprover/lean-action@v1
+         with:
+           lake-package-directory: proofs
        - run: lake build
