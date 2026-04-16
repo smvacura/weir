@@ -9,6 +9,8 @@ val get_address : t -> string
 
 val get_id : t -> IdKey.t
 
+val get_vnet : t -> Vnet.t
+
 val get_cidrs : t -> CIDR.t list
 
 val make : 

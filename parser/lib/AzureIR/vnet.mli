@@ -12,6 +12,8 @@ val get_id : t -> IdKey.t
 
 val get_rg : t -> Rg.t
 
+val get_addresses : t -> CIDR.t list
+
 val make : 
     name:string ->
     subscription:string ->

@@ -21,6 +21,8 @@ let get_id subnet  =
 let get_cidrs subnet =
   subnet.addresses
 
+let get_vnet subnet = subnet.vnet
+
 let make ~name:name ~subscription:subscription ~address:address ~resource_group:rg ~vnet:vnet ~addresses:addresses = {
   name = name;
   subscription = subscription;

@@ -27,7 +27,9 @@ let make ~name:name ~subscription:subscription ~address:address ~location:loc ~r
   addresses = addresses;
   }
 
-let get_id vnet =  
+let get_addresses vnet = vnet.addresses
+
+let get_id vnet =
   IdKey.of_strings vnet.subscription (Rg.get_name vnet.resource_group) vnet.name
 
 let show_address_block addresses =
