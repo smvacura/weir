@@ -81,16 +81,11 @@ lemma zero_allones_left_shift_eq_one {w : Nat} {m : Nat} (hm : m = 0) :
 /-- Left-shifting an all-ones vector by more than one yields a vector not equal to all ones-/
 lemma gt_zero_allones_left_shift_ne_one {w : Nat} {m : Nat} (hw : 1 ≤ w) (hm : m > 0) :
   BitVec.allOnes w <<< m ≠ BitVec.allOnes w := by
-
-  simp_all only [gt_iff_lt, ne_eq]
-  by_contra a
-  replace a := congrArg BitVec.toNat a
-  rw [BitVec.toNat_shiftLeft] at a
-  repeat rw [BitVec.toNat_allOnes] at a
-  repeat rw [Nat.shiftLeft_eq] at a
-  have h : m = 0 := by sorry
-  replace hm := Nat.ne_of_gt hm
-  contradiction
+  apply ne_of_exists_ne_bit
+  use 0
+  use hw
+  simp only [BitVec.getElem_shiftLeft, Nat.zero_sub, BitVec.getElem_allOnes,
+    Bool.and_true, hm, decide_true, Bool.not_true, ne_eq, Bool.false_eq_true, not_false_eq_true]
 
 /-- Cancellation lemma for shifting an all-one vector left-/
 lemma allones_left_shift_cancel {w : Nat} {m n : Nat} (hm : m ≤ w) (hn : n ≤ w) :

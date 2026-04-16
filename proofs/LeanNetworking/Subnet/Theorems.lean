@@ -435,13 +435,12 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
           the goal to `subnetLowerBound x m ≤ x`/`x ≤ subnetUpperBound x m`
           and the rest is trivial -/
   intro h
+  have hmask : m = m := by rfl
   apply And.intro
-  · have hmask : m = m := by rfl
-    replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
+  · replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
     rw [subnet_eq_imp_lower_bound_eq h]
     exact base_ge_lower_bound
-  · have hmask : m = m := by rfl
-    replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
+  · replace h : subnet a m = subnet x m := subnet_eq_iff_mask_network_eq.mpr (And.intro h.symm hmask)
     rw [subnet_eq_imp_upper_bound_eq h]
     exact base_le_upper_bound
 
