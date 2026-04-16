@@ -461,9 +461,10 @@ theorem subnet_eq_interval (a : IP) (m : SubnetMask) :
   ext i hi
 
   by_cases hm : i ≥ 32 - m
-  · have ha := (bitvec_squeeze hlow hup hi)
-    have hsqueeze := bounds_same_prefix hi hm (a:=a)
-    have halb_eq_x := ha hsqueeze
+  · have hprefix_for_squeeze j (_ : i ≤ j) (hjw : j < 32) :
+          (subnetLowerBound a m)[j] = (subnetUpperBound a m)[j] :=
+        bounds_same_prefix hjw (by omega)
+    have halb_eq_x := bitvec_squeeze_single_bit hlow hup hi hprefix_for_squeeze
     rw [lower_bound_is_base] at halb_eq_x
     repeat rw [applyMask_high_bits_preserved (ip:=x) (m:=m) (hm:=hm)]
     exact halb_eq_x.symm

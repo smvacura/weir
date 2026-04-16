@@ -222,10 +222,53 @@ theorem bitvec_or_and_distrib_right (u v w : BitVec n) : (u &&& v) ||| w = (u ||
   ext i
   simp [Bool.or_and_distrib_right]
 
-theorem bitvec_squeeze {w i : Nat} {lb v ub : BitVec w}
-  (hlb : lb ≤ v) (hub : v ≤ ub) (hi : i < w) (heq : lb[i]'hi = ub[i]'hi):
-  lb[i]'hi = v[i]'hi := by
-  sorry
 
+lemma lower_bits_lt (x : BitVec n) (k : Nat) :
+    x.toNat % 2^k < 2^k := Nat.mod_lt _ (Nat.two_pow_pos k)
+
+
+
+theorem bitvec_squeeze {w i : Nat} {lb v ub : BitVec w}
+    (hlb : lb ≤ v) (hub : v ≤ ub)
+    (hprefix : ∀ j, i ≤ j → (hj : j < w) → lb[j] = ub[j]) :
+    ∀ j, i ≤ j → (hj : j < w) → lb[j] = v[j] := by
+  rw [BitVec.le_def] at hlb hub
+  intro j hji hjw
+  rw [BitVec.getElem_eq_testBit_toNat, BitVec.getElem_eq_testBit_toNat]
+  -- Step 1: the "prefix word" (toNat >>> i) is the same for lb and ub
+  have hprefix_nat : lb.toNat >>> i = ub.toNat >>> i := by
+    apply Nat.eq_of_testBit_eq
+    intro k
+    simp only [Nat.testBit_shiftRight]
+    by_cases hik : i + k < w
+    · have := hprefix (i + k) (by omega) hik
+      rwa [BitVec.getElem_eq_testBit_toNat, BitVec.getElem_eq_testBit_toNat] at this
+    · -- bits beyond width w are 0 for both vectors
+      have hlb_false : lb.toNat.testBit (i + k) = false :=
+        Nat.testBit_lt_two_pow (BitVec.toNat_lt_twoPow_of_le (by omega))
+      have hub_false : ub.toNat.testBit (i + k) = false :=
+        Nat.testBit_lt_two_pow (BitVec.toNat_lt_twoPow_of_le (by omega))
+      simp [hlb_false, hub_false]
+  -- Step 2: v has the same prefix word as lb, by the division sandwich
+  --   lb/2^i ≤ v/2^i ≤ ub/2^i = lb/2^i
+  have hv_prefix : lb.toNat >>> i = v.toNat >>> i := by
+    simp only [Nat.shiftRight_eq_div_pow] at hprefix_nat ⊢
+    apply Nat.le_antisymm
+    · exact Nat.div_le_div_right hlb
+    · calc v.toNat / 2 ^ i
+           ≤ ub.toNat / 2 ^ i := Nat.div_le_div_right hub
+         _ = lb.toNat / 2 ^ i := hprefix_nat.symm
+  -- Step 3: equal prefix words → equal bit j (for j ≥ i)
+  have := congr_arg (·.testBit (j - i)) hv_prefix
+  simp only [Nat.testBit_shiftRight] at this
+  rwa [show i + (j - i) = j from by omega] at this
+
+/-- Single-bit corollary: if all bits ≥ i agree between lb and ub, and lb ≤ v ≤ ub,
+    then bit i of lb equals bit i of v. -/
+theorem bitvec_squeeze_single_bit {w i : Nat} {lb v ub : BitVec w}
+    (hlb : lb ≤ v) (hub : v ≤ ub) (hi : i < w)
+    (hprefix : ∀ j, i ≤ j → (hj : j < w) → lb[j] = ub[j]) :
+    lb[i]'hi = v[i]'hi :=
+  bitvec_squeeze hlb hub hprefix i (Nat.le_refl i) hi
 
 end BitVecUtil
