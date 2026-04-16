@@ -9,8 +9,4 @@ package «lean-networking» where
 lean_lib «LeanNetworking» where
   -- add library configuration options here
 
-lean_lib «LeanAzure» where
-
-@[default_target]
-lean_exe «lean-networking» where
-  root := `Main
+lean_lib «LeanAzure»
