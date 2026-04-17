@@ -355,7 +355,66 @@ let route_table_world =
   ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
   in world
 
-let sample_rg = 
+let nsg_subnet_assoc_world =
+  let rg = Rg.make
+    ~name:"nsg-subnet-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let vnet = Vnet.make
+    ~name:"main-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+    ~name:"main-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.main"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let rule = Nsg.SecurityRule.make
+    ~name:"allow-https"
+    ~description:(Some "")
+    ~source_ports:[Any]
+    ~destination_ports:[Single 443]
+    ~protocol:Tcp
+    ~source:Any
+    ~destination:Any
+    ~access:Allow
+    ~priority:100
+    ~direction:Inbound
+  in
+  let nsg = Nsg.make
+    ~name:"main-nsg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_network_security_group.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~rule_list:[rule]
+    ~tags:[]
+  in
+  let assoc = Association.BinaryAssociation.make nsg subnet "azurerm_subnet_network_security_group_association.assoc" in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
+  let nsgs = AddressMap.add (Nsg.get_address nsg) nsg AddressMap.empty in
+  let nics = AddressMap.empty in
+  let pips = AddressMap.empty in
+  let route_tables = AddressMap.empty in
+  let route_table_associations = AddressMap.empty in
+  let nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in
+  let nic_nsg_associations = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+
+let sample_rg =
   Rg.make 
     ~name:"example-resources"
     ~subscription:"DEFAULT"
@@ -419,7 +478,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     route_table_world
-    (AzureTFParser.get_resources "test_plans/simple_route_table/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_route_table/plan.json"));
+  "simple_nsg_subnet_assoc" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    nsg_subnet_assoc_world
+    (AzureTFParser.get_resources "test_plans/simple_nsg_subnet_assoc/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [
