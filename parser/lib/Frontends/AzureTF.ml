@@ -16,6 +16,7 @@ module AzureTFParser = struct
     route_tables : Safe.t list;
     route_table_associations : Safe.t list;
     nsg_associations : Safe.t list;
+    nic_nsg_associations : Safe.t list;
   }
 
   let raw_world_empty = {
@@ -28,6 +29,7 @@ module AzureTFParser = struct
     route_tables = [];
     route_table_associations = [];
     nsg_associations = [];
+    nic_nsg_associations = [];
   }
 
 
@@ -812,6 +814,10 @@ module AzureTFParser = struct
       let nsg_associations' = json_resource::world.nsg_associations in
       ({world with nsg_associations = nsg_associations'}, err)
     end
+    | Some "azurerm_network_interface_security_group_association" -> begin
+      let nic_nsg_associations' = json_resource::world.nic_nsg_associations in
+      ({world with nic_nsg_associations = nic_nsg_associations'}, err)
+    end
     | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
 
   
@@ -934,6 +940,10 @@ module AzureTFParser = struct
     let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nsg_associations in
     { world with nsg_associations = associations' }
 
+  let add_nic_nsg_association assoc (world : World.t) =
+    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nic_nsg_associations in
+    { world with nic_nsg_associations = associations' }
+
   let resolve_association  ~first_id_type:first_id_type ~address:address ~second_id_type:second_id_type ~json:config_json = 
     let (let*) = Result.bind in
     let* resource = get_configuration_resource address config_json 
@@ -1022,6 +1032,35 @@ module AzureTFParser = struct
     (world, err)
     nsg_assocs
 
+  let resolve_nic_nsg_associations ((world : World.t), err) config_json nic_nsg_assocs =
+    let (let*) = Result.bind in
+    let resolve_nic_nsg_association assoc_json =
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" assoc_json
+        |> generate_parse_string_result_required "address" "" "nic_nsg_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"network_security_group_id"
+          ~second_id_type:"network_interface_id"
+          ~json:config_json
+      in
+      let* nsg = AddressMap.find_opt first_address world.nsgs
+        |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
+      let* nic = AddressMap.find_opt second_address world.nics
+        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
+      Ok (Association.BinaryAssociation.make nsg nic address)
+    in
+    List.fold_left (
+      fun (world, err) assoc_json -> begin
+        match resolve_nic_nsg_association assoc_json with
+        | Ok nic_nsg_assoc -> (add_nic_nsg_association nic_nsg_assoc world, err)
+        | Error e -> (world, e::err)
+      end
+    )
+    (world, err)
+    nic_nsg_assocs
+
   let print_string_list ell =
     let rec aux = function
     | [] -> ()
@@ -1044,6 +1083,7 @@ module AzureTFParser = struct
     let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
     let world, err = resolve_route_table_associations (world, err) (Option.get config_json) raw_world.route_table_associations in
     let world, err = resolve_nsg_associations (world, err) (Option.get config_json) raw_world.nsg_associations in
+    let world, err = resolve_nic_nsg_associations (world, err) (Option.get config_json) raw_world.nic_nsg_associations in
     if List.length err > 0 then print_string_list err;
     world
 

@@ -55,7 +55,8 @@ let simple_network_world =
      pips = AddressMap.empty;
      route_tables = AddressMap.empty;
      route_table_associations = AddressMap.empty;
-     nsg_associations = AddressMap.empty} : World.t)
+     nsg_associations = AddressMap.empty;
+     nic_nsg_associations = AddressMap.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make
@@ -96,7 +97,8 @@ let simple_nsg_world =
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations} : World.t)
+  let nic_nsg_associations = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
 
 let simple_nic_world = 
   let rg = Rg.make
@@ -150,7 +152,8 @@ let simple_nic_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations} : World.t)
+  let nic_nsg_associations = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
   in world
 
 let static_nic_world = 
@@ -205,7 +208,8 @@ let static_nic_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations} : World.t)
+  let nic_nsg_associations = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
   in world
 
 
@@ -289,8 +293,10 @@ let pip_nic_world =
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
+  let nic_nsg_assoc = Association.BinaryAssociation.make nsg nic "azurerm_network_interface_security_group_association.this" in
+  let nic_nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address nic_nsg_assoc) nic_nsg_assoc AddressMap.empty in
   let world =
-    ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
   in world
 
 let route_table_world =
@@ -345,7 +351,8 @@ let route_table_world =
   let route_table_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in
   let nsg_associations = AddressMap.empty in
   let world =
-    ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations} : World.t)
+    let nic_nsg_associations = AddressMap.empty in
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
   in world
 
 let sample_rg = 
