@@ -36,10 +36,9 @@ let show { name; subscription; address; location; managed_by; tags } =
     name subscription address (Parser.Azure_types.string_of_loc location) managed_str tags_str
 
 let show_rg_map m =
-  "{" ^ 
+  "{" ^
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id,v) -> (IdKey.show id) ^ ":" ^ show v)
+  |> AddressMap.bindings
+  |> List.map (fun (addr, v) -> addr ^ ":" ^ show v)
   |> String.concat ",")
-  ^
-  "}"
+  ^ "}"

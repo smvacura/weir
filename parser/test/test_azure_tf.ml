@@ -16,7 +16,7 @@ let single_rg_world =
     ~managed_by:None
     ~tags:[]
   in
-  let rgs' = IdKeyMap.add (Rg.get_id rg) rg world.resource_groups in
+  let rgs' = AddressMap.add (Rg.get_address rg) rg world.resource_groups in
   { world with resource_groups = rgs' }
 
 let simple_network_world = 
@@ -44,15 +44,15 @@ let simple_network_world =
     ~vnet:vnet
     ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.2.0/24"]))
   in
-  let rgs' = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets' = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let rgs' = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets' = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
   let subnets' = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  ({ resource_groups = rgs'; 
-     vnets = vnets'; 
-     subnets = subnets'; 
-     nsgs = IdKeyMap.empty; 
-     nics = IdKeyMap.empty; 
-     pips = AddressMap.empty; 
+  ({ resource_groups = rgs';
+     vnets = vnets';
+     subnets = subnets';
+     nsgs = AddressMap.empty;
+     nics = AddressMap.empty;
+     pips = AddressMap.empty;
      route_tables = AddressMap.empty;
      route_table_associations = AddressMap.empty} : World.t)
 
@@ -86,11 +86,11 @@ let simple_nsg_world =
   ~rule_list:[rule]
   ~tags:[]
   in
-  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets = IdKeyMap.empty in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.empty in
   let subnets = AddressMap.empty in
-  let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
-  let nics = IdKeyMap.empty in
+  let nsgs = AddressMap.add (Nsg.get_address nsg) nsg AddressMap.empty in
+  let nics = AddressMap.empty in
   let pips = AddressMap.empty in
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
@@ -138,12 +138,12 @@ let simple_nic_world =
   ~resource_group:rg
   ~ip_configurations:[ipconfig]
   in
-  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
   let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  let nsgs =  IdKeyMap.empty in
-  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
-  let pips = AddressMap.empty in 
+  let nsgs = AddressMap.empty in
+  let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
+  let pips = AddressMap.empty in
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
   let world =
@@ -192,12 +192,12 @@ let static_nic_world =
   ~resource_group:rg
   ~ip_configurations:[ipconfig]
   in
-  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
   let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  let nsgs =  IdKeyMap.empty in
-  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
-  let pips = AddressMap.empty in 
+  let nsgs = AddressMap.empty in
+  let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
+  let pips = AddressMap.empty in
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
   let world =
@@ -276,11 +276,11 @@ let pip_nic_world =
     ~resource_group:rg
     ~ip_configurations:[ipconfig]
   in
-  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
   let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  let nsgs = IdKeyMap.add (Nsg.get_id nsg) nsg IdKeyMap.empty in
-  let nics = IdKeyMap.add (Nic.get_id nic) nic IdKeyMap.empty in
+  let nsgs = AddressMap.add (Nsg.get_address nsg) nsg AddressMap.empty in
+  let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
   let pips = AddressMap.add (Pip.get_address pip) pip AddressMap.empty in
   let route_tables = AddressMap.empty in
   let route_table_associations = AddressMap.empty in
@@ -330,11 +330,11 @@ let route_table_world =
     ~tags:[]
   in
   let assoc = Association.BinaryAssociation.make rt subnet "azurerm_subnet_route_table_association.assoc" in
-  let resource_groups = IdKeyMap.add (Rg.get_id rg) rg IdKeyMap.empty in
-  let vnets = IdKeyMap.add (Vnet.get_id vnet) vnet IdKeyMap.empty in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
   let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
-  let nsgs = IdKeyMap.empty in
-  let nics = IdKeyMap.empty in
+  let nsgs = AddressMap.empty in
+  let nics = AddressMap.empty in
   let pips = AddressMap.empty in
   let route_tables = AddressMap.add (Route_table.get_address rt) rt AddressMap.empty in
   let route_table_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in

@@ -46,10 +46,9 @@ let show { name; address; location; resource_group; addresses } =
     name address (Parser.Azure_types.string_of_loc location) (Rg.get_name resource_group) (show_address_block addresses)
 
 let show_vnet_map m =
-  "{" ^ 
+  "{" ^
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id,v) -> (IdKey.show id) ^ ":" ^ show v)
+  |> AddressMap.bindings
+  |> List.map (fun (addr, v) -> addr ^ ":" ^ show v)
   |> String.concat ",")
-  ^
-  "}"
+  ^ "}"

@@ -27,4 +27,4 @@ val show : t -> string
 
 val pp : Format.formatter -> t -> unit
 
-val show_vnet_map : t IdKeyMap.t -> string
+val show_vnet_map : t AddressMap.t -> string

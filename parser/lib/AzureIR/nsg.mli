@@ -44,4 +44,4 @@ val get_address : t -> string
 
 val show : t -> string
 
-val show_nsg_map : t IdKeyMap.t -> string
+val show_nsg_map : t AddressMap.t -> string

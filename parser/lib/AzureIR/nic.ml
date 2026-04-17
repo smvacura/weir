@@ -60,10 +60,9 @@ let get_id nic : IdKey.t =
 
 
 let show_nic_map m =
-  "{" ^ 
+  "{" ^
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id, nic) -> (IdKey.show id) ^ ":" ^ show nic)
+  |> AddressMap.bindings
+  |> List.map (fun (addr, nic) -> addr ^ ":" ^ show nic)
   |> String.concat ",")
-  ^
-  "}"
+  ^ "}"

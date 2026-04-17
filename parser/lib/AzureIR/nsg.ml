@@ -116,10 +116,9 @@ Printf.sprintf
   ""
 
 let show_nsg_map m =
-  "{" ^ 
+  "{" ^
   (m
-  |> IdKeyMap.bindings
-  |> List.map (fun (id , nsg) -> (IdKey.show id) ^ ":" ^ show nsg)
+  |> AddressMap.bindings
+  |> List.map (fun (addr, nsg) -> addr ^ ":" ^ show nsg)
   |> String.concat ",")
-  ^
-  "}"
+  ^ "}"

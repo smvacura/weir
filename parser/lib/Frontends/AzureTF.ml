@@ -29,17 +29,17 @@ module AzureTFParser = struct
   }
 
 
-  type subnet_inv_idx = Vnet.t IdKeyMap.t
+  type subnet_inv_idx = Vnet.t AddressMap.t
 
   type address_index = string IdKeyMap.t
 
-  let subnet_inv_idx_empty : subnet_inv_idx = IdKeyMap.empty
+  let subnet_inv_idx_empty : subnet_inv_idx = AddressMap.empty
 
-  let show_inv_idx (index : subnet_inv_idx) = 
+  let show_inv_idx (index : subnet_inv_idx) =
     "{" ^
     (index
-    |> IdKeyMap.bindings
-    |> List.map (fun (k,v) -> (IdKey.show k) ^ ":" ^ Vnet.show v)
+    |> AddressMap.bindings
+    |> List.map (fun (addr, v) -> addr ^ ":" ^ Vnet.show v)
     |> String.concat ",")
     ^ "}"
 
@@ -247,7 +247,11 @@ module AzureTFParser = struct
     let* rg = World.get_resource_group world "DEFAULT" rg_name
       |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
     in
-    let* vnet = IdKeyMap.find_opt (IdKey.of_strings "DEFAULT" rg_name vnet_name) world.vnets
+    let* vnet =
+      AddressMap.fold (fun _ v acc ->
+        if Vnet.get_name v = vnet_name && Rg.get_name (Vnet.get_rg v) = rg_name
+        then Some v else acc)
+        world.vnets None
       |> Option.to_result ~none:("Cannot find vnet required by subnet " ^ address)
     in
     let addresses = Safe.Util.member "address_prefixes" values
@@ -625,29 +629,24 @@ module AzureTFParser = struct
     | arr -> Some (Safe.Util.to_list arr)
 
   
-  let add_rg (world : World.t) (rg : Rg.t) = 
-    let rgs' = IdKeyMap.add (Rg.get_id rg) rg world.resource_groups in
+  let add_rg (world : World.t) (rg : Rg.t) =
+    let rgs' = AddressMap.add (Rg.get_address rg) rg world.resource_groups in
     { world with resource_groups = rgs' }
 
   let index_rg rg address_index = 
     (IdKeyMap.add (Rg.get_id rg) (Rg.get_address rg) address_index)
   
   let add_vnet (world : World.t) (vnet : Vnet.t) =
-    let vnet_id = IdKey.of_strings
-      "DEFAULT"
-      (Rg.get_name (Vnet.get_rg vnet))
-      (Vnet.get_name vnet)
-    in
-    let vnets' = IdKeyMap.add vnet_id vnet world.vnets in
+    let vnets' = AddressMap.add (Vnet.get_address vnet) vnet world.vnets in
     { world with vnets = vnets' }
   
   let index_vnet vnet address_index = 
     (IdKeyMap.add (Vnet.get_id vnet) (Vnet.get_address vnet) address_index)
 
   let add_to_index (vnet: Vnet.t) (subnets: Subnet.t list) (index : subnet_inv_idx) =
-    let rec aux vnet subnets (index : subnet_inv_idx) = 
+    let rec aux vnet subnets (index : subnet_inv_idx) =
       match subnets with
-      | h::t -> aux vnet t (IdKeyMap.add (Subnet.get_id h) vnet  index)
+      | h::t -> aux vnet t (AddressMap.add (Subnet.get_address h) vnet index)
       | [] -> index
     in
     aux vnet subnets index
@@ -660,14 +659,14 @@ module AzureTFParser = struct
     IdKeyMap.add (Subnet.get_id subnet) (Subnet.get_address subnet) address_index
 
   let add_nsg (world : World.t) (nsg : Nsg.t) =
-    let nsgs' = IdKeyMap.add (Nsg.get_id nsg) nsg world.nsgs in
+    let nsgs' = AddressMap.add (Nsg.get_address nsg) nsg world.nsgs in
     { world with nsgs = nsgs'}
   
   let index_nsg nsg address_index =
     IdKeyMap.add (Nsg.get_id nsg) (Nsg.get_address nsg) address_index
   
   let add_nic (world : World.t) (nic : Nic.t) =
-    let nics' = IdKeyMap.add (Nic.get_id nic) nic world.nics in
+    let nics' = AddressMap.add (Nic.get_address nic) nic world.nics in
     { world with nics = nics' }
 
   let index_nic nic address_index =
@@ -914,10 +913,10 @@ module AzureTFParser = struct
       | _ -> Error "Malformed NIC in configuration"
     in
     let nics', err = begin
-    IdKeyMap.fold (fun id nic (ok_map, err_list) -> 
+    AddressMap.fold (fun addr nic (ok_map, err_list) ->
       match resolve_nic_dependency nic with
-      | Ok nic' -> (IdKeyMap.add id nic' ok_map, err_list)
-      | Error e -> (ok_map, e::err_list)) nics (IdKeyMap.empty, err)
+      | Ok nic' -> (AddressMap.add addr nic' ok_map, err_list)
+      | Error e -> (ok_map, e::err_list)) nics (AddressMap.empty, err)
     end
     in ({world with nics = nics'}, err)
   

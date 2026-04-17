@@ -23,13 +23,13 @@ let get_world () = Lazy.force parsed_world
 
 let test_rg_count _ =
   let w = get_world () in
-  assert_equal 1 (IdKeyMap.cardinal w.resource_groups)
+  assert_equal 1 (AddressMap.cardinal w.resource_groups)
     ~msg:"Expected exactly 1 resource group"
     ~printer:string_of_int
 
 let test_vnet_count _ =
   let w = get_world () in
-  assert_equal n_vnets (IdKeyMap.cardinal w.vnets)
+  assert_equal n_vnets (AddressMap.cardinal w.vnets)
     ~msg:(Printf.sprintf "Expected exactly %d VNets" n_vnets)
     ~printer:string_of_int
 
@@ -42,13 +42,13 @@ let test_subnet_count _ =
 
 let test_no_nsgs _ =
   let w = get_world () in
-  assert_equal 0 (IdKeyMap.cardinal w.nsgs)
+  assert_equal 0 (AddressMap.cardinal w.nsgs)
     ~msg:"Expected no NSGs in stress plan"
     ~printer:string_of_int
 
 let test_no_nics _ =
   let w = get_world () in
-  assert_equal 0 (IdKeyMap.cardinal w.nics)
+  assert_equal 0 (AddressMap.cardinal w.nics)
     ~msg:"Expected no NICs in stress plan"
     ~printer:string_of_int
 
@@ -56,7 +56,7 @@ let test_no_nics _ =
 
 let test_rg_name _ =
   let w = get_world () in
-  let rg = IdKeyMap.bindings w.resource_groups |> List.hd |> snd in
+  let rg = AddressMap.bindings w.resource_groups |> List.hd |> snd in
   assert_equal "stress-rg" (Rg.get_name rg)
     ~msg:"RG name should be stress-rg"
     ~printer:(fun s -> s)
@@ -69,7 +69,7 @@ let test_vnet_address_spaces _ =
   for v = 0 to n_vnets - 1 do
     let vnet_name = Printf.sprintf "vnet-%d" v in
     let expected_cidr = Printf.sprintf "10.%d.0.0/16" v in
-    let found = IdKeyMap.exists (fun _ vnet ->
+    let found = AddressMap.exists (fun _ vnet ->
       Vnet.get_name vnet = vnet_name &&
       (match Vnet.get_addresses vnet with
        | [cidr] -> CIDR.show cidr = expected_cidr

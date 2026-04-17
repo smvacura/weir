@@ -23,14 +23,14 @@ let get_world () = Lazy.force parsed_world
 
 let test_rg_count _ =
   let w = get_world () in
-  assert_equal n_rgs (IdKeyMap.cardinal w.resource_groups)
+  assert_equal n_rgs (AddressMap.cardinal w.resource_groups)
     ~msg:(Printf.sprintf "Expected exactly %d resource groups" n_rgs)
     ~printer:string_of_int
 
 let test_vnet_count _ =
   let w = get_world () in
   let expected = n_rgs * n_vnets in
-  assert_equal expected (IdKeyMap.cardinal w.vnets)
+  assert_equal expected (AddressMap.cardinal w.vnets)
     ~msg:(Printf.sprintf "Expected exactly %d VNets" expected)
     ~printer:string_of_int
 
@@ -43,13 +43,13 @@ let test_subnet_count _ =
 
 let test_no_nsgs _ =
   let w = get_world () in
-  assert_equal 0 (IdKeyMap.cardinal w.nsgs)
+  assert_equal 0 (AddressMap.cardinal w.nsgs)
     ~msg:"Expected no NSGs in multi-RG stress plan"
     ~printer:string_of_int
 
 let test_no_nics _ =
   let w = get_world () in
-  assert_equal 0 (IdKeyMap.cardinal w.nics)
+  assert_equal 0 (AddressMap.cardinal w.nics)
     ~msg:"Expected no NICs in multi-RG stress plan"
     ~printer:string_of_int
 
@@ -60,7 +60,7 @@ let test_rg_names _ =
   let w = get_world () in
   for r = 0 to n_rgs - 1 do
     let rg_name = Printf.sprintf "rg-%d" r in
-    let found = IdKeyMap.exists (fun _ rg -> Rg.get_name rg = rg_name) w.resource_groups in
+    let found = AddressMap.exists (fun _ rg -> Rg.get_name rg = rg_name) w.resource_groups in
     assert_bool
       (Printf.sprintf "Resource group %s not found" rg_name)
       found
@@ -76,7 +76,7 @@ let test_vnet_address_spaces _ =
       let vnet_name    = Printf.sprintf "vnet-%d-%d" r v in
       let net_idx      = r * n_vnets + v in
       let expected_cidr = Printf.sprintf "10.%d.0.0/16" net_idx in
-      let found = IdKeyMap.exists (fun _ vnet ->
+      let found = AddressMap.exists (fun _ vnet ->
         Vnet.get_name vnet = vnet_name &&
         (match Vnet.get_addresses vnet with
          | [cidr] -> CIDR.show cidr = expected_cidr
@@ -166,7 +166,7 @@ let test_per_rg_vnet_count _ =
   let w = get_world () in
   for r = 0 to n_rgs - 1 do
     let rg_name  = Printf.sprintf "rg-%d" r in
-    let rg_vnets = IdKeyMap.fold (fun _ vnet acc ->
+    let rg_vnets = AddressMap.fold (fun _ vnet acc ->
       if Rg.get_name (Vnet.get_rg vnet) = rg_name then acc + 1 else acc)
       w.vnets 0
     in
