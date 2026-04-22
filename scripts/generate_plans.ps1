@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$basePath = "../parser/test/test_plans"
+$basePath = "../azverify/parser/test/test_plans"
 $providersSrc = Join-Path $PWD "providers.tf"
 
 Get-ChildItem -Path $basePath -Directory | ForEach-Object {

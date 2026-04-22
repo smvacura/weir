@@ -2,7 +2,7 @@
 
 set -e
 
-base_path="../parser/test/test_plans"
+base_path="../azverify/parser/test/test_plans"
 providers_src="$(pwd)/providers.tf"
 
 for dir in "$base_path"/*; do
