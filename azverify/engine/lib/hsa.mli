@@ -1,0 +1,2 @@
+type node
+type edge

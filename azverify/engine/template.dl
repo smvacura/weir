@@ -1,0 +1,8 @@
+.decl resource(id: symbol, type: symbol)
+.decl attached(from: symbol, to: symbol, rel: symbol)
+
+.decl reachable(from: symbol, to: symbol)
+.output reachable
+
+reachable(x, y) :- attached(x, y, _).
+reachable(x, y) :- reachable(x, z), attached(z, y, _).
