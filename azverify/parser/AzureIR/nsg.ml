@@ -19,13 +19,14 @@ module SecurityRule = struct
       | Some l -> Some (Addresses l)
       | None -> None
 
-  let endpoint_of_list_opt list name_this = 
-    match name_this with
+  let endpoint_of_list_opt list kind = 
+    match kind with
     | "application" -> 
       if (List.length (List.filter (Option.is_none) list) > 0) 
       then None
       else Some (ApplicationGroups (List.map (Option.value ~default:"") list))
     | "addresses" -> addresses_of_string_list_opt list
+    | _ -> None
 
   type access = 
   | Allow
