@@ -13,6 +13,14 @@ module Route = struct
 
   let make ~name ~address_prefix ~next_hop ~next_hop_in_ip_address =
     { name; address_prefix; next_hop; next_hop_in_ip_address }
+
+  let get_prefix route =
+    route.address_prefix
+
+  let compare r1 r2 = 
+    compare 
+    (Parser.Network_types.CIDR.get_mask r1.address_prefix)
+    (Parser.Network_types.CIDR.get_mask r2.address_prefix)
 end
 
 type t = {
@@ -31,6 +39,8 @@ let get_name rt =
 
 let get_address rt = 
   rt.address
+
+let get_routes rt = rt.routes
 
 let make ~name ~subscription ~address ~location ~resource_group ?(disable_bgp_route_propagation = true) ~routes ~tags =
   { name; subscription; address; location; resource_group; disable_bgp_route_propagation; routes; tags } 

@@ -1,2 +1,5 @@
-#personal notes
-misc_bugfixing.md
+#general notes
+*.md
+
+#vscode specific
+.vscode

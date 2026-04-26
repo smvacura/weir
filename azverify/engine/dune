@@ -1,0 +1,4 @@
+(library
+ (name pathfinder)
+ (libraries parser azureir)
+ (flags (:standard -w -26-27-32-34-69)))

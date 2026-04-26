@@ -27,6 +27,10 @@ module CIDR : sig
 
   val of_list_opt_strict : string option list -> t list option
 
+  val get_interval : t -> int32 * int32
+
+  val get_mask : t -> int32
+
   val show : t -> string
 
   val pp : Format.formatter -> t -> unit

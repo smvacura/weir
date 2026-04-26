@@ -20,7 +20,7 @@
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends 
-  (ocaml (>= 5.0))
+  (ocaml (>= 5.4))
   subprocess
   ounit2
   yojson

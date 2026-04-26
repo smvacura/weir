@@ -1,2 +1,7 @@
 (test
- (name test_pathfinder))
+ (name test_route_partition)
+ (libraries
+  pathfinder
+  parser
+  azureir
+  ounit2))
