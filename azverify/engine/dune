@@ -1,4 +1,5 @@
 (library
  (name pathfinder)
- (libraries parser azureir)
+ (libraries parser azureir mlbdd)
+ (modules_without_implementation bdd)
  (flags (:standard -w -26-27-32-34-69)))
