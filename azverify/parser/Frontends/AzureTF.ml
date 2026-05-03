@@ -1069,6 +1069,21 @@ module AzureTFParser = struct
   aux ell
 
 
+  let build_nic_ip_map (world : World.t) =
+    let add_nic_to_ip_map address nic ip_map =
+      let add_ipconfig_to_ip_map map ipconfig =
+        match Nic.IpConfiguration.get_private_ip ipconfig with
+        | Some ip -> IPMap.add ip nic map 
+        | None -> ip_map
+      in
+      List.fold_left add_ipconfig_to_ip_map ip_map (Nic.get_ipconfigs nic)
+    in
+    AddressMap.fold add_nic_to_ip_map world.nics IPMap.empty
+
+  let index_nic_ips (world : World.t) (ipworld : Ipworld.t) =
+    { ipworld with nics = build_nic_ip_map world}
+
+
   let get_resources file =
     let json = json_resources file in
     let config_json = json_config file in
@@ -1086,6 +1101,10 @@ module AzureTFParser = struct
     let world, err = resolve_nic_nsg_associations (world, err) (Option.get config_json) raw_world.nic_nsg_associations in
     if List.length err > 0 then print_string_list err;
     world
+
+  let get_ip_index world =
+    let ipworld = index_nic_ips world (Ipworld.empty) in
+    ipworld
 
 
 

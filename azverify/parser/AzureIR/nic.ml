@@ -20,11 +20,26 @@ module IpConfiguration = struct
   
   let get_name ipconfig = ipconfig.name
 
-let unresolved_fields r =
-  List.filter_map Fun.id [
-    (match r.subnet with Unresolved -> Some "subnet_id" | _ -> None);
-    (match r.pip with Unresolved -> Some "public_ip_address_id" | _ -> None);
-  ]
+  let get_private_ip ipconfig =
+    match ipconfig.private_address_allocation with
+    | Static ip -> Some ip
+    | _ -> None
+
+  let get_subnet_cidr_block subnet_resolvable =
+    match subnet_resolvable with 
+    | Resolved subnet -> Some (Subnet.get_cidrs subnet)
+    | _ -> None
+
+  let get_private_cidr ipconfig = 
+    match ipconfig.private_address_allocation with
+    | Dynamic -> get_subnet_cidr_block ipconfig.subnet
+    | _ -> None
+
+  let unresolved_fields r =
+    List.filter_map Fun.id [
+      (match r.subnet with Unresolved -> Some "subnet_id" | _ -> None);
+      (match r.pip with Unresolved -> Some "public_ip_address_id" | _ -> None);
+    ]
 
   let resolve ipconfig ~subnet ?(pip=None) =
     {ipconfig with subnet = Resolved subnet; pip = Resolved pip}
@@ -64,5 +79,13 @@ let show_nic_map m =
   (m
   |> AddressMap.bindings
   |> List.map (fun (addr, nic) -> addr ^ ":" ^ show nic)
+  |> String.concat ",")
+  ^ "}"
+
+let show_nic_ip_map m =
+  "{" ^
+  (m
+  |> IPMap.bindings
+  |> List.map (fun (ip, nic) -> (IPv4.show ip) ^ ":" ^ show nic)
   |> String.concat ",")
   ^ "}"

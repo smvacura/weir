@@ -15,7 +15,11 @@ module IpConfiguration : sig
         primary:bool option -> t
 
     val get_name : t -> string
-    
+
+    val get_private_ip : t -> IPv4.t option
+
+    val get_private_cidr : t -> CIDR.t list option
+
     val unresolved_fields : t -> string list
 
     val resolve : t -> subnet:Subnet.t -> ?pip:Pip.t option -> t
@@ -46,3 +50,5 @@ val show : t -> string
 val pp : Format.formatter -> t -> unit
 
 val show_nic_map : t AddressMap.t -> string
+
+val show_nic_ip_map : t IPMap.t -> string
