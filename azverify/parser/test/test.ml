@@ -6,6 +6,7 @@ let suite = "all_tests" >::: [
   "azure_tf_tests" >: Test_azure_tf.suite;
   "stress_tests" >: Test_stress.suite;
   "multi_rg_stress_tests" >: Test_multi_rg_stress.suite;
+  "property_tests" >: Test_properties.suite;
 ]
 
 let () = 
