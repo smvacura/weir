@@ -27,3 +27,5 @@ val show : t -> string
 val pp : Format.formatter -> t -> unit
 
 val show_subnet_map : t AddressMap.t -> string
+
+val show_subnet_cidr_map : t CIDRMap.t -> string

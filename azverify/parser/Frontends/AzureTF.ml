@@ -1083,6 +1083,40 @@ module AzureTFParser = struct
   let index_nic_ips (world : World.t) (ipworld : Ipworld.t) =
     { ipworld with nics = build_nic_ip_map world}
 
+  let build_subnet_cidr_map (world : World.t) =
+    let add_subnet_to_cidr_map _address subnet cidr_map =
+      List.fold_left (fun map cidr -> CIDRMap.add cidr subnet map)
+        cidr_map (Subnet.get_cidrs subnet)
+    in
+    AddressMap.fold add_subnet_to_cidr_map world.subnets CIDRMap.empty
+
+  let build_route_cidr_map (world : World.t) =
+    let add_routes_to_cidr_map _address route_table cidr_map =
+      List.fold_left (fun map route -> CIDRMap.add (Route_table.Route.get_prefix route) route map)
+        cidr_map (Route_table.get_routes route_table)
+    in
+    AddressMap.fold add_routes_to_cidr_map world.route_tables CIDRMap.empty
+
+  let build_nic_cidr_map (world : World.t) =
+    let add_nic_to_cidr_map _address nic cidr_map =
+      let add_ipconfig_to_cidr_map map ipconfig =
+        match Nic.IpConfiguration.get_private_cidr ipconfig with
+        | Some cidrs -> List.fold_left (fun m cidr -> CIDRMap.add cidr nic m) map cidrs
+        | None -> cidr_map
+      in
+      List.fold_left add_ipconfig_to_cidr_map cidr_map (Nic.get_ipconfigs nic)
+    in
+    AddressMap.fold add_nic_to_cidr_map world.nics CIDRMap.empty
+
+  let index_subnet_cidrs (world : World.t) (cidrworld : Cidrworld.t) =
+    { cidrworld with subnets = build_subnet_cidr_map world }
+
+  let index_route_cidrs (world : World.t) (cidrworld : Cidrworld.t) =
+    { cidrworld with routes = build_route_cidr_map world }
+
+  let index_nic_cidrs (world : World.t) (cidrworld : Cidrworld.t) =
+    { cidrworld with nics = build_nic_cidr_map world }
+
 
   let get_resources file =
     let json = json_resources file in
@@ -1105,6 +1139,12 @@ module AzureTFParser = struct
   let get_ip_index world =
     let ipworld = index_nic_ips world (Ipworld.empty) in
     ipworld
+
+  let get_cidr_index world =
+    let cidrworld = index_subnet_cidrs world Cidrworld.empty in
+    let cidrworld = index_route_cidrs world cidrworld in
+    let cidrworld = index_nic_cidrs world cidrworld in
+    cidrworld
 
 
 

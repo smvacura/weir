@@ -47,10 +47,18 @@ let show { name; address; resource_group; vnet; addresses } =
     name address (Rg.get_name resource_group) (Vnet.get_name vnet) (show_address_block addresses)
 
 let show_subnet_map m =
-  "{" ^ 
+  "{" ^
   (m
   |> AddressMap.bindings
   |> List.map (fun (id ,s) -> id ^ ":" ^ show s)
   |> String.concat ",")
   ^
   "}"
+
+let show_subnet_cidr_map m =
+  "{" ^
+  (m
+  |> CIDRMap.bindings
+  |> List.map (fun (cidr, s) -> (CIDR.show cidr) ^ ":" ^ show s)
+  |> String.concat ",")
+  ^ "}"

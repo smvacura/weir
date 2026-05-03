@@ -6,4 +6,6 @@ module AzureTFParser : sig
 
     val get_ip_index : World.t -> Ipworld.t
 
+    val get_cidr_index : World.t -> Cidrworld.t
+
 end

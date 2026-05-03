@@ -10,6 +10,12 @@ module Route : sig
   val get_prefix : t -> CIDR.t
 
   val compare : t -> t -> int
+
+  val show : t -> string
+
+  val pp : Format.formatter -> t -> unit
+
+  val show_cidr_map : t CIDRMap.t -> string
 end
 
 type t

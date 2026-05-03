@@ -52,3 +52,5 @@ val pp : Format.formatter -> t -> unit
 val show_nic_map : t AddressMap.t -> string
 
 val show_nic_ip_map : t IPMap.t -> string
+
+val show_nic_cidr_map : t CIDRMap.t -> string

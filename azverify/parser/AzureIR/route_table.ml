@@ -17,10 +17,24 @@ module Route = struct
   let get_prefix route =
     route.address_prefix
 
-  let compare r1 r2 = 
-    compare 
+  let compare r1 r2 =
+    compare
     (Parser.Network_types.CIDR.get_mask r1.address_prefix)
     (Parser.Network_types.CIDR.get_mask r2.address_prefix)
+
+  let show route =
+    Printf.sprintf "{ name = %s; prefix = %s; next_hop = %s }"
+      route.name (CIDR.show route.address_prefix) (show_next_hop route.next_hop)
+
+  let pp fmt route = Format.fprintf fmt "%s" (show route)
+
+  let show_cidr_map m =
+    "{" ^
+    (m
+    |> CIDRMap.bindings
+    |> List.map (fun (cidr, route) -> (CIDR.show cidr) ^ ":" ^ show route)
+    |> String.concat ",")
+    ^ "}"
 end
 
 type t = {

@@ -89,3 +89,11 @@ let show_nic_ip_map m =
   |> List.map (fun (ip, nic) -> (IPv4.show ip) ^ ":" ^ show nic)
   |> String.concat ",")
   ^ "}"
+
+let show_nic_cidr_map m =
+  "{" ^
+  (m
+  |> CIDRMap.bindings
+  |> List.map (fun (cidr, nic) -> (CIDR.show cidr) ^ ":" ^ show nic)
+  |> String.concat ",")
+  ^ "}"
