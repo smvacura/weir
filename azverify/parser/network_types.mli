@@ -6,6 +6,7 @@ module IPv4 : sig
   val of_int32 : int32 -> t
   val pp : Format.formatter -> t -> unit
   val show : t -> string
+  val compare : t -> t -> int
 end
 
 module IPv4Mask : sig
@@ -16,6 +17,8 @@ module IPv4Mask : sig
   val mask_of_prefix : int -> t
 
   val of_int32 : int32 -> t
+
+  val compare : t -> t -> int
 end
 
 module CIDR : sig
@@ -34,6 +37,8 @@ module CIDR : sig
   val show : t -> string
 
   val pp : Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
 end
 
 type ip_type =

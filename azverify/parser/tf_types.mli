@@ -15,3 +15,7 @@ end
 module IdKeyMap : Map.S with type key = IdKey.t 
 
 module AddressMap : Map.S with type key = string
+
+module IPMap : Map.S with type key = Network_types.IPv4.t
+
+module CIDRMap : Map.S with type key = Network_types.CIDR.t

@@ -43,6 +43,8 @@ module IPv4 = struct
     Printf.sprintf "%d.%d.%d.%d" a b c d
 
     let of_int32 (i : int32) : t = i
+
+  let compare (a : t) (b : t) = compare a b
 end
 
 module IPv4Mask = struct
@@ -83,6 +85,8 @@ module IPv4Mask = struct
 
   let pp fmt mask = 
     Format.fprintf fmt "%s" (show mask)
+
+  let compare (a : t) (b : t) = compare a b
 end
 
 module CIDR = struct
@@ -150,6 +154,11 @@ module CIDR = struct
 
   let pp fmt cidr =
     Format.fprintf fmt "%s" (show cidr)
+
+  let compare a b =
+    match compare (a.mask) (b.mask) with
+    | 0 -> compare a.ip b.ip
+    | i -> i
 end
 
 type ip_type =

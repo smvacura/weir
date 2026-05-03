@@ -16,3 +16,7 @@ end
 module IdKeyMap = Map.Make(IdKey)
 
 module AddressMap = Map.Make(String)
+
+module IPMap = Map.Make(Network_types.IPv4)
+
+module CIDRMap = Map.Make(Network_types.CIDR)
