@@ -1,7 +1,7 @@
 open OUnit2
 open Parser.Network_types
 open Parser.Azure_types
-open Azureir
+open Terraform_ir
 
 let test_rg =
   Rg.make

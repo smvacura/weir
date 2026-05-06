@@ -1,5 +1,5 @@
 open Parser.Network_types
-open Azureir.Route_table
+open Terraform_ir.Route_table
 
 type route_map = (Route.t, (int32 * int32) list) Hashtbl.t
 
@@ -55,7 +55,7 @@ let init_validity_index events =
 
 let partition_routes rt : route_map = 
   let partitions = Hashtbl.create 10 in
-  let routes = Azureir.Route_table.get_routes rt in
+  let routes = Terraform_ir.Route_table.get_routes rt in
   let events = get_events routes in
   let validity_index = init_validity_index events in
   let route_heap = RouteHeap.create () in

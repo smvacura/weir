@@ -1,4 +1,4 @@
-open Azureir
+open Terraform_ir
 
 module AzureTFParser : sig
 

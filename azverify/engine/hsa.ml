@@ -19,13 +19,18 @@ let get_subnets vnet subnets =
   let rec aux subnets acc =
     match subnets with
     | [] -> acc
-    | h::t -> if Azureir.Subnet.get_vnet h = vnet
+    | h::t -> if Terraform_ir.Subnet.get_vnet h = vnet
               then aux t (h::acc)
               else aux t acc
   in
   aux subnets []
 
-let get_sorted_routes route_table : Azureir.Route_table.Route.t list = []
+
+let get_route_nodes route_map =
+  ""
+
+
+let get_sorted_routes route_table : Terraform_ir.Route_table.Route.t list = []
 
 let add_edge subnet_address route_table node_index hsa_graph = 
   let id = match Hashtbl.find_opt node_index subnet_address with

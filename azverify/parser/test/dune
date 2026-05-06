@@ -3,6 +3,6 @@
  (libraries 
   parser
   frontends
-  azureir
+  terraform_ir
   ounit2)
   (deps (source_tree test_plans)))

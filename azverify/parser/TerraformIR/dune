@@ -1,5 +1,5 @@
 (library
- (name azureir)
+ (name terraform_ir)
  (libraries parser)
  (flags (:standard -w -a))
  (preprocess (pps ppx_deriving.show)))

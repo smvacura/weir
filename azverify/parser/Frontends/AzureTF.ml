@@ -3,7 +3,7 @@ module AzureTFParser = struct
   open Parser.Azure_types
   open Parser.Network_types
   open Parser.Tf_types
-  open Azureir
+  open Terraform_ir
 
 
   type raw_world = {

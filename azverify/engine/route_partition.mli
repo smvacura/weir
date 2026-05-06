@@ -1,4 +1,4 @@
-open Azureir
+open Terraform_ir
 
 type route_map = (Route_table.Route.t, (int32 * int32) list) Hashtbl.t
 

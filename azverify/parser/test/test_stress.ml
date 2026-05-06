@@ -1,6 +1,6 @@
 open OUnit2
 open Frontends.AzureTF
-open Azureir
+open Terraform_ir
 open Parser.Network_types
 open Parser.Tf_types
 

@@ -3,5 +3,5 @@
  (libraries
   pathfinder
   parser
-  azureir
+  terraform_ir
   ounit2))
