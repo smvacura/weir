@@ -3,7 +3,7 @@ open Parser.Network_types
 open Parser.Azure_types
 open Terraform_ir
 
-module CRT = Pathfinder.Complete_route_table
+module ERT = Pathfinder.Effective_route_table
 
 (* --- Fixtures --- *)
 
@@ -59,7 +59,7 @@ let subnet_index vnet subnets =
   Pathfinder.Utils.VnetMap.(add vnet subnets empty)
 
 let enrich ?(udrs = []) vnet subnets =
-  CRT.get_routes (CRT.enrich_route_table (make_rt udrs) vnet (subnet_index vnet subnets))
+  ERT.get_routes (ERT.enrich_route_table (make_rt udrs) vnet (subnet_index vnet subnets))
 
 (* --- Helpers --- *)
 
@@ -113,6 +113,19 @@ let vnet_local_tests = "vnet_local_routes" >::: [
     let routes = enrich vnet [subnet] in
     assert_route_hop routes "10.0.1.0/24" "VirtualNetwork";
     assert_route_hop routes "10.0.2.0/24" "VirtualNetwork");
+
+  (* When the VNet is absent from the subnet index there are no VirtualNetwork routes,
+     only the five default system routes. *)
+  "vnet_absent_from_index_has_no_vnetlocal_routes" >:: (fun _ ->
+    let vnet = make_vnet "vnet" in
+    let routes =
+      ERT.get_routes
+        (ERT.enrich_route_table (make_rt []) vnet Pathfinder.Utils.VnetMap.empty)
+    in
+    assert_route_hop routes "0.0.0.0/0" "Internet";
+    assert_equal 0
+      (List.length (List.filter (fun r -> show_contains r "VirtualNetwork") routes))
+      ~msg:"no VirtualNetwork routes expected when vnet is absent from subnet index");
 
 ]
 
@@ -178,9 +191,38 @@ let override_tests = "user_route_overrides" >::: [
     let routes = enrich ~udrs:[udr] vnet [subnet] in
     assert_route_hop routes "203.0.113.0/24" "Drop");
 
+  "udr_overrides_carrier_grade_nat_drop_route" >:: (fun _ ->
+    let vnet = make_vnet "vnet" in
+    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
+    let udr = make_udr "custom-cgn" "100.64.0.0/10" in
+    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    assert_route_hop routes "100.64.0.0/10" "Drop";
+    assert_equal 1 (count_routes_for routes "100.64.0.0/10")
+      ~msg:"only one 100.64.0.0/10 route should exist when UDR overrides the CGN system route");
+
+  (* A UDR whose prefix matches a subnet CIDR should shadow the VirtualNetwork system route;
+     only one route for that prefix should appear in the table. *)
+  "udr_overrides_vnet_local_route" >:: (fun _ ->
+    let vnet = make_vnet "vnet" in
+    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
+    let udr = make_udr "custom-vnet-local" "10.0.1.0/24" in
+    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    assert_route_hop routes "10.0.1.0/24" "Drop";
+    assert_equal 1 (count_routes_for routes "10.0.1.0/24")
+      ~msg:"only one route for subnet CIDR when UDR overrides the VNet-local system route");
+
+  "multiple_udrs_all_preserved" >:: (fun _ ->
+    let vnet = make_vnet "vnet" in
+    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
+    let udr1 = make_udr "custom-a" "203.0.113.0/24" in
+    let udr2 = make_udr "custom-b" "198.51.100.0/24" in
+    let routes = enrich ~udrs:[udr1; udr2] vnet [subnet] in
+    assert_route_hop routes "203.0.113.0/24" "Drop";
+    assert_route_hop routes "198.51.100.0/24" "Drop");
+
 ]
 
-let suite = "complete_route_table_suite" >::: [
+let suite = "effective_route_table_suite" >::: [
   vnet_local_tests;
   default_system_route_tests;
   override_tests;

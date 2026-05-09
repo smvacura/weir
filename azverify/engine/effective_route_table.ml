@@ -66,14 +66,14 @@ let system_routes =
       ~source:System
   ]
 
-let filter_system_routes udrs =
-  List.filter (fun x -> not (List.exists (fun y -> (Route_table.Route.get_prefix y) = (Route_table.Route.get_prefix x)) udrs)) system_routes
+let filter_routes udrs lower_routes =
+  List.filter (fun x -> not (List.exists (fun y -> (Route_table.Route.get_prefix y) = (Route_table.Route.get_prefix x)) udrs)) lower_routes
 
 
 let enrich_route_table (rt : Route_table.t) (vnet : Vnet.t) (map : Utils.subnet_index) =
-  let filtered_system_routes = filter_system_routes (Route_table.get_routes rt) in
+  let filtered_system_routes = filter_routes (Route_table.get_routes rt) system_routes in
   let new_routes = match get_decomposed_vnet_routes vnet map with
-  | Some routes -> routes @ filtered_system_routes
+  | Some routes -> filter_routes (Route_table.get_routes rt) routes @ filtered_system_routes
   | None -> filtered_system_routes
   in
   { disable_bgp_route_propagation = false; routes = Route_table.get_routes rt @ new_routes }

@@ -7,7 +7,7 @@
   ounit2))
 
 (test
- (name test_complete_route_table)
+ (name test_effective_route_table)
  (libraries
   pathfinder
   parser
