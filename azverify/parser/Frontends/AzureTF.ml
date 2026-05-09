@@ -557,6 +557,7 @@ module AzureTFParser = struct
         ~address_prefix:prefix
         ~next_hop:next_hop
         ~next_hop_in_ip_address:next_hop_in_ip_address
+        ~source:UserDefined
     )
     
 

@@ -27,6 +27,8 @@ let make ~name:name ~subscription:subscription ~address:address ~location:loc ~r
   addresses = addresses;
   }
 
+let compare = compare
+
 let get_addresses vnet = vnet.addresses
 
 let get_id vnet =

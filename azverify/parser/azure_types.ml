@@ -218,7 +218,7 @@ type next_hop =
  | Drop
  [@@deriving show]
 
-let next_hop_of_string_opt s ?(ip=None) = 
+let next_hop_of_string_opt s ?(ip=None) =
   match s with
   | "Internet" -> Some Internet
   | "VirtualNetwork" -> Some VirtualNetwork
@@ -226,4 +226,10 @@ let next_hop_of_string_opt s ?(ip=None) =
   | "VirtualGateway" -> Some VirtualGateway
   | "Drop" -> Some Drop
   | _ -> None
+
+type route_source =
+  | System
+  | Bgp
+  | UserDefined
+  [@@deriving show]
 

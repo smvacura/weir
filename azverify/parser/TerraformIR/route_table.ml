@@ -3,19 +3,23 @@ open Parser.Network_types
 open Parser.Tf_types
 
 module Route = struct
-  
+
   type t = {
     name : string;
     address_prefix : CIDR.t;
     next_hop : next_hop;
     next_hop_in_ip_address : IPv4.t option;
+    source : route_source;
   }
 
-  let make ~name ~address_prefix ~next_hop ~next_hop_in_ip_address =
-    { name; address_prefix; next_hop; next_hop_in_ip_address }
+  let make ~name ~address_prefix ~next_hop ~next_hop_in_ip_address ~source =
+    { name; address_prefix; next_hop; next_hop_in_ip_address; source }
 
   let get_prefix route =
     route.address_prefix
+
+  let get_source route =
+    route.source
 
   let compare r1 r2 =
     compare
@@ -23,8 +27,9 @@ module Route = struct
     (Parser.Network_types.CIDR.get_mask r2.address_prefix)
 
   let show route =
-    Printf.sprintf "{ name = %s; prefix = %s; next_hop = %s }"
+    Printf.sprintf "{ name = %s; prefix = %s; next_hop = %s; source = %s }"
       route.name (CIDR.show route.address_prefix) (show_next_hop route.next_hop)
+      (show_route_source route.source)
 
   let pp fmt route = Format.fprintf fmt "%s" (show route)
 

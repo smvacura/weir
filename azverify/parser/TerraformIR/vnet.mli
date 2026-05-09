@@ -23,6 +23,8 @@ val make :
     addresses:CIDR.t list -> 
     t
 
+val compare : t -> t -> int
+
 val show : t -> string
 
 val pp : Format.formatter -> t -> unit

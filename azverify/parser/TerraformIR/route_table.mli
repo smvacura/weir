@@ -5,9 +5,17 @@ open Parser.Tf_types
 module Route : sig
   type t
 
-  val make : name:string -> address_prefix:CIDR.t -> next_hop:next_hop -> next_hop_in_ip_address:IPv4.t option -> t
+  val make :
+    name:string ->
+    address_prefix:CIDR.t ->
+    next_hop:next_hop ->
+    next_hop_in_ip_address:IPv4.t option ->
+    source:route_source ->
+    t
 
   val get_prefix : t -> CIDR.t
+
+  val get_source : t -> route_source
 
   val compare : t -> t -> int
 

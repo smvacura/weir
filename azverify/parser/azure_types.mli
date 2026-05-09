@@ -86,3 +86,9 @@ type next_hop =
  [@@deriving show]
 
 val next_hop_of_string_opt : string -> ?ip:IPv4.t option -> next_hop option
+
+type route_source =
+  | System
+  | Bgp
+  | UserDefined
+  [@@deriving show]
