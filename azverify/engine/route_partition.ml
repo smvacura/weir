@@ -26,7 +26,10 @@ let get_route_mask route =
 module OrderedEvent = struct
   type t = event
 
-  let compare e1 e2 = compare e1.ip e2.ip
+  let compare e1 e2 = 
+    match Int32.unsigned_compare e1.ip e2.ip with
+    | 0 -> compare (Route.get_source e1.route) (Route.get_source e2.route)
+    | i -> i
 end
 module RouteHeap = Pqueue.MakeMax(Route)
 
@@ -92,9 +95,10 @@ let partition_routes rt : route_map =
   in
 
   let close_interval lo hi =
-    match RouteHeap.max_elt route_heap with
-    | Some route -> add_to_partition route lo hi
-    | None -> ()
+    if Int32.unsigned_compare lo hi <= 0 then
+      match RouteHeap.max_elt route_heap with
+      | Some route -> add_to_partition route lo hi
+      | None -> ()
   in
 
   let mark_route_expired route =
@@ -106,7 +110,8 @@ let partition_routes rt : route_map =
     | Start -> 
         if route_is_higher_than_max event.route 
         then (
-          close_interval !current_start (Int32.sub event.ip 1l); 
+          if Int32.unsigned_compare event.ip !current_start > 0 then
+            close_interval !current_start (Int32.sub event.ip 1l);
           current_start := event.ip; 
           RouteHeap.add route_heap event.route;
           )

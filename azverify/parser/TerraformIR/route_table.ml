@@ -22,9 +22,12 @@ module Route = struct
     route.source
 
   let compare r1 r2 =
-    compare
-    (Parser.Network_types.CIDR.get_mask r1.address_prefix)
-    (Parser.Network_types.CIDR.get_mask r2.address_prefix)
+    match Int32.unsigned_compare
+      (Parser.Network_types.CIDR.get_mask r1.address_prefix)
+      (Parser.Network_types.CIDR.get_mask r2.address_prefix)
+    with
+    | 0 -> compare r1.source r2.source
+    | c -> c
 
   let show route =
     Printf.sprintf "{ name = %s; prefix = %s; next_hop = %s; source = %s }"
