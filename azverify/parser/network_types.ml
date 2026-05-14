@@ -141,6 +141,11 @@ module CIDR = struct
   let get_interval cidr = (cidr.ip, Int32.logor cidr.ip (Int32.lognot cidr.mask))
 
   let get_mask cidr = cidr.mask
+
+let to_bit_list cidr =
+  let n = Int32.to_int cidr.mask in
+  List.init n (fun i ->
+    Int32.logand (Int32.shift_right_logical cidr.ip (31 - i)) 1l <> 0l)
   
   let show cidr =
     Printf.sprintf "%s/%s" (IPv4.show cidr.ip) (IPv4Mask.show cidr.mask)

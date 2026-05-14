@@ -42,6 +42,8 @@ val get_name : t -> string
 
 val get_address : t -> string
 
+val get_rules : t -> SecurityRule.t list
+
 val show : t -> string
 
 val show_nsg_map : t AddressMap.t -> string

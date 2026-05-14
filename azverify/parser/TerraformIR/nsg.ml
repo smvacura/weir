@@ -105,6 +105,8 @@ let get_name nsg = nsg.name
 
 let get_address nsg = nsg.address
 
+let get_rules nsg = nsg.rule_list
+
 let show { name; subscription; address; location; resource_group; rule_list; tags; } = 
 Printf.sprintf 
   "{ name = %s; subscription = %s; address = %s; location = %s; resource_group = %s; rule_list = %s tags = %s}"
