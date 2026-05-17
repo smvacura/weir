@@ -15,7 +15,7 @@ let eval mgr bdd x =
 
 let test_interval lo hi x _ =
   let man = init () ~vars:32 in
-  let in_bdd_interval = eval man (encode_interval man lo hi) x in
+  let in_bdd_interval = eval man (encode_interval man ~width:32 lo hi) x in
   if x >= lo && x <= hi
   then assert_bool "" in_bdd_interval
   else assert_bool "" (not in_bdd_interval)

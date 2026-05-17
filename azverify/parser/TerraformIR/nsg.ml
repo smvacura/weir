@@ -76,6 +76,17 @@ module SecurityRule = struct
       priority;
       direction;
     } 
+
+  let get_protocol rule = rule.protocol
+
+  let get_src_ip rule = rule.source
+
+  let get_dest_ip rule = rule.destination
+
+  let get_src_ports rule = rule.source_ports
+
+  let get_dest_ports rule = rule.destination_ports
+  
 end
 
 type t = {

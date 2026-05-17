@@ -30,6 +30,16 @@ module SecurityRule : sig
 
   val make : name:string -> description:string option -> protocol:protocol -> source_ports:port list -> destination_ports:port list -> source:endpoint -> destination:endpoint -> access:access -> priority:int -> direction:direction -> t
 
+  val get_protocol : t -> protocol
+
+  val get_src_ip : t -> endpoint
+
+  val get_dest_ip : t -> endpoint
+
+  val get_src_ports : t -> port list
+
+  val get_dest_ports : t -> port list 
+
 end
 
 type t

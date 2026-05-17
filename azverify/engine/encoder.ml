@@ -29,24 +29,15 @@ let encode_protocol man prot =
   | Any -> dtrue man
 
 
-let constant_to_bit_list c =
+let constant_to_bit_list ~width c =
   let c_32 = Int32.of_int c in
-  List.init 32 (fun i ->
-    Int32.logand (Int32.shift_right_logical c_32 (31 - i)) 1l <> 0l)
-
-let encode_le_constant man c =
-  constant_to_bit_list c
-  |> List.mapi (fun i value -> (31 - i, value))
-  |> List.fold_left ( fun acc (i, bit) ->
-    if bit 
-    then ite man (ithvar man i) (dand man acc @@ dtrue man) acc
-    else ite man (dnot man @@ Bdd.ithvar man i) (dand man acc @@ dfalse man) acc
-  ) (dtrue man)
+  List.init width (fun i ->
+    Int32.logand (Int32.shift_right_logical c_32 (width - 1 - i)) 1l <> 0l)
 
 
-let encode_le_constant man c =
-  constant_to_bit_list c
-  |> List.mapi (fun i value -> (31 - i, value))
+let encode_le_constant man ~width c =
+  constant_to_bit_list ~width c
+  |> List.mapi (fun i value -> (width - 1 - i, value))
   |> List.rev
   |> List.fold_left ( fun acc (i, bit) ->
     if bit 
@@ -54,8 +45,8 @@ let encode_le_constant man c =
     else ite man (ithvar man i) (dfalse man) acc
   ) (dtrue man)
 
-let encode_ge_constant man c =
-  constant_to_bit_list c
+let encode_ge_constant man ~width c =
+  constant_to_bit_list ~width c
   |> List.mapi (fun i value -> (31 - i, value))
   |> List.rev
   |> List.fold_left ( fun acc (i, bit) ->
@@ -64,8 +55,8 @@ let encode_ge_constant man c =
     else ite man (ithvar man i) (dtrue man) acc 
   ) (dtrue man)
 
-let encode_interval man lo hi =
-  dand man (encode_ge_constant man lo) (encode_le_constant man hi)
+let encode_interval man ~width lo hi =
+  dand man (encode_ge_constant man ~width lo) (encode_le_constant man ~width hi)
 
 let encode_cidr_membership man segment cidr =
   CIDR.to_bit_list cidr 
@@ -87,6 +78,16 @@ let encode_endpoint man segment endpoint =
   | SecurityRule.Any -> dtrue man
   | _ -> dfalse man
 
+let encode_port man port =
+  match port with
+  | Single p -> encode_interval man ~width:16 p p
+  | Range (lo, hi) -> encode_interval man ~width:16 lo hi
+  | Any -> dtrue man
+
+let encode_port_list man ports =
+  List.fold_left (fun acc port ->
+    dor man acc @@ encode_port man port
+  ) (dfalse man) ports
 
 let encode_allow man allow =
   match allow with
@@ -94,7 +95,9 @@ let encode_allow man allow =
   | SecurityRule.Deny -> dfalse man
 
 let encode_security_rule man rule =
-  ""
+  let source_bdd = encode_endpoint man SrcIP (SecurityRule.get_src_ip rule) in
+  let dest_bdd = encode_endpoint man DestIP (SecurityRule.get_dest_ip rule) in
+  dtrue man
 
 let encode_nsg nsg man = 
   dtrue man
