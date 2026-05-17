@@ -17,15 +17,23 @@ type header_segment =
 
 let get_ip_bit_loc segment bit_loc = 
   match segment with
-  | DestIP -> 2 + bit_loc
-  | SrcIP -> 34 + bit_loc
+  | DestIP -> bit_loc
+  | SrcIP -> 32 + bit_loc
   | _ -> 0
 
-let encode_protocol man prot = 
+let get_offset segment = 
+  match segment with
+  | DestIP -> 0
+  | SrcIP -> 32
+  | DestPort -> 64
+  | SrcPort -> 80
+  | Protocol -> 96
+
+let encode_protocol man ~offset prot = 
   match prot with
-  | Tcp -> dand man (ithvar man 0) (dnot man (ithvar man 1))
-  | Udp -> dand man (dnot man (ithvar man 0)) (ithvar man 1)
-  | Icmp -> dand man (ithvar man 0) (ithvar man 1)
+  | Tcp -> dand man (ithvar man offset) (dnot man (ithvar man (offset + 1)))
+  | Udp -> dand man (dnot man (ithvar man offset)) (ithvar man (offset + 1))
+  | Icmp -> dand man (ithvar man offset) (ithvar man (offset + 1))
   | Any -> dtrue man
 
 
@@ -35,58 +43,58 @@ let constant_to_bit_list ~width c =
     Int32.logand (Int32.shift_right_logical c_32 (width - 1 - i)) 1l <> 0l)
 
 
-let encode_le_constant man ~width c =
+let encode_le_constant man ~width ~offset c =
   constant_to_bit_list ~width c
   |> List.mapi (fun i value -> (width - 1 - i, value))
   |> List.rev
   |> List.fold_left ( fun acc (i, bit) ->
     if bit 
-    then ite man (ithvar man i) acc (dtrue man)
-    else ite man (ithvar man i) (dfalse man) acc
+    then ite man (ithvar man (offset + i)) acc (dtrue man)
+    else ite man (ithvar man (offset + i)) (dfalse man) acc
   ) (dtrue man)
 
-let encode_ge_constant man ~width c =
+let encode_ge_constant man ~width ~offset c =
   constant_to_bit_list ~width c
-  |> List.mapi (fun i value -> (31 - i, value))
+  |> List.mapi (fun i value -> (width - 1 - i, value))
   |> List.rev
   |> List.fold_left ( fun acc (i, bit) ->
     if bit 
-    then ite man (ithvar man i) acc (dfalse man)
-    else ite man (ithvar man i) (dtrue man) acc 
+    then ite man (ithvar man (offset + i)) acc (dfalse man)
+    else ite man (ithvar man (offset + i)) (dtrue man) acc 
   ) (dtrue man)
 
-let encode_interval man ~width lo hi =
-  dand man (encode_ge_constant man ~width lo) (encode_le_constant man ~width hi)
+let encode_interval man ~width ~offset lo hi =
+  dand man (encode_ge_constant man ~width ~offset lo) (encode_le_constant man ~width ~offset hi)
 
-let encode_cidr_membership man segment cidr =
+let encode_cidr_membership man ~offset cidr =
   CIDR.to_bit_list cidr 
   |> List.mapi (fun i value -> (31 - i, value))
   |> List.fold_left (fun acc (i, bit) -> 
-    let curr_bit = ithvar man @@ get_ip_bit_loc segment i in
+    let curr_bit = ithvar man (offset + i) in
     if bit then dand man acc curr_bit else dand man acc (dnot man curr_bit)
   ) (dtrue man)
 
 
-let encode_route_cidrs man segment cidr_list =
+let encode_route_cidrs man ~offset cidr_list =
   List.fold_left (fun acc cidr -> 
-    dor man acc @@ encode_cidr_membership man segment cidr
+    dor man acc @@ encode_cidr_membership man ~offset cidr
   ) (dfalse man) cidr_list 
 
-let encode_endpoint man segment endpoint = 
+let encode_endpoint man ~offset endpoint = 
   match endpoint with
-  | SecurityRule.Addresses cidrs -> encode_route_cidrs man segment cidrs
+  | SecurityRule.Addresses cidrs -> encode_route_cidrs man ~offset cidrs
   | SecurityRule.Any -> dtrue man
   | _ -> dfalse man
 
-let encode_port man port =
+let encode_port man ~offset port =
   match port with
-  | Single p -> encode_interval man ~width:16 p p
-  | Range (lo, hi) -> encode_interval man ~width:16 lo hi
+  | Single p -> encode_interval man ~width:16 ~offset p p
+  | Range (lo, hi) -> encode_interval man ~width:16 ~offset lo hi
   | Any -> dtrue man
 
-let encode_port_list man ports =
+let encode_port_list man ~offset ports =
   List.fold_left (fun acc port ->
-    dor man acc @@ encode_port man port
+    dor man acc @@ encode_port man ~offset port
   ) (dfalse man) ports
 
 let encode_allow man allow =
@@ -95,9 +103,28 @@ let encode_allow man allow =
   | SecurityRule.Deny -> dfalse man
 
 let encode_security_rule man rule =
-  let source_bdd = encode_endpoint man SrcIP (SecurityRule.get_src_ip rule) in
-  let dest_bdd = encode_endpoint man DestIP (SecurityRule.get_dest_ip rule) in
-  dtrue man
+    [ encode_endpoint man ~offset:(get_offset SrcIP) (SecurityRule.get_src_ip rule); 
+    encode_endpoint man ~offset:(get_offset DestIP) (SecurityRule.get_dest_ip rule); 
+    encode_port_list man ~offset:(get_offset SrcPort) (SecurityRule.get_src_ports rule); 
+    encode_port_list man ~offset:(get_offset DestPort) (SecurityRule.get_dest_ports rule); 
+    encode_protocol man ~offset:(get_offset Protocol) (SecurityRule.get_protocol rule);
+    ]
+    |> List.fold_left (dand man) (dtrue man)
 
-let encode_nsg nsg man = 
-  dtrue man
+let encode_nsg ensg man = 
+  let rules = Effective_nsg.get_effective_rules ensg 
+  |> List.sort SecurityRule.compare
+  in 
+  List.fold_left (fun (permitted, shadowed) rule ->
+    let matched = encode_security_rule man rule in
+    let unshadowed = dand man matched (dnot man shadowed) in
+    match SecurityRule.get_access rule with
+    | SecurityRule.Allow -> (dor man permitted unshadowed, dor man unshadowed shadowed)
+    | SecurityRule.Deny -> (permitted, dor man unshadowed shadowed)
+    ) (dfalse man, dfalse man) rules
+    |> fst
+
+let encode_effective_route man interval_list =
+  List.fold_left (fun acc (lo, hi) ->
+    dor man acc @@ encode_interval man ~width:32 ~offset:(get_offset DestIP) lo hi
+  ) (dfalse man) interval_list

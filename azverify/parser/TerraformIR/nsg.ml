@@ -63,6 +63,8 @@ module SecurityRule = struct
     direction : direction;
   } [@@deriving show]
 
+  let compare r1 r2 = compare r1.priority r2.priority
+
   let make ~name ~description ~protocol ~source_ports ~destination_ports ~source ~destination ~access ~priority ~direction =
     {
       name;
@@ -86,7 +88,9 @@ module SecurityRule = struct
   let get_src_ports rule = rule.source_ports
 
   let get_dest_ports rule = rule.destination_ports
-  
+
+  let get_access rule = rule.access
+
 end
 
 type t = {

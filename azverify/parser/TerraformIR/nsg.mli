@@ -6,6 +6,8 @@ module SecurityRule : sig
   
   type t
 
+  val compare : t -> t -> int
+
   type endpoint = 
   | Addresses of CIDR.t list
   | ApplicationGroups of string list
@@ -39,6 +41,8 @@ module SecurityRule : sig
   val get_src_ports : t -> port list
 
   val get_dest_ports : t -> port list 
+
+  val get_access : t -> access
 
 end
 
