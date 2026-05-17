@@ -34,6 +34,8 @@ module CIDR : sig
 
   val get_mask : t -> int32
 
+  val to_bit_list : t -> bool list
+
   val show : t -> string
 
   val pp : Format.formatter -> t -> unit

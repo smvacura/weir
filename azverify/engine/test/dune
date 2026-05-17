@@ -13,3 +13,9 @@
   parser
   terraform_ir
   ounit2))
+
+(test 
+  (name test_encoder)
+  (libraries
+   pathfinder
+   ounit2))

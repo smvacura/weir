@@ -1,19 +1,31 @@
-type node = { ip_range: Parser.Network_types.CIDR.t; attached: string }
-type edge = |
-type header_space = |
+open Terraform_ir
+open Parser.Network_types
 
 type node_id = int
 type resource_address = string
 
-type hsa_graph = (node_id, node * edge list) Hashtbl.t
+type node = { ip_range: Parser.Network_types.CIDR.t; attached: resource_address }
+type edge = { decider: Bdd.bdd; src: node_id; dest: node_id }
+
+type adjacency = (node_id, edge list) Hashtbl.t
 
 type node_index = (resource_address, node_id) Hashtbl.t
 
-let add_node address ip_range attached hsa_graph node_index =
-  let id = Hashtbl.length hsa_graph in
-  let node = { ip_range; attached } in
-  Hashtbl.add node_index address id;
-  Hashtbl.add hsa_graph id (node, [])
+type hsa_graph = {
+  nodes : (node_id, node) Hashtbl.t;
+  in_list : adjacency;
+  out_list: adjacency;
+  addr_index: node_index;
+  next_id: int ref
+}
+
+let add_node address ip_range hsa_graph =
+  let id = !(hsa_graph.next_id) in
+  let node = { ip_range; attached = address } in
+  Hashtbl.replace hsa_graph.addr_index address id;
+  Hashtbl.replace hsa_graph.nodes id node;
+  hsa_graph.next_id := id + 1;
+  id
 
 let get_subnets vnet subnets =
   let rec aux subnets acc =
@@ -26,18 +38,33 @@ let get_subnets vnet subnets =
   aux subnets []
 
 
-let get_route_nodes route_map =
-  ""
+let nsg_to_bdd (nsg : Nsg.t) (man : Bdd.manager) = Bdd.dtrue man
 
+let cidr_block_to_bdd (cidr : CIDR.t) (man : Bdd.manager) = Bdd.dtrue man
 
-let get_sorted_routes route_table : Terraform_ir.Route_table.Route.t list = []
-
-let add_edge subnet_address route_table node_index hsa_graph = 
-  let id = match Hashtbl.find_opt node_index subnet_address with
-  | Some i -> i
-  | None -> -1
+let cidr_blocks_to_bdd (cidrs : CIDR.t list) (man : Bdd.manager) = 
+  let rec aux ell acc = 
+    match ell with
+    | [] -> acc
+    | h::t -> aux t (Bdd.dor man (cidr_block_to_bdd h man) acc)
   in
-  match Hashtbl.find_opt hsa_graph id with
-  (* TODO: construct edge from route_table and prepend *)
-  | Some (node, edges) -> Hashtbl.replace hsa_graph id (node, edges)
-  | None -> ()
+  aux cidrs (Bdd.dfalse man)
+
+
+let add_edge src dest nsg_1 nsg_2 route_cidrs hsa_graph man = 
+  let nsg_1_bdd = match nsg_1 with
+  | Some nsg -> nsg_to_bdd nsg man
+  | None -> Bdd.dtrue man
+  in
+  let nsg_2_bdd = match nsg_2 with
+  | Some nsg -> nsg_to_bdd nsg man
+  | None -> Bdd.dtrue man
+  in
+  let route_bdd = cidr_blocks_to_bdd route_cidrs man in
+  let decider = Bdd.dand man (Bdd.dand man nsg_1_bdd nsg_2_bdd) route_bdd in
+  let edge = { decider; src; dest; } in
+  let push tbl k v =
+    Hashtbl.replace tbl k (v :: Hashtbl.find tbl k)
+  in
+  push hsa_graph.in_list dest edge;
+  push hsa_graph.in_list dest edge;
