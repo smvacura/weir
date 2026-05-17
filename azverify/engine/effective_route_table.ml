@@ -4,7 +4,7 @@ open Parser.Network_types
 
 type t = { disable_bgp_route_propagation : bool; routes : Route_table.Route.t list }
 
-let get_routes t = t.routes
+let get_effective_routes t = t.routes
 
 let construct_vnetlocal_route_from_cidr name cidr =
   Route_table.Route.make

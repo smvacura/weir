@@ -59,7 +59,7 @@ let subnet_index vnet subnets =
   Pathfinder.Utils.VnetMap.(add vnet subnets empty)
 
 let enrich ?(udrs = []) vnet subnets =
-  ERT.get_routes (ERT.enrich_route_table (make_rt udrs) vnet (subnet_index vnet subnets))
+  ERT.get_effective_routes (ERT.enrich_route_table (make_rt udrs) vnet (subnet_index vnet subnets))
 
 (* --- Helpers --- *)
 
@@ -119,7 +119,7 @@ let vnet_local_tests = "vnet_local_routes" >::: [
   "vnet_absent_from_index_has_no_vnetlocal_routes" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
     let routes =
-      ERT.get_routes
+      ERT.get_effective_routes
         (ERT.enrich_route_table (make_rt []) vnet Pathfinder.Utils.VnetMap.empty)
     in
     assert_route_hop routes "0.0.0.0/0" "Internet";
