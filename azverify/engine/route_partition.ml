@@ -56,9 +56,8 @@ let init_validity_index events =
   aux events
 
 
-let partition_routes rt : route_map = 
+let partition_routes routes : route_map =
   let partitions = Hashtbl.create 10 in
-  let routes = Terraform_ir.Route_table.get_routes rt in
   let events = get_events routes in
   let validity_index = init_validity_index events in
   let route_heap = RouteHeap.create () in
