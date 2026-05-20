@@ -542,12 +542,16 @@ module AzureTFParser = struct
     | `String s -> CIDR.of_string_opt s |> Option.to_result ~none:("Could not parse resource " ^ name ^ " of type route")
     | _ -> Error ("Could not parse resource " ^ name ^ " of type route")
     in
-    let next_hop_in_ip_address = match Safe.Util.member "next_hop_in_ip_address" json with
+    let ip_opt = match Safe.Util.member "next_hop_in_ip_address" json with
     | `String s -> IPv4.of_string_opt s
     | _ -> None
     in
+    let next_hop_in_ip_address = match ip_opt with
+    | Some ip -> Resolved (StaticAppliance ip)
+    | None -> Unresolved
+    in
     let* next_hop = match Safe.Util.member "next_hop_type" json with
-    | `String s -> next_hop_of_string_opt s ~ip:next_hop_in_ip_address |>
+    | `String s -> next_hop_of_string_opt s ~ip:ip_opt |>
       Option.to_result ~none:("Could not parse next hop of route " ^ name)
     | _ -> Error ("Could not parse next hop of route " ^ name)
     in

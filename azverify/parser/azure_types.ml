@@ -210,10 +210,16 @@ let show_tag tag =
 let pp_tag fmt tag = 
   Format.fprintf fmt "%s" (show_tag tag) 
 
+type appliance_ref =
+ | StaticAppliance of IPv4.t
+ | DynamicNic of string
+ | Unresolvable
+ [@@deriving show]
+
 type next_hop = 
  | Internet
  | VirtualNetwork
- | VirtualAppliance of IPv4.t
+ | VirtualAppliance of appliance_ref
  | VirtualGateway
  | Drop
  [@@deriving show]
@@ -222,7 +228,7 @@ let next_hop_of_string_opt s ?(ip=None) =
   match s with
   | "Internet" -> Some Internet
   | "VirtualNetwork" -> Some VirtualNetwork
-  | "VirtualAppliance" -> Option.map (fun ip -> VirtualAppliance ip) ip
+  | "VirtualAppliance" -> Option.map (fun ip -> VirtualAppliance (StaticAppliance ip)) ip
   | "VirtualGateway" -> Some VirtualGateway
   | "Drop" -> Some Drop
   | _ -> None

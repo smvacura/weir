@@ -77,10 +77,16 @@ val show_tag : tag -> string
 
 val pp_tag : Format.formatter -> tag -> unit
 
+type appliance_ref =
+ | StaticAppliance of IPv4.t
+ | DynamicNic of string
+ | Unresolvable
+ [@@deriving show]
+
 type next_hop = 
  | Internet
  | VirtualNetwork
- | VirtualAppliance of IPv4.t
+ | VirtualAppliance of appliance_ref
  | VirtualGateway
  | Drop
  [@@deriving show]

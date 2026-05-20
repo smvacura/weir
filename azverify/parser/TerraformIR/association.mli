@@ -7,4 +7,8 @@ module BinaryAssociation : sig
 
     val get_address : ('a, 'b) t -> string
 
+    val get_r1 : ('a, 'b) t -> 'a
+
+    val get_r2 : ('a, 'b) t -> 'b
+
 end

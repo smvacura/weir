@@ -328,7 +328,7 @@ let route_table_world =
     ~name:"default"
     ~address_prefix:(Option.get (CIDR.of_string_opt "0.0.0.0/0"))
     ~next_hop:Internet
-    ~next_hop_in_ip_address:None
+    ~next_hop_in_ip_address:Unresolved
     ~source:UserDefined
   in
   let rt = Route_table.make

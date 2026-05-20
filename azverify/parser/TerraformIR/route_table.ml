@@ -8,7 +8,7 @@ module Route = struct
     name : string;
     address_prefix : CIDR.t;
     next_hop : next_hop;
-    next_hop_in_ip_address : IPv4.t option;
+    next_hop_in_ip_address : appliance_ref resolvable;
     source : route_source;
   }
 
