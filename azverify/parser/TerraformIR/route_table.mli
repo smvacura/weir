@@ -17,6 +17,10 @@ module Route : sig
 
   val get_source : t -> route_source
 
+  val next_hop_is_unresolved : t -> bool
+
+  val resolve_next_hop : ?list:(string list) -> ?address:string -> t -> t
+
   val compare : t -> t -> int
 
   val show : t -> string
@@ -34,4 +38,8 @@ val get_address : t -> string
 
 val get_routes : t -> Route.t list
 
-val make : name:string -> subscription:string -> address:string -> location:azure_location -> resource_group:Rg.t -> ?disable_bgp_route_propagation:bool -> routes:Route.t list -> tags:tag list -> t
+val resolve_routes : Route.t list -> t -> t
+
+val make : name:string -> subscription:string -> address:string -> location:azure_location -> resource_group:Rg.t -> ?bgp_route_propagation_enabled:bool -> routes:Route.t list -> tags:tag list -> t
+
+val show_rt_map : t AddressMap.t -> string

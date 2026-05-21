@@ -1,3 +1,4 @@
+open Parser.Tf_types
 
 module BinaryAssociation : sig
 
@@ -10,5 +11,7 @@ module BinaryAssociation : sig
     val get_r1 : ('a, 'b) t -> 'a
 
     val get_r2 : ('a, 'b) t -> 'b
+
+    val show_assoc_map : ('a, 'b) t AddressMap.t -> string
 
 end

@@ -583,8 +583,8 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type route table")
     in
-    let* disable_bgp_route_propagation = match Safe.Util.member "disable_bgp_route_propagation" values with
-    | `Bool b -> Ok b 
+    let* bgp_route_propagation_enabled = match Safe.Util.member "bgp_route_propagation_enabled" values with
+    | `Bool b -> Ok b
     | _ -> Ok true
     in
     let tags = Safe.Util.member "tags" values 
@@ -601,7 +601,7 @@ module AzureTFParser = struct
       ~address:address
       ~location:location
       ~resource_group:rg
-      ~disable_bgp_route_propagation:disable_bgp_route_propagation
+      ~bgp_route_propagation_enabled:bgp_route_propagation_enabled
       ~routes:routes
       ~tags:tags
     )
@@ -862,13 +862,16 @@ module AzureTFParser = struct
     aux address json_list
 
   let resolve_ip_config_dependencies ipconfig (world : World.t) ip_config_json =
-    let resolved_subnet = 
-      let subnet_references = Safe.Util.member "subnet_id" ip_config_json |>
-        Safe.Util.member "references" |> 
-        Safe.Util.to_list |>
-        Safe.Util.filter_string in
+    let resolved_subnet =
+      let subnet_references =
+        match Safe.Util.member "subnet_id" ip_config_json with
+        | `Null -> []
+        | json -> Safe.Util.member "references" json |>
+                  Safe.Util.to_list |>
+                  Safe.Util.filter_string
+      in
       match subnet_references with
-      | [id; address] -> AddressMap.find_opt address world.subnets
+      | [_id; address] -> AddressMap.find_opt address world.subnets
       | _ -> None
     in
     let resolved_pip =
@@ -1066,6 +1069,48 @@ module AzureTFParser = struct
     (world, err)
     nic_nsg_assocs
 
+  let get_route_nics (json : Safe.t list) nics =
+    List.fold_left (
+      fun set json -> match json with
+      | `String s when AddressMap.mem s nics ->  AddressSet.add s set
+      | _ -> set
+    ) AddressSet.empty json 
+    |> AddressSet.elements
+
+  let resolve_routes rt niclist = 
+    let resolve_route route =
+      if not @@ Route_table.Route.next_hop_is_unresolved route
+      then route
+      else match niclist with
+      | [] -> Route_table.Route.resolve_next_hop route
+      | [address] -> Route_table.Route.resolve_next_hop ~address route
+      | list -> Route_table.Route.resolve_next_hop ~list route
+    in
+    let routes = List.map resolve_route (Route_table.get_routes rt) in
+    Route_table.resolve_routes routes rt
+
+  let resolve_route_table_dynamic_ips ((world : World.t), err) config_json =
+    let rts = world.route_tables in
+    let resolve_route_table_dynamic_ip rt =
+      let (let*) = Result.bind in
+      let* resource = get_configuration_resource (Route_table.get_address rt) config_json 
+        |> Option.to_result ~none:("Could not resolve ids for route table " ^ (Route_table.get_name rt)) in
+      let expressions = Safe.Util.member "expressions" resource in
+      let route = Safe.Util.member "route" expressions in
+      match Safe.Util.member "references" route with 
+      | `List l -> Ok (resolve_routes rt (get_route_nics l world.nics))
+      | `Null -> Ok rt
+      | _ -> Error "Malformed route table in configuration"
+    in
+    let rts', err' = begin
+    AddressMap.fold (fun addr rt (ok_map, err_list) ->
+      match resolve_route_table_dynamic_ip rt with
+      | Ok rt' -> (AddressMap.add addr rt' ok_map, err_list)
+      | Error e -> (ok_map, e::err_list)) rts (AddressMap.empty, err)
+    end
+    in ({world with route_tables = rts'}, err')
+      
+
   let print_string_list ell =
     let rec aux = function
     | [] -> ()
@@ -1135,6 +1180,7 @@ module AzureTFParser = struct
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
     let world, err = parse_route_tables (world, err) raw_world.route_tables in
     let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
+    let world, err = resolve_route_table_dynamic_ips (world, err) (Option.get config_json) in
     let world, err = resolve_route_table_associations (world, err) (Option.get config_json) raw_world.route_table_associations in
     let world, err = resolve_nsg_associations (world, err) (Option.get config_json) raw_world.nsg_associations in
     let world, err = resolve_nic_nsg_associations (world, err) (Option.get config_json) raw_world.nic_nsg_associations in

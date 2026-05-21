@@ -43,10 +43,14 @@ let get_resource_group world _subscription rg_name =
     if Rg.get_name rg = rg_name then Some rg else acc)
     world.resource_groups None
 
-let show world = 
+let show world =
   "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
   "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^
   "Subnets: " ^ Subnet.show_subnet_map world.subnets ^ "\n" ^
   "Nsgs: " ^ Nsg.show_nsg_map world.nsgs ^ "\n" ^
   "Nics: " ^ Nic.show_nic_map world.nics ^ "\n" ^
-  "Pips: " ^ Pip.show_pip_map world.pips ^ "\n"
+  "Pips: " ^ Pip.show_pip_map world.pips ^ "\n" ^
+  "Route tables: " ^ Route_table.show_rt_map world.route_tables ^ "\n" ^
+  "RT associations: " ^ Association.BinaryAssociation.show_assoc_map world.route_table_associations ^ "\n" ^
+  "NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nsg_associations ^ "\n" ^
+  "NIC-NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nic_nsg_associations ^ "\n"

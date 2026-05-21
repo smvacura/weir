@@ -1,3 +1,4 @@
+open Parser.Tf_types
 
 module BinaryAssociation = struct
   
@@ -15,5 +16,13 @@ module BinaryAssociation = struct
   let get_r2 assoc = assoc.r2
 
   let get_address assoc = assoc.address
+
+  let show_assoc_map m =
+    "{" ^
+    (m
+    |> AddressMap.bindings
+    |> List.map (fun (addr, _) -> addr)
+    |> String.concat ",")
+    ^ "}"
 
 end

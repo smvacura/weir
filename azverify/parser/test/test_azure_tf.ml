@@ -338,7 +338,7 @@ let route_table_world =
     ~location:EastUs
     ~resource_group:rg
     ~routes:[route]
-    ~disable_bgp_route_propagation:true
+    ~bgp_route_propagation_enabled:true
     ~tags:[]
   in
   let assoc = Association.BinaryAssociation.make rt subnet "azurerm_subnet_route_table_association.assoc" in
@@ -415,6 +415,108 @@ let nsg_subnet_assoc_world =
   let nic_nsg_associations = AddressMap.empty in
   ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
 
+let dynamic_nic_udr_world =
+  let rg = Rg.make
+    ~name:"main-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let vnet = Vnet.make
+    ~name:"main-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let appliance_subnet = Subnet.make
+    ~name:"appliance-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.appliance"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/24"]))
+  in
+  let workload_subnet = Subnet.make
+    ~name:"workload-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.workload"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let ipconfig = Nic.IpConfiguration.make
+    ~name:"internal"
+    ~subscription:"DEFAULT"
+    ~subnet:(Resolved appliance_subnet)
+    ~ip_address_version:IPv4
+    ~pip:(Resolved None)
+    ~private_address_allocation:Dynamic
+    ~primary:None
+  in
+  let nic = Nic.make
+    ~name:"appliance-nic"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_network_interface.appliance"
+    ~location:EastUs
+    ~resource_group:rg
+    ~ip_configurations:[ipconfig]
+  in
+  let route = Route_table.Route.make
+    ~name:"to-appliance"
+    ~address_prefix:(Option.get (CIDR.of_string_opt "0.0.0.0/0"))
+    ~next_hop:VirtualAppliance
+    ~next_hop_in_ip_address:(Resolved (DynamicNic "azurerm_network_interface.appliance"))
+    ~source:UserDefined
+  in
+  let rt = Route_table.make
+    ~name:"workload-rt"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_route_table.workload"
+    ~location:EastUs
+    ~resource_group:rg
+    ~bgp_route_propagation_enabled:true
+    ~routes:[route]
+    ~tags:[]
+  in
+  let assoc = Association.BinaryAssociation.make rt workload_subnet "azurerm_subnet_route_table_association.workload" in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address appliance_subnet) appliance_subnet AddressMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address workload_subnet) workload_subnet subnets in
+  let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
+  let route_tables = AddressMap.add (Route_table.get_address rt) rt AddressMap.empty in
+  let route_table_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in
+  ({resource_groups; vnets; subnets;
+    nsgs = AddressMap.empty; nics; pips = AddressMap.empty;
+    route_tables; route_table_associations;
+    nsg_associations = AddressMap.empty;
+    nic_nsg_associations = AddressMap.empty} : World.t)
+
+let nic_no_subnet_world =
+  let rg = Rg.make
+    ~name:"main-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  ({resource_groups;
+    vnets = AddressMap.empty;
+    subnets = AddressMap.empty;
+    nsgs = AddressMap.empty;
+    nics = AddressMap.empty;
+    pips = AddressMap.empty;
+    route_tables = AddressMap.empty;
+    route_table_associations = AddressMap.empty;
+    nsg_associations = AddressMap.empty;
+    nic_nsg_associations = AddressMap.empty} : World.t)
+
 let sample_rg =
   Rg.make 
     ~name:"example-resources"
@@ -485,7 +587,19 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     nsg_subnet_assoc_world
-    (AzureTFParser.get_resources "test_plans/simple_nsg_subnet_assoc/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_nsg_subnet_assoc/plan.json"));
+  "nic_no_subnet" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    nic_no_subnet_world
+    (AzureTFParser.get_resources "test_plans/nic_no_subnet/plan.json"));
+  "dynamic_nic_udr" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    dynamic_nic_udr_world
+    (AzureTFParser.get_resources "test_plans/dynamic_nic_udr/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [

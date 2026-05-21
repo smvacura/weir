@@ -81,14 +81,14 @@ val pp_tag : Format.formatter -> tag -> unit
 type appliance_ref =
  | StaticAppliance of IPv4.t
  | DynamicNic of string
- | ApplianceSet of AddressSet.t
+ | ApplianceSet of string list
  | Unresolvable
  [@@deriving show]
 
 type next_hop = 
  | Internet
  | VirtualNetwork
- | VirtualAppliance of appliance_ref
+ | VirtualAppliance
  | VirtualGateway
  | Drop
  [@@deriving show]
