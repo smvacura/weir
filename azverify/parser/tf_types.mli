@@ -19,3 +19,9 @@ module AddressMap : Map.S with type key = string
 module IPMap : Map.S with type key = Network_types.IPv4.t
 
 module CIDRMap : Map.S with type key = Network_types.CIDR.t
+
+module AddressSet : sig
+  include  Set.S with type elt = string
+
+  val pp : Format.formatter -> t -> unit
+end

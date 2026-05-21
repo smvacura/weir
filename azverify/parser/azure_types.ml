@@ -1,4 +1,5 @@
 open Network_types
+open Tf_types
 
 type azure_location =
   | AustraliaCentral
@@ -213,6 +214,7 @@ let pp_tag fmt tag =
 type appliance_ref =
  | StaticAppliance of IPv4.t
  | DynamicNic of string
+ | ApplianceSet of AddressSet.t
  | Unresolvable
  [@@deriving show]
 
