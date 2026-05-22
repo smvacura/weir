@@ -1,31 +1,92 @@
 open Terraform_ir
 open Parser.Network_types
+open Parser.Tf_types
+
+open Bdd
 
 type node_id = int
 type resource_address = string
 
-type node = { ip_range: Parser.Network_types.CIDR.t; attached: resource_address }
+type node = { ip_range: Parser.Network_types.CIDR.t; attached: resource_address; nsg : Effective_nsg.t }
 type edge = { decider: Bdd.bdd; src: node_id; dest: node_id }
 
 type adjacency = (node_id, edge list) Hashtbl.t
 
 type node_index = (resource_address, node_id) Hashtbl.t
 
+type cidr_index = (Vnet.t * CIDR.t, node_id) Hashtbl.t 
+
 type hsa_graph = {
   nodes : (node_id, node) Hashtbl.t;
   in_list : adjacency;
   out_list: adjacency;
   addr_index: node_index;
+  cidr_index: cidr_index;
   next_id: int ref
 }
 
-let add_node address ip_range hsa_graph =
+(* TODO: initialize hashmaps with better values *)
+let init_hsa_graph (world : World.t) = {
+  nodes = Hashtbl.create (AddressMap.cardinal world.subnets + AddressMap.cardinal world.nics);
+  in_list = Hashtbl.create 0;
+  out_list = Hashtbl.create 0;
+  addr_index = Hashtbl.create 0;
+  cidr_index = Hashtbl.create 0;
+  next_id = ref 0
+}
+
+let push tbl k v =
+    match Hashtbl.find_opt tbl k with
+    | Some e -> Hashtbl.replace tbl k (v::e)
+    | None -> Hashtbl.add tbl k [v]
+
+let push_mult tbl k v = 
+  match Hashtbl.find_opt tbl k with
+  | Some e -> Hashtbl.replace tbl k (e @ v)
+  | None -> Hashtbl.add tbl k v
+
+let get_node_opt f graph =
+  let (let*) = Option.bind in
+  let* id = f in
+  let* node = Hashtbl.find_opt graph.nodes id in
+  Some (id, node)
+
+let get_node_from_cidr_opt cidr graph =
+  get_node_opt (Hashtbl.find_opt graph.cidr_index cidr) graph
+
+let get_node_from_addr_opt addr graph =
+  get_node_opt (Hashtbl.find_opt graph.addr_index addr) graph
+
+let add_subnet subnet subnet_to_nsg hsa_graph =
+  let attached = Subnet.get_address subnet in
+  let vnet = Subnet.get_vnet subnet in
+  let ip_range = Subnet.get_cidrs subnet |> List.hd in
+  let nsg = AddressMap.find_opt attached subnet_to_nsg
+    |> Effective_nsg.enrich_nsg
+  in
   let id = !(hsa_graph.next_id) in
-  let node = { ip_range; attached = address } in
-  Hashtbl.replace hsa_graph.addr_index address id;
+  let node = { ip_range; attached; nsg } in
+  Hashtbl.replace hsa_graph.addr_index attached id;
   Hashtbl.replace hsa_graph.nodes id node;
-  hsa_graph.next_id := id + 1;
-  id
+  Hashtbl.replace hsa_graph.cidr_index (vnet, ip_range) id;
+  hsa_graph.next_id := id + 1
+
+let add_nic nic nic_to_nsg hsa_graph =
+  let address = Nic.get_address nic in
+  let nsg = AddressMap.find_opt address nic_to_nsg
+    |> Effective_nsg.enrich_nsg
+  in
+  List.iter (fun ipconfig ->
+      let config_name = Nic.IpConfiguration.get_name ipconfig in
+      let subaddress = address ^ "/" ^ config_name in
+      let id = !(hsa_graph.next_id) in
+      match Nic.IpConfiguration.get_private_ip ipconfig with
+      | Some ip -> let node = { ip_range = CIDR.make ip (IPv4Mask.of_int32 32l); attached = subaddress; nsg} in
+                   Hashtbl.replace hsa_graph.addr_index subaddress id;
+                   Hashtbl.replace hsa_graph.nodes id node;
+                   hsa_graph.next_id := id + 1
+      | None -> ()
+    ) (Nic.get_ipconfigs nic)
 
 let get_subnets vnet subnets =
   let rec aux subnets acc =
@@ -38,33 +99,145 @@ let get_subnets vnet subnets =
   aux subnets []
 
 
-let nsg_to_bdd (nsg : Nsg.t) (man : Bdd.manager) = Bdd.dtrue man
+let add_edge subnet_id node_id node effective_nsg interval graph man = 
+  let decider = dand man (dand man
+  (Encoder.encode_effective_route man interval) 
+  (Encoder.encode_nsg effective_nsg man))
+  (Encoder.encode_nsg node.nsg man) in
+  let edge = { decider; src = subnet_id; dest = node_id} in
+  push graph.in_list node_id edge;
+  push graph.out_list subnet_id edge
 
-let cidr_block_to_bdd (cidr : CIDR.t) (man : Bdd.manager) = Bdd.dtrue man
+type build_context = {
+  subnet_to_rt : Route_table.t AddressMap.t;
+  subnet_to_nsg : Nsg.t AddressMap.t;
+  subnet_index : Utils.subnet_index;
+  nic_to_subnet : Subnet.t AddressMap.t;
+  nic_to_nsg : Nsg.t AddressMap.t;
+}
 
-let cidr_blocks_to_bdd (cidrs : CIDR.t list) (man : Bdd.manager) = 
-  let rec aux ell acc = 
-    match ell with
-    | [] -> acc
-    | h::t -> aux t (Bdd.dor man (cidr_block_to_bdd h man) acc)
+let add_subnet_edges man ctx subnet_id subnet graph =
+  let subnet_address = Subnet.get_address subnet in
+  let vnet = Subnet.get_vnet subnet in
+  let rt = AddressMap.find_opt subnet_address ctx.subnet_to_rt
+    |> Option.value ~default:Route_table.empty in
+  let source_nsg = AddressMap.find_opt subnet_address ctx.subnet_to_nsg in
+  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.subnet_index
+    |> Effective_route_table.get_effective_routes
+    |> Route_partition.partition_routes in
+  let effective_nsg = Effective_nsg.enrich_nsg source_nsg in
+  Hashtbl.iter (
+    fun route interval ->
+      let add addr_result =
+        Option.iter (fun (id, node) ->
+          add_edge subnet_id id node effective_nsg interval graph man
+        ) addr_result
+      in
+      match Route_table.Route.get_next_hop route with
+      | VirtualAppliance -> begin
+        match Route_table.Route.get_next_hop_ip route with
+        | Resolved StaticAppliance ip ->
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph)
+        | Resolved DynamicNic address ->
+          add (get_node_from_addr_opt address graph)
+        | Resolved ApplianceSet set ->
+          List.iter (fun address -> add (get_node_from_addr_opt address graph)) set
+        | _ -> ()
+      end
+      | VirtualNetwork -> add (get_node_from_cidr_opt (vnet, (Route_table.Route.get_prefix route)) graph) 
+      | _ -> ()
+  ) effective_routes
+
+let add_nic_edge ctx nic_id nic graph man =
+  let nic_address = Nic.get_address nic in
+  let ensg = AddressMap.find_opt nic_address ctx.nic_to_nsg 
+    |> Effective_nsg.enrich_nsg
   in
-  aux cidrs (Bdd.dfalse man)
+  match AddressMap.find_opt nic_address ctx.nic_to_subnet with
+  | Some subnet -> begin
+    match Hashtbl.find_opt graph.addr_index (Subnet.get_address subnet) with
+    | Some node_id -> 
+      let decider = Encoder.encode_nsg ensg man in
+      let edge = { decider; src = nic_id; dest = node_id} in
+      push graph.in_list node_id edge;
+      push graph.out_list nic_id edge
+    | None -> ()
+    end
+  | None -> ()
 
 
-let add_edge src dest nsg_1 nsg_2 route_cidrs hsa_graph man = 
-  let nsg_1_bdd = match nsg_1 with
-  | Some nsg -> nsg_to_bdd nsg man
-  | None -> Bdd.dtrue man
+let build_graph world man =
+  let subnet_to_nsg = AddressMap.fold (fun _ assoc acc ->
+    AddressMap.add
+      (Subnet.get_address (Association.BinaryAssociation.get_r2 assoc))
+      (Association.BinaryAssociation.get_r1 assoc)
+      acc
+  ) world.World.nsg_associations AddressMap.empty
   in
-  let nsg_2_bdd = match nsg_2 with
-  | Some nsg -> nsg_to_bdd nsg man
-  | None -> Bdd.dtrue man
+  let subnet_to_rt = AddressMap.fold (fun _ assoc acc ->
+    AddressMap.add
+      (Subnet.get_address (Association.BinaryAssociation.get_r2 assoc))
+      (Association.BinaryAssociation.get_r1 assoc)
+      acc
+  ) world.World.route_table_associations AddressMap.empty
   in
-  let route_bdd = cidr_blocks_to_bdd route_cidrs man in
-  let decider = Bdd.dand man (Bdd.dand man nsg_1_bdd nsg_2_bdd) route_bdd in
-  let edge = { decider; src; dest; } in
-  let push tbl k v =
-    Hashtbl.replace tbl k (v :: Hashtbl.find tbl k)
+  let nic_to_nsg = AddressMap.fold (fun _ assoc acc ->
+    AddressMap.add
+      (Nic.get_address (Association.BinaryAssociation.get_r2 assoc))
+      (Association.BinaryAssociation.get_r1 assoc)
+      acc
+  ) world.nic_nsg_associations AddressMap.empty
   in
-  push hsa_graph.in_list dest edge;
-  push hsa_graph.in_list dest edge;
+  let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
+    let address = Nic.get_address nic in
+    match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
+    | Some subnet -> AddressMap.add address subnet acc
+    | None -> acc
+  ) world.nics AddressMap.empty in
+  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; } in
+  let hsa_graph = init_hsa_graph world in
+  AddressMap.iter (fun _addr subnet ->
+    add_subnet subnet subnet_to_nsg hsa_graph
+  ) world.subnets;
+  AddressMap.iter (fun _addr nic ->
+    add_nic nic nic_to_nsg hsa_graph
+  ) world.nics;
+  AddressMap.iter (fun _addr subnet ->
+    let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
+    add_subnet_edges man ctx subnet_id subnet hsa_graph
+  ) world.subnets;
+  AddressMap.iter (fun _addr nic ->
+    List.iter (fun ipconfig ->
+      let config_name = Nic.IpConfiguration.get_name ipconfig in
+      let subaddress = Nic.get_address nic ^ "/" ^ config_name in
+      Option.iter (fun nic_id ->
+        add_nic_edge ctx nic_id nic hsa_graph man
+      ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
+    ) (Nic.get_ipconfigs nic)
+  ) world.nics;
+  hsa_graph
+
+let node_count graph = Hashtbl.length graph.nodes
+
+let resolve_addr graph addr =
+  Hashtbl.find_opt graph.addr_index addr
+
+let has_edge_between graph src_addr dest_addr =
+  match resolve_addr graph src_addr, resolve_addr graph dest_addr with
+  | Some src_id, Some dest_id ->
+    (match Hashtbl.find_opt graph.out_list src_id with
+    | Some edges -> List.exists (fun e -> e.dest = dest_id) edges
+    | None -> false)
+  | _ -> false
+
+let get_decider graph src_addr dest_addr =
+  match resolve_addr graph src_addr, resolve_addr graph dest_addr with
+  | Some src_id, Some dest_id ->
+    (match Hashtbl.find_opt graph.out_list src_id with
+    | Some edges ->
+      (match List.find_opt (fun e -> e.dest = dest_id) edges with
+      | Some edge -> Some edge.decider
+      | None -> None)
+    | None -> None)
+  | _ -> None
+  

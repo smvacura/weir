@@ -41,7 +41,7 @@ let make_udr name cidr_str =
     ~name
     ~address_prefix:(cidr cidr_str)
     ~next_hop:Drop
-    ~next_hop_in_ip_address:None
+    ~next_hop_in_ip_address:Unresolved
     ~source:UserDefined
 
 let make_rt routes =
@@ -51,7 +51,7 @@ let make_rt routes =
     ~address:"azurerm_route_table.test"
     ~location:EastUs
     ~resource_group:test_rg
-    ~disable_bgp_route_propagation:true
+    ~bgp_route_propagation_enabled:false
     ~routes
     ~tags:[]
 

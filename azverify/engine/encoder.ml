@@ -126,5 +126,5 @@ let encode_nsg ensg man =
 
 let encode_effective_route man interval_list =
   List.fold_left (fun acc (lo, hi) ->
-    dor man acc @@ encode_interval man ~width:32 ~offset:(get_offset DestIP) lo hi
+    dor man acc @@ encode_interval man ~width:32 ~offset:(get_offset DestIP) (Int32.to_int lo) (Int32.to_int hi)
   ) (dfalse man) interval_list

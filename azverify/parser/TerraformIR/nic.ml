@@ -45,6 +45,11 @@ module IpConfiguration = struct
     {ipconfig with subnet = Resolved subnet; pip = Resolved pip}
 
 
+  let get_subnet ipconfig =
+    match ipconfig.subnet with
+    | Resolved subnet -> Some subnet
+    | _ -> None
+
   let resolve_subnet subnet' ip_config = { ip_config with subnet = Resolved subnet' }
 end
 

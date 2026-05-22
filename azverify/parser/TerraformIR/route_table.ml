@@ -21,6 +21,12 @@ module Route = struct
   let get_source route =
     route.source
 
+  let get_next_hop route = 
+    route.next_hop
+
+  let get_next_hop_ip route = 
+    route.next_hop_in_ip_address
+
   let compare r1 r2 =
     match Int32.unsigned_compare
       (Parser.Network_types.CIDR.get_mask r1.address_prefix)
@@ -88,6 +94,18 @@ let resolve_routes routes rt =
 
 let make ~name ~subscription ~address ~location ~resource_group ?(bgp_route_propagation_enabled = true) ~routes ~tags =
   { name; subscription; address; location; resource_group; bgp_route_propagation_enabled; routes; tags }
+
+
+let empty = {
+  name = "EMPTY";
+  subscription = "EMPTY";
+  address = "EMPTY";
+  location = EastUs;
+  resource_group = Rg.empty;
+  bgp_route_propagation_enabled = false;
+  routes = [];
+  tags = [];
+}
 
 let show rt =
   Printf.sprintf "{ name = %s; subscription = %s; location = %s; rg = %s; bgp_enabled = %s; tags = [%s]; routes = [%s] }"

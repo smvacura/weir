@@ -20,6 +20,8 @@ module IpConfiguration : sig
 
     val get_private_cidr : t -> CIDR.t list option
 
+    val get_subnet : t -> Subnet.t option
+
     val unresolved_fields : t -> string list
 
     val resolve : t -> subnet:Subnet.t -> ?pip:Pip.t option -> t

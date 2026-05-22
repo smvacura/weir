@@ -28,6 +28,15 @@ let make ~name:name ~subscription:subscription ~address:address ~location:locati
   tags = tags
 }
 
+let empty = {
+  name = "EMPTY";
+  subscription = "EMPTY";
+  address = "EMPTY";
+  location = EastUs;
+  managed_by = None;
+  tags = []
+}
+
 let show { name; subscription; address; location; managed_by; tags } =
   let managed_str = Option.fold ~none:"None" ~some:(fun s -> s) managed_by in
   let tags_str = String.concat ", " (List.map Parser.Azure_types.show_tag tags) in

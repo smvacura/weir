@@ -8,7 +8,7 @@ let make_route ?(source = UserDefined) name cidr_str =
     ~name
     ~address_prefix:(Option.get (CIDR.of_string_opt cidr_str))
     ~next_hop:Internet
-    ~next_hop_in_ip_address:None
+    ~next_hop_in_ip_address:Unresolved
     ~source
 
 let sorted_partitions result route =

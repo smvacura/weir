@@ -18,6 +18,8 @@ val make :
     tags:tag list -> 
     t
 
+val empty : t
+
 val show : t -> string
 
 val pp : Format.formatter -> t -> unit

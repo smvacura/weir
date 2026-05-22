@@ -10,7 +10,7 @@ let get_subnet_index (world : World.t) =
     let vnet = Subnet.get_vnet subnet in
     match VnetMap.find_opt vnet map with
     | Some subnets -> VnetMap.add vnet (subnet::subnets) map
-    | None -> map
+    | None -> VnetMap.add vnet [subnet] map
   in
   let rec aux subnets map =
     match subnets with

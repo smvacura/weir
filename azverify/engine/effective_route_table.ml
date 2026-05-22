@@ -2,7 +2,7 @@ open Terraform_ir
 open Parser.Azure_types
 open Parser.Network_types
 
-type t = { disable_bgp_route_propagation : bool; routes : Route_table.Route.t list }
+type t = { bgp_route_propagation_enabled : bool; routes : Route_table.Route.t list }
 
 let get_effective_routes t = t.routes
 
@@ -11,7 +11,7 @@ let construct_vnetlocal_route_from_cidr name cidr =
     ~name
     ~address_prefix:cidr
     ~next_hop:VirtualNetwork
-    ~next_hop_in_ip_address:None
+    ~next_hop_in_ip_address:Unresolved
     ~source:System
 
 let vnetlocal_route_name vnet_name subnet_name =
@@ -38,31 +38,31 @@ let system_routes =
       ~name:"Internet"
       ~address_prefix:(make_exact_cidr "0.0.0.0" "0")
       ~next_hop:Internet
-      ~next_hop_in_ip_address:None
+      ~next_hop_in_ip_address:Unresolved
       ~source:System;
     Route_table.Route.make
       ~name:"Internal Class A"
       ~address_prefix:(make_exact_cidr "10.0.0.0" "8")
       ~next_hop:Drop
-      ~next_hop_in_ip_address:None
+      ~next_hop_in_ip_address:Unresolved
       ~source:System;
     Route_table.Route.make
       ~name:"Internal Class B"
       ~address_prefix:(make_exact_cidr "172.16.0.0" "12")
       ~next_hop:Drop
-      ~next_hop_in_ip_address:None
+      ~next_hop_in_ip_address:Unresolved
       ~source:System;
     Route_table.Route.make
       ~name:"Internal Class C"
       ~address_prefix:(make_exact_cidr "192.168.0.0" "16")
       ~next_hop:Drop
-      ~next_hop_in_ip_address:None
+      ~next_hop_in_ip_address:Unresolved
       ~source:System;
     Route_table.Route.make 
       ~name:"Carrier-grade NAT"
       ~address_prefix:(make_exact_cidr "100.64.0.0" "10")
       ~next_hop:Drop
-      ~next_hop_in_ip_address:None
+      ~next_hop_in_ip_address:Unresolved
       ~source:System
   ]
 
@@ -76,5 +76,5 @@ let enrich_route_table (rt : Route_table.t) (vnet : Vnet.t) (map : Utils.subnet_
   | Some routes -> filter_routes (Route_table.get_routes rt) routes @ filtered_system_routes
   | None -> filtered_system_routes
   in
-  { disable_bgp_route_propagation = false; routes = Route_table.get_routes rt @ new_routes }
+  { bgp_route_propagation_enabled = true; routes = Route_table.get_routes rt @ new_routes }
 
