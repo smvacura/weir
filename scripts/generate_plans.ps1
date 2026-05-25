@@ -1,9 +1,12 @@
 $ErrorActionPreference = "Stop"
 
-$basePath = "../azverify/parser/test/test_plans"
+$basePaths = @(
+    "../azverify/parser/test/test_plans",
+    "../azverify/engine/test/test_plans"
+)
 $providersSrc = Join-Path $PWD "providers.tf"
 
-Get-ChildItem -Path $basePath -Directory | ForEach-Object {
+$basePaths | ForEach-Object { Get-ChildItem -Path $_ -Directory } | ForEach-Object {
     Write-Host "Processing $($_.FullName)"
     
     Copy-Item $providersSrc -Destination $_.FullName

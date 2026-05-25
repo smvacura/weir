@@ -2,10 +2,13 @@
 
 set -e
 
-base_path="../azverify/parser/test/test_plans"
+base_paths=(
+    "../azverify/parser/test/test_plans"
+    "../azverify/engine/test/test_plans"
+)
 providers_src="$(pwd)/providers.tf"
 
-for dir in "$base_path"/*; do
+for dir in "${base_paths[@]/%//*}"; do
   if [ -d "$dir" ]; then
     echo "Processing $dir"
     

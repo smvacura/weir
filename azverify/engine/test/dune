@@ -27,3 +27,13 @@
    parser
    terraform_ir
    ounit2))
+
+(test
+  (name test_hsa_integration)
+  (libraries
+   pathfinder
+   frontends
+   parser
+   terraform_ir
+   ounit2)
+  (deps (source_tree test_plans)))

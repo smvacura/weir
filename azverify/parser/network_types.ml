@@ -100,10 +100,15 @@ module CIDR = struct
     mask=mask;
   }
 
-  let of_string_opt s = 
+  let of_string_opt s =
     match String.split_on_char '/' s with
     | [s_ip; s_m] -> begin
       match IPv4.of_string_opt s_ip, IPv4Mask.of_string_opt s_m with
+      | Some ip, Some m -> Some {ip=ip; mask=m}
+      | _ -> None
+    end
+    | [s_ip] -> begin
+      match IPv4.of_string_opt s_ip, IPv4Mask.of_string_opt "32" with
       | Some ip, Some m -> Some {ip=ip; mask=m}
       | _ -> None
     end
@@ -143,8 +148,13 @@ module CIDR = struct
   let get_mask cidr = cidr.mask
 
 let to_bit_list cidr =
-  let n = Int32.to_int cidr.mask in
-  List.init n (fun i ->
+  let prefix_len =
+    let rec count m acc =
+      if m = 0l then acc else count (Int32.shift_left m 1) (acc + 1)
+    in
+    count cidr.mask 0
+  in
+  List.init prefix_len (fun i ->
     Int32.logand (Int32.shift_right_logical cidr.ip (31 - i)) 1l <> 0l)
   
   let show cidr =

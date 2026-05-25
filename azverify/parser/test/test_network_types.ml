@@ -53,7 +53,7 @@ let cidr_tests = "cidr_tests" >::: [
   "invalid_mask" >:: (fun _ ->
     assert_equal None (CIDR.of_string_opt "192.168.1.1/33"));
   "missing_slash" >:: (fun _ ->
-    assert_equal None (CIDR.of_string_opt "192.168.1.1"));
+    assert_equal (Some (make_cidr 0xC0A80101l 0xFFFFFFFFl)) (CIDR.of_string_opt "192.168.1.1"));
   "invalid_ip" >:: (fun _ ->
     assert_equal None (CIDR.of_string_opt "256.1.1.1/24"));
 ]

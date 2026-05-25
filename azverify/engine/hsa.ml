@@ -312,3 +312,13 @@ let query_num_paths_opt table src_id dest_id man =
   match Hashtbl.find_opt table (src_id, dest_id) with
   | Some packets -> Bdd.sat_count man packets
   | None -> 0.0
+
+let reachable_packet_count world src_addr dest_addr =
+  let man = Bdd.init () in
+  let graph = build_graph world man in
+  match resolve_addr graph src_addr, resolve_addr graph dest_addr with
+  | Some src_id, Some dest_id ->
+    let table = Hashtbl.create 4 in
+    compute_fixpoint src_id graph table man;
+    query_num_paths_opt table src_id dest_id man
+  | _ -> 0.0

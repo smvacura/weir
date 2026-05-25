@@ -111,18 +111,21 @@ let encode_security_rule man rule =
     ]
     |> List.fold_left (dand man) (dtrue man)
 
-let encode_nsg ensg man = 
-  let rules = Effective_nsg.get_effective_rules ensg 
+let encode_nsg ensg man =
+  let rules = Effective_nsg.get_effective_rules ensg
   |> List.sort SecurityRule.compare
-  in 
-  List.fold_left (fun (permitted, shadowed) rule ->
-    let matched = encode_security_rule man rule in
-    let unshadowed = dand man matched (dnot man shadowed) in
-    match SecurityRule.get_access rule with
-    | SecurityRule.Allow -> (dor man permitted unshadowed, dor man unshadowed shadowed)
-    | SecurityRule.Deny -> (permitted, dor man unshadowed shadowed)
-    ) (dfalse man, dfalse man) rules
-    |> fst
+  in
+  match rules with
+  | [] -> dtrue man
+  | _ ->
+    List.fold_left (fun (permitted, shadowed) rule ->
+      let matched = encode_security_rule man rule in
+      let unshadowed = dand man matched (dnot man shadowed) in
+      match SecurityRule.get_access rule with
+      | SecurityRule.Allow -> (dor man permitted unshadowed, dor man unshadowed shadowed)
+      | SecurityRule.Deny -> (permitted, dor man unshadowed shadowed)
+      ) (dfalse man, dfalse man) rules
+      |> fst
 
 let encode_effective_route man interval_list =
   List.fold_left (fun acc (lo, hi) ->

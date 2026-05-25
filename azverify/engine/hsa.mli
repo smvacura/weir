@@ -12,3 +12,5 @@ val node_count : hsa_graph -> int
 val has_edge_between : hsa_graph -> resource_address -> resource_address -> bool
 
 val get_decider : hsa_graph -> resource_address -> resource_address -> Bdd.bdd option
+
+val reachable_packet_count : Terraform_ir.World.t -> resource_address -> resource_address -> float
