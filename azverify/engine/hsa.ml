@@ -217,6 +217,63 @@ let build_graph world man =
   ) world.nics;
   hsa_graph
 
+
+type reachability_table = (node_id * node_id, bdd) Hashtbl.t
+
+let compute_fixpoint src graph table man =
+  let init_worklist () =
+    let worklist = Queue.create () in
+    Queue.add src worklist;
+    worklist
+  in
+
+  let init_reachability_table () =
+    Hashtbl.add table (src, src) (dtrue man);
+  in
+
+  let worklist = init_worklist () in
+  init_reachability_table ();
+
+  let current_node_packets dest =
+    match Hashtbl.find_opt table (src, dest) with
+    | Some packets -> packets
+    | None -> dfalse man
+  in
+
+  let compute_new_headers edge packets =
+    Bdd.dand man (edge.decider) packets
+  in
+
+  let add_to_table old_headers headers node_id man =
+    Hashtbl.replace table (src, node_id) (dor man old_headers headers)
+  in
+
+  let add_to_worklist old_packets new_packets node_id =
+    if sat_count man (dand man new_packets (dnot man old_packets)) > 0.0 
+    then Queue.add node_id worklist
+  in
+
+  let step node =
+    match Hashtbl.find_opt graph.out_list node with
+    | Some edges ->
+      List.iter (fun edge ->
+        let dest_id = edge.dest in
+        let src_id = edge.src in
+        let src_packets = current_node_packets src_id in
+        let old_packets = current_node_packets dest_id in
+        let new_packets = compute_new_headers edge src_packets in
+        add_to_table old_packets new_packets dest_id man;
+        add_to_worklist old_packets new_packets dest_id;
+      ) edges
+    | None -> ()
+  in
+
+  while not @@ Queue.is_empty worklist do
+    let curr_node = Queue.pop worklist in
+    step curr_node
+  done
+
+
 let node_count graph = Hashtbl.length graph.nodes
 
 let resolve_addr graph addr =
@@ -240,4 +297,18 @@ let get_decider graph src_addr dest_addr =
       | None -> None)
     | None -> None)
   | _ -> None
-  
+
+
+let analyze world =
+  let man = Bdd.init () in
+  let graph = build_graph world man in
+  let table = Hashtbl.create (Hashtbl.length graph.nodes) in
+  Hashtbl.iter (
+    fun src_id src -> compute_fixpoint src_id graph table man
+  ) graph.nodes;
+  table
+
+let query_num_paths_opt table src_id dest_id man =
+  match Hashtbl.find_opt table (src_id, dest_id) with
+  | Some packets -> Bdd.sat_count man packets
+  | None -> 0.0
