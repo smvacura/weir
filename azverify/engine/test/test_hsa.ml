@@ -140,13 +140,13 @@ let node_count_tests = "node_count" >::: [
       |> add_nic_to_world nic
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     assert_equal 3 (node_count graph)
       ~msg:"expected 2 subnet nodes + 1 NIC node");
 
   "empty_world_has_no_nodes" >:: (fun _ ->
     let mgr = man () in
-    let graph = build_graph World.empty mgr in
+    let graph, _ = build_graph World.empty mgr in
     assert_equal 0 (node_count graph));
 
 ]
@@ -165,7 +165,7 @@ let nic_connectivity_tests = "nic_connectivity" >::: [
       |> add_nic_to_world nic
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     assert_bool "NIC should have outgoing edge to its subnet"
       (has_edge_between graph (nic_node_addr nic) (Subnet.get_address subnet)));
 
@@ -182,7 +182,7 @@ let nic_connectivity_tests = "nic_connectivity" >::: [
       |> add_nic_to_world nic
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     assert_bool "NIC should not connect directly to an unrelated subnet"
       (not (has_edge_between graph (nic_node_addr nic) (Subnet.get_address sb))));
 
@@ -202,7 +202,7 @@ let subnet_connectivity_tests = "subnet_connectivity" >::: [
       |> add_subnet_to_world sb
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     assert_bool "subnet-a should connect to subnet-b via VNet-local route"
       (has_edge_between graph (Subnet.get_address sa) (Subnet.get_address sb));
     assert_bool "subnet-b should connect to subnet-a via VNet-local route"
@@ -221,7 +221,7 @@ let subnet_connectivity_tests = "subnet_connectivity" >::: [
       |> add_subnet_to_world sb
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     assert_bool "subnets in different VNets should not be connected"
       (not (has_edge_between graph (Subnet.get_address sa) (Subnet.get_address sb))));
 
@@ -247,7 +247,7 @@ let bdd_tests = "bdd_semantics" >::: [
       |> attach_nsg_to_subnet nsg_b sb
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
     | None -> assert_failure "expected edge from subnet-a to subnet-b"
     | Some bdd ->
@@ -269,7 +269,7 @@ let bdd_tests = "bdd_semantics" >::: [
       |> attach_nsg_to_subnet nsg_b sb
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
     | None -> assert_failure "expected edge from subnet-a to subnet-b"
     | Some bdd ->
@@ -304,7 +304,7 @@ let bdd_tests = "bdd_semantics" >::: [
       |> attach_nsg_to_nic deny_all_nsg nic
     in
     let mgr = man () in
-    let graph = build_graph world mgr in
+    let graph, _ = build_graph world mgr in
     match get_decider graph (nic_node_addr nic) (Subnet.get_address subnet) with
     | None -> assert_failure "expected edge from NIC to subnet"
     | Some bdd ->

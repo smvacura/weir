@@ -166,7 +166,28 @@ let add_nic_edge ctx nic_id nic graph man =
   | None -> ()
 
 
+type build_timing = {
+  association_build_ms : float;
+  node_addition_ms     : float;
+  edge_addition_ms     : float;
+  total_build_ms       : float;
+}
+
+type analyze_timing = {
+  build         : build_timing;
+  fixpoint_ms   : float;
+  total_ms      : float;
+  node_count    : int;
+  edge_count    : int;
+}
+
+let ms_since t = (Unix.gettimeofday () -. t) *. 1000.0
+
+let edge_count graph =
+  Hashtbl.fold (fun _ edges acc -> acc + List.length edges) graph.out_list 0
+
 let build_graph world man =
+  let t0 = Unix.gettimeofday () in
   let subnet_to_nsg = AddressMap.fold (fun _ assoc acc ->
     AddressMap.add
       (Subnet.get_address (Association.BinaryAssociation.get_r2 assoc))
@@ -195,6 +216,8 @@ let build_graph world man =
     | None -> acc
   ) world.nics AddressMap.empty in
   let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; } in
+  let t_assoc = ms_since t0 in
+  let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
   AddressMap.iter (fun _addr subnet ->
     add_subnet subnet subnet_to_nsg hsa_graph
@@ -202,6 +225,8 @@ let build_graph world man =
   AddressMap.iter (fun _addr nic ->
     add_nic nic nic_to_nsg hsa_graph
   ) world.nics;
+  let t_nodes = ms_since t1 in
+  let t2 = Unix.gettimeofday () in
   AddressMap.iter (fun _addr subnet ->
     let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
     add_subnet_edges man ctx subnet_id subnet hsa_graph
@@ -215,7 +240,13 @@ let build_graph world man =
       ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
     ) (Nic.get_ipconfigs nic)
   ) world.nics;
-  hsa_graph
+  let timing = {
+    association_build_ms = t_assoc;
+    node_addition_ms     = t_nodes;
+    edge_addition_ms     = ms_since t2;
+    total_build_ms       = ms_since t0;
+  } in
+  (hsa_graph, timing)
 
 
 type reachability_table = (node_id * node_id, bdd) Hashtbl.t
@@ -244,26 +275,31 @@ let compute_fixpoint src graph table man =
     Bdd.dand man (edge.decider) packets
   in
 
-  let add_to_table old_headers headers node_id man =
-    Hashtbl.replace table (src, node_id) (dor man old_headers headers)
+  let add_to_table old_packets new_packets node_id =
+    Hashtbl.replace table (src, node_id) (dor man old_packets new_packets)
   in
 
-  let add_to_worklist old_packets new_packets node_id =
-    if sat_count man (dand man new_packets (dnot man old_packets)) > 0.0 
-    then Queue.add node_id worklist
+  let packets_grew combined old_packets =
+    not (Bdd.equal combined old_packets)
+  in
+
+  let add_to_worklist node_id =
+    Queue.add node_id worklist
   in
 
   let step node =
     match Hashtbl.find_opt graph.out_list node with
     | Some edges ->
       List.iter (fun edge ->
-        let dest_id = edge.dest in
-        let src_id = edge.src in
-        let src_packets = current_node_packets src_id in
+        let dest_id     = edge.dest in
+        let src_packets = current_node_packets edge.src in
         let old_packets = current_node_packets dest_id in
         let new_packets = compute_new_headers edge src_packets in
-        add_to_table old_packets new_packets dest_id man;
-        add_to_worklist old_packets new_packets dest_id;
+        let combined    = dor man old_packets new_packets in
+        if packets_grew combined old_packets then begin
+          add_to_table old_packets new_packets dest_id;
+          add_to_worklist dest_id
+        end
       ) edges
     | None -> ()
   in
@@ -272,6 +308,7 @@ let compute_fixpoint src graph table man =
     let curr_node = Queue.pop worklist in
     step curr_node
   done
+
 
 
 let node_count graph = Hashtbl.length graph.nodes
@@ -301,12 +338,25 @@ let get_decider graph src_addr dest_addr =
 
 let analyze world =
   let man = Bdd.init () in
-  let graph = build_graph world man in
+  let graph, _ = build_graph world man in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
-  Hashtbl.iter (
-    fun src_id src -> compute_fixpoint src_id graph table man
-  ) graph.nodes;
+  Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
   table
+
+let run_analysis_timed world =
+  let t0 = Unix.gettimeofday () in
+  let man = Bdd.init () in
+  let graph, build = build_graph world man in
+  let t1 = Unix.gettimeofday () in
+  let table = Hashtbl.create (Hashtbl.length graph.nodes) in
+  Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
+  {
+    build;
+    fixpoint_ms = ms_since t1;
+    total_ms    = ms_since t0;
+    node_count  = node_count graph;
+    edge_count  = edge_count graph;
+  }
 
 let query_num_paths_opt table src_id dest_id man =
   match Hashtbl.find_opt table (src_id, dest_id) with
@@ -315,7 +365,7 @@ let query_num_paths_opt table src_id dest_id man =
 
 let reachable_packet_count world src_addr dest_addr =
   let man = Bdd.init () in
-  let graph = build_graph world man in
+  let graph, _ = build_graph world man in
   match resolve_addr graph src_addr, resolve_addr graph dest_addr with
   | Some src_id, Some dest_id ->
     let table = Hashtbl.create 4 in

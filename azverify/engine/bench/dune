@@ -1,0 +1,8 @@
+(executable
+ (name bench)
+ (libraries pathfinder frontends parser terraform_ir))
+
+(rule
+ (alias bench)
+ (deps ../test/test_plans/single_header_subnet/plan.json)
+ (action (run ./bench.exe ../test/test_plans/single_header_subnet/plan.json)))

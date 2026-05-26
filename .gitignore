@@ -3,3 +3,6 @@
 
 #vscode specific
 .vscode
+
+# provider semantic notes
+semantics/

@@ -22,14 +22,14 @@ let integration_tests = "hsa_integration" >::: [
   "graph_has_two_nodes" >:: (fun _ ->
     let world = get_world () in
     let man = init () in
-    let graph = build_graph world man in
+    let graph, _ = build_graph world man in
     assert_equal 2 (node_count graph)
       ~msg:"expected 2 nodes" ~printer:string_of_int);
 
   "edge_exists_src_to_dest" >:: (fun _ ->
     let world = get_world () in
     let man = init () in
-    let graph = build_graph world man in
+    let graph, _ = build_graph world man in
     assert_bool "expected edge from source_subnet to nic_subnet"
       (has_edge_between graph src_addr dest_addr));
 
