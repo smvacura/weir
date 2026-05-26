@@ -68,6 +68,17 @@ let allsat mgr bdd =
     arr
   ) (MLBDD.allsat bdd)
 
+let pick_sat mgr bdd =
+  let n = !(mgr.nvars) in
+  match MLBDD.sat bdd with
+  | None -> None
+  | Some assignment ->
+    let arr = Array.make n None in
+    List.iter (fun (polarity, var) ->
+      if var < n then arr.(var) <- Some polarity
+    ) assignment;
+    Some arr
+
 let itersat mgr bdd f =
   let n = !(mgr.nvars) in
   MLBDD.itersat (fun assignment ->

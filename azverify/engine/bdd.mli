@@ -41,6 +41,8 @@ val allsat    : manager -> bdd -> bool option array list
 
 val itersat   : manager -> bdd -> (bool option array -> unit) -> unit
 
+val pick_sat  : manager -> bdd -> bool option array option
+
 val dump : manager -> bdd list -> string -> unit
 
 val load : manager -> string -> bdd list
