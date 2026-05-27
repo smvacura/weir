@@ -18,6 +18,8 @@ module IPv4Mask : sig
 
   val of_int32 : int32 -> t
 
+  val of_mask_length : int -> t
+
   val compare : t -> t -> int
 end
 

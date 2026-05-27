@@ -35,3 +35,5 @@ val reachable_packet_count : Terraform_ir.World.t -> resource_address -> resourc
 val run_analysis_timed : Terraform_ir.World.t -> analyze_timing
 
 val analyze : Terraform_ir.World.t -> analysis_result
+
+val pick_packet_opt : resource_address -> resource_address -> analysis_result -> Encoder.packet_header option

@@ -16,6 +16,7 @@ type packet_header = {
     src_port : port;
     protocol : protocol
 }
+[@@deriving show]
 
 val get_offset : header_segment -> int
 

@@ -1,8 +1,10 @@
 open OUnit2
 open Frontends.AzureTF
 open Parser.Tf_types
+open Parser.Network_types
 open Pathfinder.Hsa
 open Pathfinder.Bdd
+open Pathfinder.Encoder
 
 let plan_path = "test_plans/single_header_subnet/plan.json"
 
@@ -38,6 +40,21 @@ let integration_tests = "hsa_integration" >::: [
     assert_equal 1.0
       (reachable_packet_count world src_addr dest_addr)
       ~msg:"expected exactly 1 reachable header" ~printer:string_of_float);
+
+  "one_header_is_correct" >:: (fun _ ->
+    let world = get_world () in
+    assert_equal {
+      src_ip = CIDR.make (Option.get @@ IPv4.of_string_opt "10.1.1.24") (IPv4Mask.of_mask_length 32);
+      dest_ip = CIDR.make (Option.get @@ IPv4.of_string_opt "10.1.2.24") (IPv4Mask.of_mask_length 32);
+      src_port = Single 22;
+      dest_port = Single 22;
+      protocol = Tcp
+    }
+    ~printer:show_packet_header
+    (analyze world
+      |> pick_packet_opt "azurerm_subnet.source_subnet" "azurerm_subnet.nic_subnet"
+      |> Option.get
+    ));
 
 ]
 

@@ -74,6 +74,9 @@ module IPv4Mask = struct
 
   let of_int32 (i : int32) : t =
     i
+
+  let of_mask_length len = 
+    of_int32 (Int32.shift_left (-1l) (32 - len))
   
   let show mask =
   (* count leading 1s *)
