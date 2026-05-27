@@ -25,6 +25,14 @@ type hsa_graph = {
   next_id: int ref
 }
 
+type reachability_table = (node_id * node_id, bdd) Hashtbl.t
+
+type analysis_result = {
+  graph : hsa_graph;
+  table : reachability_table;
+  man : manager
+}
+
 (* TODO: initialize hashmaps with better values *)
 let init_hsa_graph (world : World.t) = {
   nodes = Hashtbl.create (AddressMap.cardinal world.subnets + AddressMap.cardinal world.nics);
@@ -249,8 +257,6 @@ let build_graph world man =
   (hsa_graph, timing)
 
 
-type reachability_table = (node_id * node_id, bdd) Hashtbl.t
-
 let compute_fixpoint src graph table man =
   let init_worklist () =
     let worklist = Queue.create () in
@@ -341,7 +347,7 @@ let analyze world =
   let graph, _ = build_graph world man in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
   Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
-  table
+  {table; graph; man}
 
 let run_analysis_timed world =
   let t0 = Unix.gettimeofday () in
@@ -362,6 +368,14 @@ let query_num_paths_opt table src_id dest_id man =
   match Hashtbl.find_opt table (src_id, dest_id) with
   | Some packets -> Bdd.sat_count man packets
   | None -> 0.0
+
+let pick_packet_opt src_addr dest_addr {table; graph; man} =
+  let (let*) = Option.bind in
+  let* src_id = Hashtbl.find_opt graph.addr_index src_addr in
+  let* dest_id = Hashtbl.find_opt graph.addr_index dest_addr in
+  let* packets = Hashtbl.find_opt table (src_id, dest_id) in
+  Bdd.pick_sat man packets 
+  |> Option.map Encoder.decode_single_packet 
 
 let reachable_packet_count world src_addr dest_addr =
   let man = Bdd.init () in

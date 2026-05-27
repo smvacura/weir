@@ -15,6 +15,14 @@ type header_segment =
 | Protocol
 
 
+type packet_header = {
+    dest_ip : CIDR.t;
+    src_ip : CIDR.t;
+    dest_port : port;
+    src_port : port;
+    protocol : protocol
+}
+
 let get_ip_bit_loc segment bit_loc = 
   match segment with
   | DestIP -> bit_loc
@@ -131,3 +139,26 @@ let encode_effective_route man interval_list =
   List.fold_left (fun acc (lo, hi) ->
     dor man acc @@ encode_interval man ~width:32 ~offset:(get_offset DestIP) (Int32.to_int lo) (Int32.to_int hi)
   ) (dfalse man) interval_list
+
+let bits_to_int arr lo len =
+  let v = ref 0 in
+  for i = lo to lo + len - 1 do
+    let b = match arr.(i) with Some p -> p | None -> false in
+    v := (!v lsl 1) lor (if b then 1 else 0)
+  done;
+  !v
+
+let protocol_of_bits b1 b2 =
+  match b1, b2 with
+  | Some true, Some false -> Tcp
+  | Some false, Some true -> Udp
+  | Some true, Some true -> Icmp
+  | None, None -> Any
+  | _ -> failwith "Incorrect protocol bits"
+
+let decode_single_packet arr =
+  { dest_ip = bits_to_int arr (get_offset DestIP) 32 |> Int32.of_int |> IPv4.of_int32 |> (fun ip -> CIDR.make ip (IPv4Mask.of_int32 32l));  (* force /32 downstream *)
+    src_ip = bits_to_int arr (get_offset SrcIP) 32 |> Int32.of_int |> IPv4.of_int32 |> (fun ip -> CIDR.make ip (IPv4Mask.of_int32 32l));
+    dest_port = Single (bits_to_int arr (get_offset DestPort) 16);
+    src_port = Single (bits_to_int arr (get_offset SrcPort) 16);
+    protocol = protocol_of_bits (Array.get arr (get_offset Protocol)) (Array.get arr (get_offset Protocol + 1))}

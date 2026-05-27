@@ -5,6 +5,8 @@ type hsa_graph
 
 type resource_address = string
 
+type analysis_result
+
 type build_timing = {
   association_build_ms : float;
   node_addition_ms     : float;
@@ -31,3 +33,5 @@ val get_decider : hsa_graph -> resource_address -> resource_address -> Bdd.bdd o
 val reachable_packet_count : Terraform_ir.World.t -> resource_address -> resource_address -> float
 
 val run_analysis_timed : Terraform_ir.World.t -> analyze_timing
+
+val analyze : Terraform_ir.World.t -> analysis_result
