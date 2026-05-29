@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $basePaths = @(
     "../azverify/parser/test/test_plans",
-    "../azverify/engine/test/test_plans"
+    "../azverify/engine/test/test_plans",
+    "../azverify/engine/bench/test_plans"
 )
 $providersSrc = Join-Path $PWD "providers.tf"
 
