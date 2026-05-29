@@ -43,6 +43,11 @@ let get_resource_group world _subscription rg_name =
     if Rg.get_name rg = rg_name then Some rg else acc)
     world.resource_groups None
 
+let resource_addresses world =
+  let keys m = AddressMap.fold (fun k _ acc -> k :: acc) m [] in
+  keys world.nics @ keys world.pips @ keys world.subnets
+  |> List.sort_uniq String.compare
+
 let show world =
   "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
   "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^

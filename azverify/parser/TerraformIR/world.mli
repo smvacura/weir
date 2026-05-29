@@ -19,4 +19,6 @@ val equal : t -> t-> bool
 
 val get_resource_group : t -> string -> string  -> Rg.t option
 
+val resource_addresses : t -> string list
+
 val show : t -> string
