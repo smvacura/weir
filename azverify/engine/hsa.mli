@@ -34,6 +34,10 @@ val reachable_packet_count : Terraform_ir.World.t -> resource_address -> resourc
 
 val run_analysis_timed : Terraform_ir.World.t -> analyze_timing
 
-val analyze : Terraform_ir.World.t -> analysis_result
+val analyze : Bdd.manager -> Terraform_ir.World.t -> analysis_result
+
+val reachable_pairs : analysis_result -> (resource_address * resource_address) list
+
+val get_bdd : analysis_result -> resource_address -> resource_address -> Bdd.bdd option
 
 val pick_packet_opt : resource_address -> resource_address -> analysis_result -> Encoder.packet_header option

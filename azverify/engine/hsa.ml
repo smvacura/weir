@@ -342,12 +342,24 @@ let get_decider graph src_addr dest_addr =
   | _ -> None
 
 
-let analyze world =
-  let man = Bdd.init () in
+let analyze man world =
   let graph, _ = build_graph world man in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
   Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
   {table; graph; man}
+
+let reachable_pairs {table; graph; man = _} =
+  Hashtbl.fold (fun (src_id, dest_id) _bdd acc ->
+    match Hashtbl.find_opt graph.nodes src_id, Hashtbl.find_opt graph.nodes dest_id with
+    | Some src_node, Some dest_node -> (src_node.attached, dest_node.attached) :: acc
+    | _ -> acc
+  ) table []
+
+let get_bdd {table; graph; man = _} src_addr dest_addr =
+  let (let*) = Option.bind in
+  let* src_id = Hashtbl.find_opt graph.addr_index src_addr in
+  let* dest_id = Hashtbl.find_opt graph.addr_index dest_addr in
+  Hashtbl.find_opt table (src_id, dest_id)
 
 let run_analysis_timed world =
   let t0 = Unix.gettimeofday () in

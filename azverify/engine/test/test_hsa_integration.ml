@@ -51,7 +51,7 @@ let integration_tests = "hsa_integration" >::: [
       protocol = Tcp
     }
     ~printer:show_packet_header
-    (analyze world
+    (analyze (init ()) world
       |> pick_packet_opt "azurerm_subnet.source_subnet" "azurerm_subnet.nic_subnet"
       |> Option.get
     ));
