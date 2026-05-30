@@ -8,6 +8,7 @@ type t = {
   nics : Nic.t AddressMap.t;
   pips : Pip.t AddressMap.t;
   route_tables : Route_table.t AddressMap.t;
+  vnet_peerings : Vnet_peering.t AddressMap.t;
   route_table_associations : (Route_table.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
   nsg_associations : (Nsg.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
   nic_nsg_associations : (Nsg.t, Nic.t) Association.BinaryAssociation.t AddressMap.t
@@ -21,6 +22,7 @@ let equal t1 t2 =
   AddressMap.equal (=) t1.nics t2.nics &&
   AddressMap.equal (=) t1.pips t2.pips &&
   AddressMap.equal (=) t1.route_tables t2.route_tables &&
+  AddressMap.equal (=) t1.vnet_peerings t2.vnet_peerings &&
   AddressMap.equal (=) t1.route_table_associations t2.route_table_associations &&
   AddressMap.equal (=) t1.nsg_associations t2.nsg_associations &&
   AddressMap.equal (=) t1.nic_nsg_associations t2.nic_nsg_associations
@@ -33,6 +35,7 @@ let empty = {
   nics = AddressMap.empty;
   pips = AddressMap.empty;
   route_tables = AddressMap.empty;
+  vnet_peerings = AddressMap.empty;
   route_table_associations = AddressMap.empty;
   nsg_associations = AddressMap.empty;
   nic_nsg_associations = AddressMap.empty;
@@ -56,6 +59,7 @@ let show world =
   "Nics: " ^ Nic.show_nic_map world.nics ^ "\n" ^
   "Pips: " ^ Pip.show_pip_map world.pips ^ "\n" ^
   "Route tables: " ^ Route_table.show_rt_map world.route_tables ^ "\n" ^
+  "Vnet peerings: " ^ Vnet_peering.show_peering_map world.vnet_peerings ^ "\n" ^
   "RT associations: " ^ Association.BinaryAssociation.show_assoc_map world.route_table_associations ^ "\n" ^
   "NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nsg_associations ^ "\n" ^
   "NIC-NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nic_nsg_associations ^ "\n"
