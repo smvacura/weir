@@ -5,6 +5,8 @@ module AzureTFParser = struct
   open Parser.Tf_types
   open Terraform_ir
 
+  exception Parse_error of string
+
 
   type raw_world = {
     rgs : Safe.t list;
@@ -15,9 +17,11 @@ module AzureTFParser = struct
     pips : Safe.t list;
     route_tables : Safe.t list;
     vnet_peerings : Safe.t list;
+    asgs : Safe.t list;
     route_table_associations : Safe.t list;
     nsg_associations : Safe.t list;
     nic_nsg_associations : Safe.t list;
+    nic_asg_associations : Safe.t list;
   }
 
   let raw_world_empty = {
@@ -29,27 +33,14 @@ module AzureTFParser = struct
     pips = [];
     route_tables = [];
     vnet_peerings = [];
+    asgs = [];
     route_table_associations = [];
     nsg_associations = [];
     nic_nsg_associations = [];
+    nic_asg_associations = [];
   }
 
 
-  type subnet_inv_idx = Vnet.t AddressMap.t
-
-  type address_index = string IdKeyMap.t
-
-  let subnet_inv_idx_empty : subnet_inv_idx = AddressMap.empty
-
-  let show_inv_idx (index : subnet_inv_idx) =
-    "{" ^
-    (index
-    |> AddressMap.bindings
-    |> List.map (fun (addr, v) -> addr ^ ":" ^ Vnet.show v)
-    |> String.concat ",")
-    ^ "}"
-
-  
   let partition_results rs =
   let rec go oks errs = function
     | [] -> if errs = [] then Ok (List.rev oks) else Error (List.rev errs)
@@ -236,7 +227,7 @@ module AzureTFParser = struct
     end in
     Ok (vnet, inline_subnets)
 
-  let subnet_of_json world index json =
+  let subnet_of_json world json =
     let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in
     let* name = Safe.Util.member "name" values 
@@ -644,116 +635,89 @@ module AzureTFParser = struct
     let rgs' = AddressMap.add (Rg.get_address rg) rg world.resource_groups in
     { world with resource_groups = rgs' }
 
-  let index_rg rg address_index = 
-    (IdKeyMap.add (Rg.get_id rg) (Rg.get_address rg) address_index)
-  
   let add_vnet (world : World.t) (vnet : Vnet.t) =
     let vnets' = AddressMap.add (Vnet.get_address vnet) vnet world.vnets in
     { world with vnets = vnets' }
-  
-  let index_vnet vnet address_index = 
-    (IdKeyMap.add (Vnet.get_id vnet) (Vnet.get_address vnet) address_index)
-
-  let add_to_index (vnet: Vnet.t) (subnets: Subnet.t list) (index : subnet_inv_idx) =
-    let rec aux vnet subnets (index : subnet_inv_idx) =
-      match subnets with
-      | h::t -> aux vnet t (AddressMap.add (Subnet.get_address h) vnet index)
-      | [] -> index
-    in
-    aux vnet subnets index
 
   let add_subnet (world : World.t) (subnet : Subnet.t) =
     let subnets' = AddressMap.add (Subnet.get_address subnet) subnet world.subnets in
     { world with subnets = subnets'}
 
-  let index_subnet subnet address_index =
-    IdKeyMap.add (Subnet.get_id subnet) (Subnet.get_address subnet) address_index
-
   let add_nsg (world : World.t) (nsg : Nsg.t) =
     let nsgs' = AddressMap.add (Nsg.get_address nsg) nsg world.nsgs in
     { world with nsgs = nsgs'}
-  
-  let index_nsg nsg address_index =
-    IdKeyMap.add (Nsg.get_id nsg) (Nsg.get_address nsg) address_index
-  
+
   let add_nic (world : World.t) (nic : Nic.t) =
     let nics' = AddressMap.add (Nic.get_address nic) nic world.nics in
     { world with nics = nics' }
 
-  let index_nic nic address_index =
-    IdKeyMap.add (Nic.get_id nic) (Nic.get_address nic) address_index
-
   let add_pip (world : World.t) (pip : Pip.t) =
     let pips' = AddressMap.add (Pip.get_address pip) pip world.pips in
     { world with pips = pips'}
-  
-  let index_pip pip address_index =
-    IdKeyMap.add (Pip.get_id pip) (Pip.get_address pip) address_index
 
   let add_route_table (world : World.t) (rt : Route_table.t) =
   let route_tables' = AddressMap.add (Route_table.get_address rt) rt world.route_tables in
   { world with route_tables = route_tables' }
   
-  let parse_resource_groups (world, address_index, err) rgs =
-    let parse_rg (world, address_index, err) rg_json =
+  let parse_resource_groups world rgs =
+    let parse_rg world rg_json =
       match rg_of_json rg_json with
-      | Ok rg -> (add_rg world rg, index_rg rg address_index, err)
-      | Error e -> (world, address_index, e::err)
+      | Ok rg -> add_rg world rg
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
     in
-    List.fold_left parse_rg (world, address_index, err) rgs
+    List.fold_left parse_rg world rgs
 
-  
-  let parse_vnets (world, address_index, err) index vnets =
-    let parse_vnet (world, address_index, err, subnet_index) vnet_json =
+  let parse_vnets world vnets =
+    let parse_vnet world vnet_json =
       match vnet_of_json world vnet_json with
-      | Ok (vnet, subnets) -> begin
-        match partition_results subnets with 
-        |  Ok subnets -> (add_vnet world vnet, (index_vnet vnet address_index), err, (add_to_index vnet subnets index))
-        | Error errors -> (add_vnet world vnet, (index_vnet vnet address_index), err @ errors, index)
-      end
-      | Error e -> (world, address_index, e::err, index)
+      | Ok (vnet, subnets) ->
+        (match partition_results subnets with
+        | Error errors -> List.iter (fun e -> Logs.warn (fun m -> m "%s" e)) errors
+        | Ok _ -> ());
+        add_vnet world vnet
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
     in
-    List.fold_left parse_vnet (world, address_index, err, index) vnets
+    List.fold_left parse_vnet world vnets
 
-  let parse_subnets (world, address_index, err) index subnets = 
-    let parse_subnet (world, address_index, err, index) subnet_json =
-      match subnet_of_json world index subnet_json with
-      | Ok subnet -> (add_subnet world subnet, index_subnet subnet address_index, err, index)
-      | Error e -> (world, address_index, e::err, index)
+  let parse_subnets world subnets =
+    let parse_subnet world subnet_json =
+      match subnet_of_json world subnet_json with
+      | Ok subnet -> add_subnet world subnet
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
     in
-    List.fold_left parse_subnet (world, address_index, err, index) subnets
+    List.fold_left parse_subnet world subnets
 
-  let parse_nsgs (world, address_index, err) nsgs = 
-    let parse_nsg (world, address_index, err) nsg_json = 
+  let parse_nsgs world nsgs =
+    let parse_nsg world nsg_json =
       match nsg_of_json world nsg_json with
-      | Ok nsg -> (add_nsg world nsg, index_nsg nsg address_index, err)
-      | Error e -> (world, address_index, e::err)
+      | Ok nsg -> add_nsg world nsg
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
     in
-    List.fold_left parse_nsg (world, address_index, err) nsgs
-  
-  let parse_nics (world, address_index, err) nics = 
-    let parse_nic (world, address_index, err) nic_json =
+    List.fold_left parse_nsg world nsgs
+
+  let parse_nics world nics =
+    let parse_nic world nic_json =
       match nic_of_json world nic_json with
-      | Ok nic -> (add_nic world nic, index_nic nic address_index, err)
-      | Error e -> (world, address_index, e::err)
+      | Ok nic -> add_nic world nic
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
     in
-    List.fold_left parse_nic (world, address_index, err) nics
+    List.fold_left parse_nic world nics
 
-  let parse_pips (world, address_index, err) pips =
-    let parse_pip (world, address_index, err) pip_json =
+  let parse_pips world pips =
+    let parse_pip world pip_json =
       match pip_of_json world pip_json with
-      | Ok pip -> (add_pip world pip, index_pip pip address_index, err)
-      | Error e -> (world, address_index, e::err)
+      | Ok pip -> add_pip world pip
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
     in
-    List.fold_left parse_pip (world, address_index, err) pips
+    List.fold_left parse_pip world pips
 
-  let parse_route_tables (world, err) route_tables =
-    let parse_route_table (world, err) rt_json =
+  let parse_route_tables world route_tables =
+    let parse_route_table world rt_json =
       match route_table_of_json world rt_json with
-      | Ok route_table -> (add_route_table world route_table, err)
-      | Error e -> (world, e::err)
+      | Ok route_table -> add_route_table world route_table
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
     in
-    List.fold_left parse_route_table (world, err) route_tables
+    List.fold_left parse_route_table world route_tables
     
   let parse_resource json_resource (world : World.t) err =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -765,80 +729,95 @@ module AzureTFParser = struct
     | None -> (world, err)
 
 
-  let raw_parse_resource json_resource (world : raw_world) err =
+  let raw_parse_resource json_resource (world : raw_world) =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
     match resource_type with
     | Some "azurerm_resource_group" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let rgs' = json_resource::world.rgs in
-        ({world with rgs = rgs'}, err)
-      | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with rgs = json_resource :: world.rgs }
+      | None ->
+        Logs.warn (fun m -> m "Malformed resource_group: cannot parse name");
+        world
     end
     | Some "azurerm_virtual_network" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let vnets' = json_resource::world.vnets in
-        ({world with vnets = vnets'}, err)
-      | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with vnets = json_resource :: world.vnets }
+      | None ->
+        Logs.warn (fun m -> m "Malformed virtual_network: cannot parse name");
+        world
     end
     | Some "azurerm_subnet" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let subnets' = json_resource::world.subnets in
-        ({world with subnets = subnets'}, err)
-      | None -> (world, ("Malformed resource group: cannot parse name from " ^ Safe.show json_resource)::err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with subnets = json_resource :: world.subnets }
+      | None ->
+        Logs.warn (fun m -> m "Malformed subnet: cannot parse name");
+        world
     end
     | Some "azurerm_network_security_group" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let nsgs' = json_resource::world.nsgs in
-      ({world with nsgs = nsgs'}, err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with nsgs = json_resource :: world.nsgs }
+      | None ->
+        Logs.warn (fun m -> m "Malformed network_security_group: cannot parse name");
+        world
     end
     | Some "azurerm_network_interface" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let nics' = json_resource::world.nics in
-      ({world with nics = nics'}, err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with nics = json_resource :: world.nics }
+      | None ->
+        Logs.warn (fun m -> m "Malformed network_interface: cannot parse name");
+        world
     end
     | Some "azurerm_public_ip" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let pips' = json_resource::world.pips in
-      ({world with pips = pips'}, err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with pips = json_resource :: world.pips }
+      | None ->
+        Logs.warn (fun m -> m "Malformed public_ip: cannot parse name");
+        world
     end
     | Some "azurerm_route_table" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some s -> let route_tables' = json_resource::world.route_tables in
-      ({world with route_tables = route_tables'}, err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with route_tables = json_resource :: world.route_tables }
+      | None ->
+        Logs.warn (fun m -> m "Malformed route_table: cannot parse name");
+        world
     end
     | Some "azurerm_virtual_network_peering" -> begin
-      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
-      match name with
-      | Some _ -> let vnet_peerings' = json_resource::world.vnet_peerings in
-        ({world with vnet_peerings = vnet_peerings'}, err)
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with vnet_peerings = json_resource :: world.vnet_peerings }
+      | None ->
+        Logs.warn (fun m -> m "Malformed virtual_network_peering: cannot parse name");
+        world
     end
-    | Some "azurerm_subnet_route_table_association" -> begin
-      let route_table_associations' = json_resource::world.route_table_associations in
-      ({world with route_table_associations = route_table_associations'}, err)
+    | Some "azurerm_subnet_route_table_association" ->
+      { world with route_table_associations = json_resource :: world.route_table_associations }
+    | Some "azurerm_subnet_network_security_group_association" ->
+      { world with nsg_associations = json_resource :: world.nsg_associations }
+    | Some "azurerm_network_interface_security_group_association" ->
+      { world with nic_nsg_associations = json_resource :: world.nic_nsg_associations }
+    | Some "azurerm_application_security_group" -> begin
+      match Safe.Util.member "name" json_resource |> parse_json_string_opt with
+      | Some _ -> { world with asgs = json_resource :: world.asgs }
+      | None ->
+        Logs.warn (fun m -> m "Malformed application_security_group: cannot parse name");
+        world
     end
-    | Some "azurerm_subnet_network_security_group_association" -> begin
-      let nsg_associations' = json_resource::world.nsg_associations in
-      ({world with nsg_associations = nsg_associations'}, err)
-    end
-    | Some "azurerm_network_interface_security_group_association" -> begin
-      let nic_nsg_associations' = json_resource::world.nic_nsg_associations in
-      ({world with nic_nsg_associations = nic_nsg_associations'}, err)
-    end
-    | _ -> (world, ("Unknown resource type from " ^ Safe.show json_resource)::err)
+    | Some "azurerm_network_interface_application_security_group_association" ->
+      { world with nic_asg_associations = json_resource :: world.nic_asg_associations }
+    | Some t ->
+      Logs.debug (fun m -> m "Skipping unknown resource type: %s" t);
+      world
+    | None ->
+      Logs.warn (fun m -> m "Resource with no type field");
+      world
 
   
   let raw_parse_resources json =
     match json with
     | Some arr ->
-      List.fold_left (fun (world, err) r -> raw_parse_resource r world err) (raw_world_empty, []) arr
-    | None -> (raw_world_empty, ["Could not parse resource array"])
+      List.fold_left (fun world r -> raw_parse_resource r world) raw_world_empty arr
+    | None ->
+      Logs.warn (fun m -> m "Could not parse resource array");
+      raw_world_empty
 
 
   let is_resolvable json =
@@ -925,14 +904,14 @@ module AzureTFParser = struct
     in
     aux ipconfigs []
   
-  let resolve_nic_dependencies nics world config_json err = 
-    let resolve_nic_dependency nic = 
+  let resolve_nic_dependencies nics world config_json =
+    let resolve_nic_dependency nic =
       let (let*) = Result.bind in
-      let* resource = get_configuration_resource (Nic.get_address nic) config_json 
+      let* resource = get_configuration_resource (Nic.get_address nic) config_json
         |> Option.to_result ~none:("Could not resolve ids for nic " ^ (Nic.get_name nic)) in
       let expressions = Safe.Util.member "expressions" resource in
       let ip_config = Safe.Util.member "ip_configuration" expressions in
-      match ip_config with 
+      match ip_config with
       | `List l -> begin
         match resolve_ip_configurations (Nic.get_ipconfigs nic) world l with
         | Ok l -> Ok (Nic.resolve_ipconfigs nic l)
@@ -940,13 +919,14 @@ module AzureTFParser = struct
       end
       | _ -> Error "Malformed NIC in configuration"
     in
-    let nics', err = begin
-    AddressMap.fold (fun addr nic (ok_map, err_list) ->
-      match resolve_nic_dependency nic with
-      | Ok nic' -> (AddressMap.add addr nic' ok_map, err_list)
-      | Error e -> (ok_map, e::err_list)) nics (AddressMap.empty, err)
-    end
-    in ({world with nics = nics'}, err)
+    let nics' =
+      AddressMap.fold (fun addr nic ok_map ->
+        match resolve_nic_dependency nic with
+        | Ok nic' -> AddressMap.add addr nic' ok_map
+        | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e))
+        nics AddressMap.empty
+    in
+    { world with nics = nics' }
   
   let add_route_table_association assoc (world : World.t) =
     let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.route_table_associations in
@@ -989,37 +969,33 @@ module AzureTFParser = struct
     in
     Ok (first_resolved, second_resolved)
     
-  let resolve_route_table_associations ((world : World.t), err) config_json rt_associations  =
+  let resolve_route_table_associations (world : World.t) config_json rt_associations =
     let (let*) = Result.bind in
-    let resolve_route_table_association rt_association_json = 
+    let resolve_route_table_association rt_association_json =
       let values = Safe.Util.member "values" rt_association_json in
       let (let*) = Result.bind in
-      let* address = Safe.Util.member "address" rt_association_json 
+      let* address = Safe.Util.member "address" rt_association_json
         |> generate_parse_string_result_required "address" "" "route_table_association" in
       let* first_address, second_address =
-      resolve_association 
-        ~address:address
-        ~first_id_type:"route_table_id"
-        ~second_id_type:"subnet_id"
-        ~json:config_json
+        resolve_association
+          ~address:address
+          ~first_id_type:"route_table_id"
+          ~second_id_type:"subnet_id"
+          ~json:config_json
       in
-      let* route_table = AddressMap.find_opt first_address world.route_tables 
+      let* route_table = AddressMap.find_opt first_address world.route_tables
         |> Option.to_result ~none:("Could not find route table " ^ first_address ^ " required by association " ^ address) in
       let* subnet = AddressMap.find_opt second_address world.subnets
         |> Option.to_result ~none:("Could not find subnet " ^ first_address ^ " required by association " ^ address) in
       Ok (Association.BinaryAssociation.make route_table subnet address)
     in
-    List.fold_left (
-      fun (world, err) assoc_json -> begin
-        match resolve_route_table_association assoc_json with
-        | Ok rt_assoc -> (add_route_table_association rt_assoc world, err)
-        | Error e -> (world, e::err)
-      end
-    )
-    (world, err)
-    rt_associations
+    List.fold_left (fun world assoc_json ->
+      match resolve_route_table_association assoc_json with
+      | Ok rt_assoc -> add_route_table_association rt_assoc world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world rt_associations
 
-  let resolve_nsg_associations ((world : World.t), err) config_json nsg_assocs =
+  let resolve_nsg_associations (world : World.t) config_json nsg_assocs =
     let (let*) = Result.bind in
     let resolve_nsg_association assoc_json =
       let (let*) = Result.bind in
@@ -1038,17 +1014,13 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find subnet " ^ second_address ^ " required by association " ^ address) in
       Ok (Association.BinaryAssociation.make nsg subnet address)
     in
-    List.fold_left (
-      fun (world, err) assoc_json -> begin
-        match resolve_nsg_association assoc_json with
-        | Ok nsg_assoc -> (add_nsg_association nsg_assoc world, err)
-        | Error e -> (world, e::err)
-      end
-    )
-    (world, err)
-    nsg_assocs
+    List.fold_left (fun world assoc_json ->
+      match resolve_nsg_association assoc_json with
+      | Ok nsg_assoc -> add_nsg_association nsg_assoc world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nsg_assocs
 
-  let resolve_nic_nsg_associations ((world : World.t), err) config_json nic_nsg_assocs =
+  let resolve_nic_nsg_associations (world : World.t) config_json nic_nsg_assocs =
     let (let*) = Result.bind in
     let resolve_nic_nsg_association assoc_json =
       let (let*) = Result.bind in
@@ -1067,15 +1039,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
       Ok (Association.BinaryAssociation.make nsg nic address)
     in
-    List.fold_left (
-      fun (world, err) assoc_json -> begin
-        match resolve_nic_nsg_association assoc_json with
-        | Ok nic_nsg_assoc -> (add_nic_nsg_association nic_nsg_assoc world, err)
-        | Error e -> (world, e::err)
-      end
-    )
-    (world, err)
-    nic_nsg_assocs
+    List.fold_left (fun world assoc_json ->
+      match resolve_nic_nsg_association assoc_json with
+      | Ok nic_nsg_assoc -> add_nic_nsg_association nic_nsg_assoc world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nic_nsg_assocs
 
   let parse_bool_opt json =
     match json with
@@ -1147,17 +1115,88 @@ module AzureTFParser = struct
       ~remote_subnet_names:remote_subnet_names
       ~peer_complete_virtual_networks_enabled:peer_complete_virtual_networks_enabled)
 
+  let asg_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "asg"
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "asg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "asg"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by asg " ^ name)
+    in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "asg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type asg")
+    in
+    let tags = Safe.Util.member "tags" values
+      |> parse_tags_lenient
+      |> fst
+    in
+    Ok (Asg.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~resource_group:rg
+      ~tags:tags)
+
   let add_vnet_peering (world : World.t) (peering : Vnet_peering.t) =
     let vnet_peerings' = AddressMap.add (Vnet_peering.get_address peering) peering world.vnet_peerings in
     { world with vnet_peerings = vnet_peerings' }
 
-  let parse_vnet_peerings (world, err) peerings =
-    let parse_vnet_peering (world, err) peering_json =
+  let parse_vnet_peerings world peerings =
+    let parse_vnet_peering world peering_json =
       match vnet_peering_of_json world peering_json with
-      | Ok peering -> (add_vnet_peering world peering, err)
-      | Error e -> (world, e::err)
+      | Ok peering -> add_vnet_peering world peering
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
     in
-    List.fold_left parse_vnet_peering (world, err) peerings
+    List.fold_left parse_vnet_peering world peerings
+
+  let add_asg (world : World.t) (asg : Asg.t) =
+    let asgs' = AddressMap.add (Asg.get_address asg) asg world.asgs in
+    { world with asgs = asgs' }
+
+  let parse_asgs world asgs =
+    let parse_asg world asg_json =
+      match asg_of_json world asg_json with
+      | Ok asg -> add_asg world asg
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
+    in
+    List.fold_left parse_asg world asgs
+
+  let add_nic_asg_association assoc (world : World.t) =
+    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nic_asg_associations in
+    { world with nic_asg_associations = associations' }
+
+  let resolve_nic_asg_associations (world : World.t) config_json nic_asg_assocs =
+    let resolve_nic_asg_association assoc_json =
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" assoc_json
+        |> generate_parse_string_result_required "address" "" "nic_asg_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"application_security_group_id"
+          ~second_id_type:"network_interface_id"
+          ~json:config_json
+      in
+      let* asg = AddressMap.find_opt first_address world.asgs
+        |> Option.to_result ~none:("Could not find ASG " ^ first_address ^ " required by association " ^ address) in
+      let* nic = AddressMap.find_opt second_address world.nics
+        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
+      Ok (Association.BinaryAssociation.make asg nic address)
+    in
+    List.fold_left (fun world assoc_json ->
+      match resolve_nic_asg_association assoc_json with
+      | Ok nic_asg_assoc -> add_nic_asg_association nic_asg_assoc world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nic_asg_assocs
 
   let resolve_vnet_peering_remote_ref peering config_json (world : World.t) =
     let (let*) = Result.bind in
@@ -1180,15 +1219,15 @@ module AzureTFParser = struct
     in
     Ok (Vnet_peering.resolve_remote_vnet remote_vnet peering)
 
-  let resolve_vnet_peering_dependencies ((world : World.t), err) config_json =
-    let peerings', err' =
-      AddressMap.fold (fun addr peering (ok_map, err_list) ->
+  let resolve_vnet_peering_dependencies (world : World.t) config_json =
+    let peerings' =
+      AddressMap.fold (fun addr peering ok_map ->
         match resolve_vnet_peering_remote_ref peering config_json world with
-        | Ok peering' -> (AddressMap.add addr peering' ok_map, err_list)
-        | Error e -> (ok_map, e::err_list))
-        world.vnet_peerings (AddressMap.empty, err)
+        | Ok peering' -> AddressMap.add addr peering' ok_map
+        | Error e -> Logs.warn (fun m -> m "%s" e); ok_map)
+        world.vnet_peerings AddressMap.empty
     in
-    ({ world with vnet_peerings = peerings' }, err')
+    { world with vnet_peerings = peerings' }
 
   let get_route_nics (json : Safe.t list) nics =
     List.fold_left (
@@ -1210,35 +1249,28 @@ module AzureTFParser = struct
     let routes = List.map resolve_route (Route_table.get_routes rt) in
     Route_table.resolve_routes routes rt
 
-  let resolve_route_table_dynamic_ips ((world : World.t), err) config_json =
+  let resolve_route_table_dynamic_ips (world : World.t) config_json =
     let rts = world.route_tables in
     let resolve_route_table_dynamic_ip rt =
       let (let*) = Result.bind in
-      let* resource = get_configuration_resource (Route_table.get_address rt) config_json 
+      let* resource = get_configuration_resource (Route_table.get_address rt) config_json
         |> Option.to_result ~none:("Could not resolve ids for route table " ^ (Route_table.get_name rt)) in
       let expressions = Safe.Util.member "expressions" resource in
       let route = Safe.Util.member "route" expressions in
-      match Safe.Util.member "references" route with 
+      match Safe.Util.member "references" route with
       | `List l -> Ok (resolve_routes rt (get_route_nics l world.nics))
       | `Null -> Ok rt
       | _ -> Error "Malformed route table in configuration"
     in
-    let rts', err' = begin
-    AddressMap.fold (fun addr rt (ok_map, err_list) ->
-      match resolve_route_table_dynamic_ip rt with
-      | Ok rt' -> (AddressMap.add addr rt' ok_map, err_list)
-      | Error e -> (ok_map, e::err_list)) rts (AddressMap.empty, err)
-    end
-    in ({world with route_tables = rts'}, err')
+    let rts' =
+      AddressMap.fold (fun addr rt ok_map ->
+        match resolve_route_table_dynamic_ip rt with
+        | Ok rt' -> AddressMap.add addr rt' ok_map
+        | Error e -> Logs.warn (fun m -> m "%s" e); ok_map)
+        rts AddressMap.empty
+    in
+    { world with route_tables = rts' }
       
-
-  let print_string_list ell =
-    let rec aux = function
-    | [] -> ()
-    | h::t -> print_string (h ^ "\n"); aux t;
-  in
-  aux ell
-
 
   let build_nic_ip_map (world : World.t) =
     let add_nic_to_ip_map address nic ip_map =
@@ -1292,23 +1324,23 @@ module AzureTFParser = struct
   let get_resources file =
     let json = json_resources file in
     let config_json = json_config file in
-    let raw_world, err = raw_parse_resources json in
-    let world, address_index, err = parse_resource_groups (World.empty, IdKeyMap.empty, err) raw_world.rgs in
-    let world, address_index, err, vnet_inv_index = parse_vnets (world, address_index, err) subnet_inv_idx_empty raw_world.vnets in
-    let world, address_index, err, vnet_inv_index = parse_subnets (world, address_index, err) vnet_inv_index raw_world.subnets in
-    let world, address_index, err = parse_nsgs (world, address_index, err) raw_world.nsgs in 
-    let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
-    let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
-    let world, err = parse_route_tables (world, err) raw_world.route_tables in
-    let world, err = parse_vnet_peerings (world, err) raw_world.vnet_peerings in
-    let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
-    let world, err = resolve_route_table_dynamic_ips (world, err) (Option.get config_json) in
-    let world, err = resolve_route_table_associations (world, err) (Option.get config_json) raw_world.route_table_associations in
-    let world, err = resolve_nsg_associations (world, err) (Option.get config_json) raw_world.nsg_associations in
-    let world, err = resolve_nic_nsg_associations (world, err) (Option.get config_json) raw_world.nic_nsg_associations in
-    let world, err = resolve_vnet_peering_dependencies (world, err) (Option.get config_json) in
-    if List.length err > 0 then print_string_list err;
-    world
+    let raw_world = raw_parse_resources json in
+    let world = parse_resource_groups World.empty raw_world.rgs in
+    let world = parse_vnets world raw_world.vnets in
+    let world = parse_subnets world raw_world.subnets in
+    let world = parse_nsgs world raw_world.nsgs in
+    let world = parse_nics world raw_world.nics in
+    let world = parse_pips world raw_world.pips in
+    let world = parse_route_tables world raw_world.route_tables in
+    let world = parse_vnet_peerings world raw_world.vnet_peerings in
+    let world = parse_asgs world raw_world.asgs in
+    let world = resolve_nic_dependencies world.nics world (Option.get config_json) in
+    let world = resolve_route_table_dynamic_ips world (Option.get config_json) in
+    let world = resolve_route_table_associations world (Option.get config_json) raw_world.route_table_associations in
+    let world = resolve_nsg_associations world (Option.get config_json) raw_world.nsg_associations in
+    let world = resolve_nic_nsg_associations world (Option.get config_json) raw_world.nic_nsg_associations in
+    let world = resolve_nic_asg_associations world (Option.get config_json) raw_world.nic_asg_associations in
+    resolve_vnet_peering_dependencies world (Option.get config_json)
 
   let get_ip_index world =
     let ipworld = index_nic_ips world (Ipworld.empty) in

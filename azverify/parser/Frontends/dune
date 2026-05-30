@@ -1,4 +1,4 @@
 (library
  (name frontends)
- (libraries yojson parser terraform_ir)
+ (libraries yojson parser terraform_ir logs)
  (flags (:standard -w -a)))

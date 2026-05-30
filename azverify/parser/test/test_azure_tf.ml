@@ -54,9 +54,11 @@ let simple_network_world =
      nics = AddressMap.empty;
      pips = AddressMap.empty;
      route_tables = AddressMap.empty;
+     asgs = AddressMap.empty;
      route_table_associations = AddressMap.empty;
      nsg_associations = AddressMap.empty;
      nic_nsg_associations = AddressMap.empty;
+     nic_asg_associations = AddressMap.empty;
      vnet_peerings = AddressMap.empty} : World.t)
 
 let simple_nsg_world = 
@@ -99,7 +101,7 @@ let simple_nsg_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
 
 let simple_nic_world = 
   let rg = Rg.make
@@ -154,7 +156,7 @@ let simple_nic_world =
   let nsg_associations = AddressMap.empty in
   let world =
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
   in world
 
 let static_nic_world = 
@@ -210,7 +212,7 @@ let static_nic_world =
   let nsg_associations = AddressMap.empty in
   let world =
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
   in world
 
 
@@ -297,7 +299,7 @@ let pip_nic_world =
   let nic_nsg_assoc = Association.BinaryAssociation.make nsg nic "azurerm_network_interface_security_group_association.this" in
   let nic_nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address nic_nsg_assoc) nic_nsg_assoc AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
   in world
 
 let route_table_world =
@@ -354,7 +356,7 @@ let route_table_world =
   let nsg_associations = AddressMap.empty in
   let world =
     let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
   in world
 
 let nsg_subnet_assoc_world =
@@ -414,7 +416,7 @@ let nsg_subnet_assoc_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty; asgs = AddressMap.empty; nic_asg_associations = AddressMap.empty} : World.t)
 
 let dynamic_nic_udr_world =
   let rg = Rg.make
@@ -496,7 +498,9 @@ let dynamic_nic_udr_world =
     route_tables; route_table_associations;
     nsg_associations = AddressMap.empty;
     nic_nsg_associations = AddressMap.empty;
-    vnet_peerings = AddressMap.empty} : World.t)
+    vnet_peerings = AddressMap.empty;
+    asgs = AddressMap.empty;
+    nic_asg_associations = AddressMap.empty} : World.t)
 
 let nic_no_subnet_world =
   let rg = Rg.make
@@ -518,7 +522,9 @@ let nic_no_subnet_world =
     route_table_associations = AddressMap.empty;
     nsg_associations = AddressMap.empty;
     nic_nsg_associations = AddressMap.empty;
-    vnet_peerings = AddressMap.empty} : World.t)
+    vnet_peerings = AddressMap.empty;
+    asgs = AddressMap.empty;
+    nic_asg_associations = AddressMap.empty} : World.t)
 
 let simple_vnet_peering_world =
   let rg = Rg.make
@@ -572,7 +578,9 @@ let simple_vnet_peering_world =
     route_tables = AddressMap.empty;
     route_table_associations = AddressMap.empty;
     nsg_associations = AddressMap.empty;
-    nic_nsg_associations = AddressMap.empty} : World.t)
+    nic_nsg_associations = AddressMap.empty;
+    asgs = AddressMap.empty;
+    nic_asg_associations = AddressMap.empty} : World.t)
 
 let sample_rg =
   Rg.make 
@@ -646,11 +654,9 @@ let basic_tests = "simple_graphs" >::: [
     nsg_subnet_assoc_world
     (AzureTFParser.get_resources "test_plans/simple_nsg_subnet_assoc/plan.json"));
   "nic_no_subnet" >:: (fun _ ->
-    assert_equal
-    ~cmp:World.equal
-    ~printer:World.show
-    nic_no_subnet_world
-    (AzureTFParser.get_resources "test_plans/nic_no_subnet/plan.json"));
+    assert_raises
+      (AzureTFParser.Parse_error "Could not resolve subnet for NIC internal")
+      (fun () -> AzureTFParser.get_resources "test_plans/nic_no_subnet/plan.json" |> ignore));
   "dynamic_nic_udr" >:: (fun _ ->
     assert_equal
     ~cmp:World.equal

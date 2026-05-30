@@ -2,6 +2,8 @@ open Terraform_ir
 
 module AzureTFParser : sig
 
+    exception Parse_error of string
+
     val get_resources : string -> World.t
 
     val get_ip_index : World.t -> Ipworld.t
