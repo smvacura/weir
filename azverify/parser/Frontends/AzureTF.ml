@@ -928,17 +928,17 @@ module AzureTFParser = struct
     in
     { world with nics = nics' }
   
-  let add_route_table_association assoc (world : World.t) =
-    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.route_table_associations in
-    { world with route_table_associations = associations'}
+  let add_subnet_rt rt subnet_addr (world : World.t) =
+    let assocs' = { world.assocs with subnet_rt = AddressMap.add subnet_addr rt world.assocs.subnet_rt } in
+    { world with assocs = assocs' }
 
-  let add_nsg_association assoc (world : World.t) =
-    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nsg_associations in
-    { world with nsg_associations = associations' }
+  let add_subnet_nsg nsg subnet_addr (world : World.t) =
+    let assocs' = { world.assocs with subnet_nsg = AddressMap.add subnet_addr nsg world.assocs.subnet_nsg } in
+    { world with assocs = assocs' }
 
-  let add_nic_nsg_association assoc (world : World.t) =
-    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nic_nsg_associations in
-    { world with nic_nsg_associations = associations' }
+  let add_nic_nsg nsg nic_addr (world : World.t) =
+    let assocs' = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } in
+    { world with assocs = assocs' }
 
   let resolve_association  ~first_id_type:first_id_type ~address:address ~second_id_type:second_id_type ~json:config_json = 
     let (let*) = Result.bind in
@@ -987,11 +987,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find route table " ^ first_address ^ " required by association " ^ address) in
       let* subnet = AddressMap.find_opt second_address world.subnets
         |> Option.to_result ~none:("Could not find subnet " ^ first_address ^ " required by association " ^ address) in
-      Ok (Association.BinaryAssociation.make route_table subnet address)
+      Ok (route_table, Subnet.get_address subnet)
     in
     List.fold_left (fun world assoc_json ->
       match resolve_route_table_association assoc_json with
-      | Ok rt_assoc -> add_route_table_association rt_assoc world
+      | Ok (rt, subnet_addr) -> add_subnet_rt rt subnet_addr world
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world rt_associations
 
@@ -1012,11 +1012,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
       let* subnet = AddressMap.find_opt second_address world.subnets
         |> Option.to_result ~none:("Could not find subnet " ^ second_address ^ " required by association " ^ address) in
-      Ok (Association.BinaryAssociation.make nsg subnet address)
+      Ok (nsg, Subnet.get_address subnet)
     in
     List.fold_left (fun world assoc_json ->
       match resolve_nsg_association assoc_json with
-      | Ok nsg_assoc -> add_nsg_association nsg_assoc world
+      | Ok (nsg, subnet_addr) -> add_subnet_nsg nsg subnet_addr world
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world nsg_assocs
 
@@ -1037,11 +1037,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
       let* nic = AddressMap.find_opt second_address world.nics
         |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
-      Ok (Association.BinaryAssociation.make nsg nic address)
+      Ok (nsg, Nic.get_address nic)
     in
     List.fold_left (fun world assoc_json ->
       match resolve_nic_nsg_association assoc_json with
-      | Ok nic_nsg_assoc -> add_nic_nsg_association nic_nsg_assoc world
+      | Ok (nsg, nic_addr) -> add_nic_nsg nsg nic_addr world
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world nic_nsg_assocs
 
@@ -1170,9 +1170,9 @@ module AzureTFParser = struct
     in
     List.fold_left parse_asg world asgs
 
-  let add_nic_asg_association assoc (world : World.t) =
-    let associations' = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc world.nic_asg_associations in
-    { world with nic_asg_associations = associations' }
+  let add_nic_asg asg nic_addr (world : World.t) =
+    let assocs' = { world.assocs with nic_asg = AddressMap.add nic_addr asg world.assocs.nic_asg } in
+    { world with assocs = assocs' }
 
   let resolve_nic_asg_associations (world : World.t) config_json nic_asg_assocs =
     let resolve_nic_asg_association assoc_json =
@@ -1190,11 +1190,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find ASG " ^ first_address ^ " required by association " ^ address) in
       let* nic = AddressMap.find_opt second_address world.nics
         |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
-      Ok (Association.BinaryAssociation.make asg nic address)
+      Ok (asg, Nic.get_address nic)
     in
     List.fold_left (fun world assoc_json ->
       match resolve_nic_asg_association assoc_json with
-      | Ok nic_asg_assoc -> add_nic_asg_association nic_asg_assoc world
+      | Ok (asg, nic_addr) -> add_nic_asg asg nic_addr world
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world nic_asg_assocs
 
@@ -1321,6 +1321,18 @@ module AzureTFParser = struct
     { cidrworld with nics = build_nic_cidr_map world }
 
 
+  let build_subnet_to_nics (world : World.t) =
+    AddressMap.fold (fun _ nic acc ->
+      match Nic.get_ipconfigs nic
+            |> List.filter_map Nic.IpConfiguration.get_subnet
+            |> List.find_opt (fun _ -> true) with
+      | Some subnet ->
+        let addr = Subnet.get_address subnet in
+        let existing = Option.value ~default:[] (AddressMap.find_opt addr acc) in
+        AddressMap.add addr (nic :: existing) acc
+      | None -> acc
+    ) world.nics AddressMap.empty
+
   let get_resources file =
     let json = json_resources file in
     let config_json = json_config file in
@@ -1340,6 +1352,7 @@ module AzureTFParser = struct
     let world = resolve_nsg_associations world (Option.get config_json) raw_world.nsg_associations in
     let world = resolve_nic_nsg_associations world (Option.get config_json) raw_world.nic_nsg_associations in
     let world = resolve_nic_asg_associations world (Option.get config_json) raw_world.nic_asg_associations in
+    let world = { world with assocs = { world.assocs with subnet_to_nics = build_subnet_to_nics world } } in
     resolve_vnet_peering_dependencies world (Option.get config_json)
 
   let get_ip_index world =

@@ -1,5 +1,13 @@
 open Parser.Tf_types
 
+type assocs = {
+  subnet_nsg     : Nsg.t AddressMap.t;
+  subnet_rt      : Route_table.t AddressMap.t;
+  nic_nsg        : Nsg.t AddressMap.t;
+  nic_asg        : Asg.t AddressMap.t;
+  subnet_to_nics : Nic.t list AddressMap.t;
+}
+
 type t = {
   resource_groups : Rg.t AddressMap.t;
   subnets : Subnet.t AddressMap.t;
@@ -10,10 +18,7 @@ type t = {
   route_tables : Route_table.t AddressMap.t;
   vnet_peerings : Vnet_peering.t AddressMap.t;
   asgs : Asg.t AddressMap.t;
-  route_table_associations : (Route_table.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
-  nsg_associations : (Nsg.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
-  nic_nsg_associations : (Nsg.t, Nic.t) Association.BinaryAssociation.t AddressMap.t;
-  nic_asg_associations : (Asg.t, Nic.t) Association.BinaryAssociation.t AddressMap.t;
+  assocs : assocs;
 }
 
 val empty : t

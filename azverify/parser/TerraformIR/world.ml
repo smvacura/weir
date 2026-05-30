@@ -1,5 +1,13 @@
 open Parser.Tf_types
 
+type assocs = {
+  subnet_nsg     : Nsg.t AddressMap.t;
+  subnet_rt      : Route_table.t AddressMap.t;
+  nic_nsg        : Nsg.t AddressMap.t;
+  nic_asg        : Asg.t AddressMap.t;
+  subnet_to_nics : Nic.t list AddressMap.t;
+}
+
 type t = {
   resource_groups : Rg.t AddressMap.t;
   subnets : Subnet.t AddressMap.t;
@@ -10,11 +18,15 @@ type t = {
   route_tables : Route_table.t AddressMap.t;
   vnet_peerings : Vnet_peering.t AddressMap.t;
   asgs : Asg.t AddressMap.t;
-  route_table_associations : (Route_table.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
-  nsg_associations : (Nsg.t, Subnet.t) Association.BinaryAssociation.t AddressMap.t;
-  nic_nsg_associations : (Nsg.t, Nic.t) Association.BinaryAssociation.t AddressMap.t;
-  nic_asg_associations : (Asg.t, Nic.t) Association.BinaryAssociation.t AddressMap.t;
+  assocs : assocs;
 }
+
+let equal_assocs a1 a2 =
+  AddressMap.equal (=) a1.subnet_nsg a2.subnet_nsg &&
+  AddressMap.equal (=) a1.subnet_rt a2.subnet_rt &&
+  AddressMap.equal (=) a1.nic_nsg a2.nic_nsg &&
+  AddressMap.equal (=) a1.nic_asg a2.nic_asg &&
+  AddressMap.equal (List.equal (=)) a1.subnet_to_nics a2.subnet_to_nics
 
 let equal t1 t2 =
   AddressMap.equal (=) t1.resource_groups t2.resource_groups &&
@@ -26,10 +38,15 @@ let equal t1 t2 =
   AddressMap.equal (=) t1.route_tables t2.route_tables &&
   AddressMap.equal (=) t1.vnet_peerings t2.vnet_peerings &&
   AddressMap.equal (=) t1.asgs t2.asgs &&
-  AddressMap.equal (=) t1.route_table_associations t2.route_table_associations &&
-  AddressMap.equal (=) t1.nsg_associations t2.nsg_associations &&
-  AddressMap.equal (=) t1.nic_nsg_associations t2.nic_nsg_associations &&
-  AddressMap.equal (=) t1.nic_asg_associations t2.nic_asg_associations
+  equal_assocs t1.assocs t2.assocs
+
+let empty_assocs = {
+  subnet_nsg     = AddressMap.empty;
+  subnet_rt      = AddressMap.empty;
+  nic_nsg        = AddressMap.empty;
+  nic_asg        = AddressMap.empty;
+  subnet_to_nics = AddressMap.empty;
+}
 
 let empty = {
   resource_groups = AddressMap.empty;
@@ -41,10 +58,7 @@ let empty = {
   route_tables = AddressMap.empty;
   vnet_peerings = AddressMap.empty;
   asgs = AddressMap.empty;
-  route_table_associations = AddressMap.empty;
-  nsg_associations = AddressMap.empty;
-  nic_nsg_associations = AddressMap.empty;
-  nic_asg_associations = AddressMap.empty;
+  assocs = empty_assocs;
 }
 
 let get_resource_group world _subscription rg_name =
@@ -57,6 +71,11 @@ let resource_addresses world =
   keys world.nics @ keys world.pips @ keys world.subnets
   |> List.sort_uniq String.compare
 
+let show_assoc_map m =
+  "{" ^
+  (m |> AddressMap.bindings |> List.map fst |> String.concat ",")
+  ^ "}"
+
 let show world =
   "Resource groups: " ^ Rg.show_rg_map world.resource_groups ^ "\n" ^
   "Vnets: " ^ Vnet.show_vnet_map world.vnets ^ "\n" ^
@@ -67,7 +86,7 @@ let show world =
   "Route tables: " ^ Route_table.show_rt_map world.route_tables ^ "\n" ^
   "Vnet peerings: " ^ Vnet_peering.show_peering_map world.vnet_peerings ^ "\n" ^
   "ASGs: " ^ Asg.show_asg_map world.asgs ^ "\n" ^
-  "RT associations: " ^ Association.BinaryAssociation.show_assoc_map world.route_table_associations ^ "\n" ^
-  "NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nsg_associations ^ "\n" ^
-  "NIC-NSG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nic_nsg_associations ^ "\n" ^
-  "NIC-ASG associations: " ^ Association.BinaryAssociation.show_assoc_map world.nic_asg_associations ^ "\n"
+  "subnet_nsg: " ^ show_assoc_map world.assocs.subnet_nsg ^ "\n" ^
+  "subnet_rt: " ^ show_assoc_map world.assocs.subnet_rt ^ "\n" ^
+  "nic_nsg: " ^ show_assoc_map world.assocs.nic_nsg ^ "\n" ^
+  "nic_asg: " ^ show_assoc_map world.assocs.nic_asg ^ "\n"

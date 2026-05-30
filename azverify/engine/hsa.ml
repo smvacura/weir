@@ -196,27 +196,9 @@ let edge_count graph =
 
 let build_graph world man =
   let t0 = Unix.gettimeofday () in
-  let subnet_to_nsg = AddressMap.fold (fun _ assoc acc ->
-    AddressMap.add
-      (Subnet.get_address (Association.BinaryAssociation.get_r2 assoc))
-      (Association.BinaryAssociation.get_r1 assoc)
-      acc
-  ) world.World.nsg_associations AddressMap.empty
-  in
-  let subnet_to_rt = AddressMap.fold (fun _ assoc acc ->
-    AddressMap.add
-      (Subnet.get_address (Association.BinaryAssociation.get_r2 assoc))
-      (Association.BinaryAssociation.get_r1 assoc)
-      acc
-  ) world.World.route_table_associations AddressMap.empty
-  in
-  let nic_to_nsg = AddressMap.fold (fun _ assoc acc ->
-    AddressMap.add
-      (Nic.get_address (Association.BinaryAssociation.get_r2 assoc))
-      (Association.BinaryAssociation.get_r1 assoc)
-      acc
-  ) world.nic_nsg_associations AddressMap.empty
-  in
+  let subnet_to_nsg = world.World.assocs.subnet_nsg in
+  let subnet_to_rt  = world.World.assocs.subnet_rt in
+  let nic_to_nsg    = world.World.assocs.nic_nsg in
   let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
     let address = Nic.get_address nic in
     match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with

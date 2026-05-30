@@ -92,14 +92,12 @@ let add_vnet_to_world vnet (world : World.t) =
   { world with vnets = AddressMap.add (Vnet.get_address vnet) vnet world.vnets }
 
 let attach_nsg_to_subnet nsg subnet (world : World.t) =
-  let addr = "assoc_nsg_" ^ Nsg.get_address nsg ^ "_" ^ Subnet.get_address subnet in
-  { world with nsg_associations =
-    AddressMap.add addr (Association.BinaryAssociation.make nsg subnet addr) world.nsg_associations }
+  let subnet_addr = Subnet.get_address subnet in
+  { world with assocs = { world.assocs with subnet_nsg = AddressMap.add subnet_addr nsg world.assocs.subnet_nsg } }
 
 let attach_nsg_to_nic nsg nic (world : World.t) =
-  let addr = "assoc_nsg_" ^ Nsg.get_address nsg ^ "_" ^ Nic.get_address nic in
-  { world with nic_nsg_associations =
-    AddressMap.add addr (Association.BinaryAssociation.make nsg nic addr) world.nic_nsg_associations }
+  let nic_addr = Nic.get_address nic in
+  { world with assocs = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } }
 
 let nic_node_addr nic = Nic.get_address nic ^ "/ipconfig1"
 
