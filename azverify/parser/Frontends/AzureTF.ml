@@ -14,6 +14,7 @@ module AzureTFParser = struct
     nics : Safe.t list;
     pips : Safe.t list;
     route_tables : Safe.t list;
+    vnet_peerings : Safe.t list;
     route_table_associations : Safe.t list;
     nsg_associations : Safe.t list;
     nic_nsg_associations : Safe.t list;
@@ -27,6 +28,7 @@ module AzureTFParser = struct
     nics = [];
     pips = [];
     route_tables = [];
+    vnet_peerings = [];
     route_table_associations = [];
     nsg_associations = [];
     nic_nsg_associations = [];
@@ -811,6 +813,12 @@ module AzureTFParser = struct
       | Some s -> let route_tables' = json_resource::world.route_tables in
       ({world with route_tables = route_tables'}, err)
     end
+    | Some "azurerm_virtual_network_peering" -> begin
+      let name = Safe.Util.member "name" json_resource |> parse_json_string_opt in
+      match name with
+      | Some _ -> let vnet_peerings' = json_resource::world.vnet_peerings in
+        ({world with vnet_peerings = vnet_peerings'}, err)
+    end
     | Some "azurerm_subnet_route_table_association" -> begin
       let route_table_associations' = json_resource::world.route_table_associations in
       ({world with route_table_associations = route_table_associations'}, err)
@@ -1069,6 +1077,119 @@ module AzureTFParser = struct
     (world, err)
     nic_nsg_assocs
 
+  let parse_bool_opt json =
+    match json with
+    | `Bool b -> Some b
+    | _ -> None
+
+  let parse_string_list_opt json =
+    match json with
+    | `List l -> Some (List.filter_map Safe.Util.to_string_option l)
+    | _ -> None
+
+  let vnet_peering_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "vnet_peering"
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "vnet_peering"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "vnet_peering"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet peering " ^ name)
+    in
+    let* vnet_name = Safe.Util.member "virtual_network_name" values
+      |> generate_parse_string_result_required "virtual_network_name" name "vnet_peering"
+    in
+    let local_vnet =
+      AddressMap.fold (fun _ v acc ->
+        if Vnet.get_name v = vnet_name && Rg.get_name (Vnet.get_rg v) = rg_name
+        then Some v else acc)
+        world.vnets None
+    in
+    let allow_virtual_network_access =
+      parse_bool_opt (Safe.Util.member "allow_virtual_network_access" values)
+    in
+    let allow_forwarded_traffic =
+      parse_bool_opt (Safe.Util.member "allow_forwarded_traffic" values)
+    in
+    let allow_gateway_transit =
+      parse_bool_opt (Safe.Util.member "allow_gateway_transit" values)
+    in
+    let use_remote_gateways =
+      parse_bool_opt (Safe.Util.member "use_remote_gateways" values)
+    in
+    let local_subnet_names =
+      parse_string_list_opt (Safe.Util.member "local_subnet_names" values)
+    in
+    let remote_subnet_names =
+      parse_string_list_opt (Safe.Util.member "remote_subnet_names" values)
+    in
+    let peer_complete_virtual_networks_enabled =
+      parse_bool_opt (Safe.Util.member "peer_complete_virtual_networks_enabled" values)
+    in
+    Ok (Vnet_peering.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~resource_group:rg
+      ~local_vnet:(match local_vnet with Some v -> Resolved v | None -> Unresolved)
+      ~remote_vnet:Unresolved
+      ~allow_virtual_network_access:allow_virtual_network_access
+      ~allow_forwarded_traffic:allow_forwarded_traffic
+      ~allow_gateway_transit:allow_gateway_transit
+      ~use_remote_gateways:use_remote_gateways
+      ~local_subnet_names:local_subnet_names
+      ~remote_subnet_names:remote_subnet_names
+      ~peer_complete_virtual_networks_enabled:peer_complete_virtual_networks_enabled)
+
+  let add_vnet_peering (world : World.t) (peering : Vnet_peering.t) =
+    let vnet_peerings' = AddressMap.add (Vnet_peering.get_address peering) peering world.vnet_peerings in
+    { world with vnet_peerings = vnet_peerings' }
+
+  let parse_vnet_peerings (world, err) peerings =
+    let parse_vnet_peering (world, err) peering_json =
+      match vnet_peering_of_json world peering_json with
+      | Ok peering -> (add_vnet_peering world peering, err)
+      | Error e -> (world, e::err)
+    in
+    List.fold_left parse_vnet_peering (world, err) peerings
+
+  let resolve_vnet_peering_remote_ref peering config_json (world : World.t) =
+    let (let*) = Result.bind in
+    let* resource = get_configuration_resource (Vnet_peering.get_address peering) config_json
+      |> Option.to_result ~none:("Could not resolve ids for vnet peering " ^ (Vnet_peering.get_name peering))
+    in
+    let expressions = Safe.Util.member "expressions" resource in
+    let remote_refs =
+      Safe.Util.member "remote_virtual_network_id" expressions |>
+      Safe.Util.member "references" |>
+      Safe.Util.to_list |>
+      Safe.Util.filter_string
+    in
+    let* remote_address = match remote_refs with
+      | [_id; address] -> Ok address
+      | _ -> Error ("Could not resolve remote_virtual_network_id of peering " ^ (Vnet_peering.get_name peering))
+    in
+    let* remote_vnet = AddressMap.find_opt remote_address world.vnets
+      |> Option.to_result ~none:("Could not find remote vnet " ^ remote_address ^ " required by peering " ^ (Vnet_peering.get_name peering))
+    in
+    Ok (Vnet_peering.resolve_remote_vnet remote_vnet peering)
+
+  let resolve_vnet_peering_dependencies ((world : World.t), err) config_json =
+    let peerings', err' =
+      AddressMap.fold (fun addr peering (ok_map, err_list) ->
+        match resolve_vnet_peering_remote_ref peering config_json world with
+        | Ok peering' -> (AddressMap.add addr peering' ok_map, err_list)
+        | Error e -> (ok_map, e::err_list))
+        world.vnet_peerings (AddressMap.empty, err)
+    in
+    ({ world with vnet_peerings = peerings' }, err')
+
   let get_route_nics (json : Safe.t list) nics =
     List.fold_left (
       fun set json -> match json with
@@ -1179,11 +1300,13 @@ module AzureTFParser = struct
     let world, address_index, err = parse_nics (world, address_index, err) raw_world.nics in
     let world, address_index, err = parse_pips (world, address_index, err) raw_world.pips in
     let world, err = parse_route_tables (world, err) raw_world.route_tables in
+    let world, err = parse_vnet_peerings (world, err) raw_world.vnet_peerings in
     let world, err = resolve_nic_dependencies world.nics world (Option.get config_json) err in
     let world, err = resolve_route_table_dynamic_ips (world, err) (Option.get config_json) in
     let world, err = resolve_route_table_associations (world, err) (Option.get config_json) raw_world.route_table_associations in
     let world, err = resolve_nsg_associations (world, err) (Option.get config_json) raw_world.nsg_associations in
     let world, err = resolve_nic_nsg_associations (world, err) (Option.get config_json) raw_world.nic_nsg_associations in
+    let world, err = resolve_vnet_peering_dependencies (world, err) (Option.get config_json) in
     if List.length err > 0 then print_string_list err;
     world
 

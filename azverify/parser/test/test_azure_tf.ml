@@ -56,7 +56,8 @@ let simple_network_world =
      route_tables = AddressMap.empty;
      route_table_associations = AddressMap.empty;
      nsg_associations = AddressMap.empty;
-     nic_nsg_associations = AddressMap.empty} : World.t)
+     nic_nsg_associations = AddressMap.empty;
+     vnet_peerings = AddressMap.empty} : World.t)
 
 let simple_nsg_world = 
   let rg = Rg.make
@@ -98,7 +99,7 @@ let simple_nsg_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.empty in
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
 
 let simple_nic_world = 
   let rg = Rg.make
@@ -153,7 +154,7 @@ let simple_nic_world =
   let nsg_associations = AddressMap.empty in
   let world =
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
   in world
 
 let static_nic_world = 
@@ -209,7 +210,7 @@ let static_nic_world =
   let nsg_associations = AddressMap.empty in
   let world =
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
   in world
 
 
@@ -296,7 +297,7 @@ let pip_nic_world =
   let nic_nsg_assoc = Association.BinaryAssociation.make nsg nic "azurerm_network_interface_security_group_association.this" in
   let nic_nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address nic_nsg_assoc) nic_nsg_assoc AddressMap.empty in
   let world =
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
   in world
 
 let route_table_world =
@@ -353,7 +354,7 @@ let route_table_world =
   let nsg_associations = AddressMap.empty in
   let world =
     let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
   in world
 
 let nsg_subnet_assoc_world =
@@ -413,7 +414,7 @@ let nsg_subnet_assoc_world =
   let route_table_associations = AddressMap.empty in
   let nsg_associations = AddressMap.add (Association.BinaryAssociation.get_address assoc) assoc AddressMap.empty in
   let nic_nsg_associations = AddressMap.empty in
-  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations} : World.t)
+  ({resource_groups; vnets; subnets; nsgs; nics; pips; route_tables; route_table_associations; nsg_associations; nic_nsg_associations; vnet_peerings = AddressMap.empty} : World.t)
 
 let dynamic_nic_udr_world =
   let rg = Rg.make
@@ -494,7 +495,8 @@ let dynamic_nic_udr_world =
     nsgs = AddressMap.empty; nics; pips = AddressMap.empty;
     route_tables; route_table_associations;
     nsg_associations = AddressMap.empty;
-    nic_nsg_associations = AddressMap.empty} : World.t)
+    nic_nsg_associations = AddressMap.empty;
+    vnet_peerings = AddressMap.empty} : World.t)
 
 let nic_no_subnet_world =
   let rg = Rg.make
@@ -508,6 +510,61 @@ let nic_no_subnet_world =
   let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
   ({resource_groups;
     vnets = AddressMap.empty;
+    subnets = AddressMap.empty;
+    nsgs = AddressMap.empty;
+    nics = AddressMap.empty;
+    pips = AddressMap.empty;
+    route_tables = AddressMap.empty;
+    route_table_associations = AddressMap.empty;
+    nsg_associations = AddressMap.empty;
+    nic_nsg_associations = AddressMap.empty;
+    vnet_peerings = AddressMap.empty} : World.t)
+
+let simple_vnet_peering_world =
+  let rg = Rg.make
+    ~name:"network-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let local_vnet = Vnet.make
+    ~name:"local-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.local"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let remote_vnet = Vnet.make
+    ~name:"remote-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.remote"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.1.0.0/16"]))
+  in
+  let peering = Vnet_peering.make
+    ~name:"local-to-remote"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network_peering.local_to_remote"
+    ~resource_group:rg
+    ~local_vnet:(Resolved local_vnet)
+    ~remote_vnet:(Resolved remote_vnet)
+    ~allow_virtual_network_access:(Some true)
+    ~allow_forwarded_traffic:(Some false)
+    ~allow_gateway_transit:(Some false)
+    ~use_remote_gateways:(Some false)
+    ~local_subnet_names:None
+    ~remote_subnet_names:None
+    ~peer_complete_virtual_networks_enabled:(Some true)
+  in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address local_vnet) local_vnet AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address remote_vnet) remote_vnet vnets in
+  let vnet_peerings = AddressMap.add (Vnet_peering.get_address peering) peering AddressMap.empty in
+  ({resource_groups; vnets; vnet_peerings;
     subnets = AddressMap.empty;
     nsgs = AddressMap.empty;
     nics = AddressMap.empty;
@@ -599,7 +656,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     dynamic_nic_udr_world
-    (AzureTFParser.get_resources "test_plans/dynamic_nic_udr/plan.json"))
+    (AzureTFParser.get_resources "test_plans/dynamic_nic_udr/plan.json"));
+  "simple_vnet_peering" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    simple_vnet_peering_world
+    (AzureTFParser.get_resources "test_plans/simple_vnet_peering/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [
