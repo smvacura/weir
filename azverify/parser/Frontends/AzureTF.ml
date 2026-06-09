@@ -41,6 +41,8 @@ module AzureTFParser = struct
   }
 
 
+  (* ===== SHARED INFRASTRUCTURE ===== *)
+
   let partition_results rs =
   let rec go oks errs = function
     | [] -> if errs = [] then Ok (List.rev oks) else Error (List.rev errs)
@@ -52,32 +54,31 @@ module AzureTFParser = struct
     match json with
     | `String s -> Some s
     | _ -> None
-      
-  
+
   let generate_parse_string_result field_name resource_name resource_type (json : Safe.t) =
     match json with
     | `String s -> Ok (Some s)
     | `Null -> Ok None
-    | _ -> Error 
-      ("Error: Could not parse field " 
+    | _ -> Error
+      ("Error: Could not parse field "
       ^ field_name
       ^ " of resource "
       ^ resource_name
       ^ " of type "
       ^ resource_type)
-  
+
   let generate_parse_string_result_required field_name resource_name resource_type (json : Safe.t) =
   match json with
   | `String s -> Ok s
-  | _ -> Error 
-    ("Error: Could not parse field " 
+  | _ -> Error
+    ("Error: Could not parse field "
     ^ field_name
     ^ " of resource "
     ^ resource_name
     ^ " of type "
     ^ resource_type)
 
-  let generate_loc_parse_result resource_name resource_type res = 
+  let generate_loc_parse_result resource_name resource_type res =
     match res with
     | Some loc -> Ok loc
     | None -> Error
@@ -106,198 +107,22 @@ module AzureTFParser = struct
   | _ ->
       ([], [ "expected JSON object for tags" ])
 
-
-  let rg_of_json json = 
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "name" "" "resource_group" in
-    let* name = Safe.Util.member "name" values 
-      |> generate_parse_string_result_required "name" "" "resource_group" in
-    let* managed_by = Safe.Util.member "managed_by" values 
-      |> generate_parse_string_result "managed_by" name "resource_group" in
-    let tags = Safe.Util.member "tags" json 
-      |> parse_tags_lenient 
-      |> fst in 
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "resource_group"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type resource group")
-    in
-
-    Ok (Rg.make 
-      ~name:name 
-      ~subscription:"DEFAULT" 
-      ~address:address 
-      ~location:location 
-      ~managed_by:managed_by 
-      ~tags:tags)
-
   let list_of_json_opt (json_list : Safe.t) =
-    match json_list with 
+    match json_list with
     | `List l -> Some l
     | _ -> None
 
-  let string_list_of_json_opt (json_list : Safe.t) = 
+  let string_list_of_json_opt (json_list : Safe.t) =
     match json_list with
     | `List a -> Some (List.map Safe.Util.to_string_option a)
     | _ -> None
-  
-  let parse_address_block_opt addresses = 
+
+  let parse_address_block_opt addresses =
     match string_list_of_json_opt addresses with
     | Some l -> Parser.Network_types.CIDR.of_list_opt_strict l
     | None -> None
-    
-  let inline_subnets_of_json vnet subnet_json = 
-    let get_subnet_cidr_block subnet_name subnet_block =
-      match Parser.Network_types.CIDR.of_list_opt_strict subnet_block with
-      | Some l -> Ok l
-      | None -> Error  ("Malformed addresses for subnet " ^ subnet_name)
-    in
 
-    let single_inline_of_json json = 
-      let (let*) = Result.bind in 
-      let* name = Safe.Util.member "name" json 
-        |> generate_parse_string_result_required "name" "" "subnet" in
-      let* address = Safe.Util.member "address" json
-        |> generate_parse_string_result_required "address" name "subnet" in
-      let* subnet_block = Safe.Util.member "subnet" json
-        |> string_list_of_json_opt
-        |> (fun l_opt -> 
-          match l_opt with
-          | Some l -> get_subnet_cidr_block name l
-          | None -> (Ok []))
-      in
-      let rg = Vnet.get_rg vnet in
-      Ok (Subnet.make 
-      ~name:name 
-      ~subscription:"DEFAULT" 
-      ~address:address 
-      ~resource_group:rg 
-      ~vnet:vnet 
-      ~addresses:subnet_block)
-    
-    in let rec aux json_list acc =
-    match json_list with
-    | h::t -> (single_inline_of_json h)::acc
-    | [] -> acc
-    in
-    aux subnet_json []
-
-  
-
-  let vnet_of_json world json =
-    let get_vnet_cidr_block vnet_name vnet_block =
-      match Parser.Network_types.CIDR.of_list_opt_strict vnet_block with
-      | Some l -> Ok l
-      | None -> Error  ("Malformed addresses for subnet " ^ vnet_name)
-    in
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in 
-    let* name = Safe.Util.member "name" values 
-      |> generate_parse_string_result_required "name" "" "vnet" in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "resource_group" in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "vnet"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type vnet")
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "vnet"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet " ^ name)
-    in
-    let addresses = Safe.Util.member "address_space" values
-    in
-    let* cidr_list = parse_address_block_opt addresses
-      |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
-    in
-    let vnet = (Vnet.make 
-      ~name:name 
-      ~subscription:"DEFAULT" 
-      ~address:address 
-      ~location:location 
-      ~resource_group:rg 
-      ~addresses:cidr_list) in
-    let inline_subnets = begin
-    match Safe.Util.member "subnet" values with
-    | `List subnet_json -> inline_subnets_of_json vnet subnet_json
-    | `Null -> []
-    | _ -> []
-    end in
-    Ok (vnet, inline_subnets)
-
-  let subnet_of_json world json =
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values 
-      |> generate_parse_string_result_required "name" "" "subnet"
-    in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "vnet" in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "subnet"
-    in
-    let* vnet_name = Safe.Util.member "virtual_network_name" values
-      |> generate_parse_string_result_required "virtual_network_name" name "subnet"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
-    in
-    let* vnet =
-      AddressMap.fold (fun _ v acc ->
-        if Vnet.get_name v = vnet_name && Rg.get_name (Vnet.get_rg v) = rg_name
-        then Some v else acc)
-        world.vnets None
-      |> Option.to_result ~none:("Cannot find vnet required by subnet " ^ address)
-    in
-    let addresses = Safe.Util.member "address_prefixes" values
-    in
-    let* cidr_list = parse_address_block_opt addresses
-      |> Option.to_result ~none:("Cannot parse address block of subnet " ^ name)
-    in
-    Ok (Subnet.make 
-      ~name:name 
-      ~subscription:"DEFAULT" 
-      ~address:address 
-      ~resource_group:rg 
-      ~vnet:vnet 
-      ~addresses:cidr_list)
-
-  let endpoint_of_element (json : Safe.t) (kind : string) =
-    match json with
-    | `String s -> Nsg.SecurityRule.endpoint_of_list_opt [Some s] kind
-    | `List l -> Nsg.SecurityRule.endpoint_of_list_opt (List.map Safe.Util.to_string_option l) kind
-    | _ -> None
-  
-
-  let is_nonempty_json_list (json : Safe.t) key =
-    match Safe.Util.member key json with
-    | `List l -> List.length l > 0 
-    | _ -> false
-  
-  let is_nonempty_json_string (json : Safe.t) key =
-    match Safe.Util.member key json with
-    | `String s -> String.length s > 0
-    | _ -> false
-  
-  let endpoint_of_json (json : Safe.t) target =
-    if is_nonempty_json_string json (target ^ "_address_prefix")
-    then Nsg.SecurityRule.endpoint_of_list_opt 
-        [(Safe.Util.member (target ^ "_address_prefix") json |> Safe.Util.to_string_option)]
-        "addresses"
-    else if is_nonempty_json_list json (target ^ "_address_prefixes")
-    then Nsg.SecurityRule.endpoint_of_list_opt 
-        (Safe.Util.member (target ^ "_address_prefixes") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
-        "addresses"
-    else if is_nonempty_json_list json (target ^ "_application_security_group_ids")
-    then Nsg.SecurityRule.endpoint_of_list_opt 
-        (Safe.Util.member (target ^ "_application_security_group_ids") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
-        "application"
-    else None
-
-
-  let sequence_rev xs = 
+  let sequence_rev xs =
     List.fold_left (fun acc x ->
       match acc, x with
       | Some vs, Some v -> Some (v :: vs)
@@ -312,422 +137,30 @@ module AzureTFParser = struct
       | _, Error v -> Error v)
     (Ok [])
     xs
-    
-    
-  let port_list_of_json (json : Safe.t) target = 
-    if is_nonempty_json_string json (target ^ "_port_range")
-    then let (let*) = Option.bind in 
-         let* port_range = Safe.Util.member (target ^ "_port_range") json |>
-            Safe.Util.to_string_option in
-          port_list_of_string_list_opt [port_range]
-    else if is_nonempty_json_list json (target ^ "_port_ranges")
-    then let (let*) = Option.bind in 
-         let* port_ranges = Safe.Util.member (target ^ "_port_ranges") json |>
-         Safe.Util.to_list |>
-         List.map Safe.Util.to_string_option |>
-         sequence_rev in
-         port_list_of_string_list_opt port_ranges
-    else None 
 
-  let rule_of_json rule = 
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" rule |>
-      generate_parse_string_result_required "name" "" "security_rule"
+  let is_nonempty_json_list (json : Safe.t) key =
+    match Safe.Util.member key json with
+    | `List l -> List.length l > 0
+    | _ -> false
+
+  let is_nonempty_json_string (json : Safe.t) key =
+    match Safe.Util.member key json with
+    | `String s -> String.length s > 0
+    | _ -> false
+
+  let get_configuration_resource address json_list =
+    let rec aux address ell =
+    match ell with
+    | h::t ->
+      if Safe.Util.member "address" h |> Safe.Util.to_string = address
+      then Some h
+      else aux address t
+    | [] -> None
     in
-    let* description = Safe.Util.member "description" rule |>
-      generate_parse_string_result "description" name "security_rule"
-    in
-    let* access = Safe.Util.member "access" rule |>
-      Safe.Util.to_string_option |>
-      Option.value ~default:"" |>
-      Nsg.SecurityRule.access_of_string_opt |>
-      Option.to_result ~none:("Could not parse access of rule " ^ name)
-    in
-    let* direction = Safe.Util.member "direction" rule |>
-      Safe.Util.to_string_option |>
-      Option.value ~default:"" |>
-      Nsg.SecurityRule.direction_of_string_opt |>
-      Option.to_result ~none:("Could not parse direction of rule " ^ name)
-    in
-    let* protocol = Safe.Util.member "protocol" rule |>
-      Safe.Util.to_string_option |>
-      Option.value ~default:"" |>
-      protocol_of_string_opt |>
-      Option.to_result ~none:("Could not parse protocol of rule " ^ name)
-    in
-    let* dest_prefixes = endpoint_of_json rule "destination"|> 
-      Option.to_result ~none:("Could not parse destination of rule " ^ name)
-    in
-    let* source_prefixes = endpoint_of_json rule "source"|> 
-      Option.to_result ~none:("Could not parse source of rule " ^ name)
-    in
-    let* source_ports = port_list_of_json rule "source" |>
-      Option.to_result ~none:("Could not parse source ports of rule " ^ name)
-    in
-    let* dest_ports = port_list_of_json rule "destination" |>
-      Option.to_result ~none:("Could not parse destination ports of rule " ^ name)
-    in
-    let* priority = Safe.Util.member "priority" rule |>
-      Safe.Util.to_int_option |>
-      Option.to_result ~none:("Could not parse priority of rule " ^ name)
-    in
-    Ok (
-      Nsg.SecurityRule.make
-      ~name:name
-      ~description:description
-      ~protocol:protocol
-      ~source_ports:source_ports
-      ~destination_ports:dest_ports
-      ~source:source_prefixes
-      ~destination:dest_prefixes
-      ~access:access
-      ~priority:priority
-      ~direction:direction
-    )
+    aux address json_list
 
 
-  let nsg_of_json world json = 
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values |>
-      generate_parse_string_result_required "name" "" "nsg"
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "subnet"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
-    in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "resource_group" in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
-    in
-    let* security_rules = Safe.Util.member "security_rule" values |>
-      Safe.Util.to_list |>
-      List.map (rule_of_json) |>
-      sequence_result_rev
-    in
-    let tags = Safe.Util.member "tags" values 
-      |> parse_tags_lenient 
-      |> fst in 
-     Ok 
-     (Nsg.make 
-     ~name:name
-     ~subscription:"DEFAULT"
-     ~address:address
-     ~location:location
-     ~resource_group:rg
-     ~rule_list:security_rules
-     ~tags:tags)
-    
-  let ip_configuration_of_json ip_config_json = 
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" ip_config_json |>
-      generate_parse_string_result_required "name" "" "nsg"
-    in
-    let* ip_type_string = Safe.Util.member "private_ip_address_version" ip_config_json |>
-      generate_parse_string_result_required "private_ip_address_version" name "ip_configuration"
-    in 
-    let* ip_type = 
-      ip_type_of_string_opt ip_type_string |>
-      Option.to_result ~none:("Could not parse private_ip_address_version of configuration" ^ name)
-    in
-    let* ip_allocation_string = Safe.Util.member "private_ip_address_allocation" ip_config_json |>
-      generate_parse_string_result_required "private_ip_address_allocation" name "ip_configuration"
-    in
-    let* ip_string = Safe.Util.member "private_ip_address" ip_config_json |> 
-      generate_parse_string_result "" "" "" 
-    in
-    let ip = match ip_allocation_string, ip_string with
-     | "Static", Some ip -> IPv4.of_string_opt ip
-     | _ -> None
-    in
-    let allocation = match ip with
-      | Some ip -> (Static ip : private_ip_assignment)
-      | _ -> Dynamic
-    in
-    Ok (Nic.IpConfiguration.make
-    ~name:name
-    ~subscription:"DEFAULT"
-    ~subnet:Unresolved
-    ~ip_address_version:ip_type
-    ~pip:Unresolved
-    ~private_address_allocation:allocation
-    ~primary:None)
-
-  (* TODO: tighten up into one pass *)
-  let ip_config_block_of_json (ip_config_json : Safe.t) =
-    match ip_config_json with
-    | `List ell -> sequence_result_rev @@ List.map ip_configuration_of_json ell  
-    | _ -> Error "Could not parse IP configuration list"
-
-  let nic_of_json world json =
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values |>
-      generate_parse_string_result_required "name" "" "nsg"
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "subnet"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
-    in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "resource_group" in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
-    in
-    let* ip_configurations = Safe.Util.member "ip_configuration" values |>
-      ip_config_block_of_json
-    in
-     Ok 
-     (Nic.make 
-     ~name:name
-     ~subscription:"DEFAULT"
-     ~address:address
-     ~resource_group:rg
-     ~location:location
-     ~ip_configurations:ip_configurations)
-
-  let pip_of_json world json =
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values |>
-      generate_parse_string_result_required "name" "" "pip"
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "pip"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by pip " ^ name)
-    in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "resource_group" in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type pip")
-    in
-    let* ip_allocation_string = Safe.Util.member "allocation_method" values 
-      |> generate_parse_string_result_required "allocation method" name "resource_group" in
-    let* ip_allocation = match ip_allocation_string with
-      | "Static" -> Ok (Static)
-      | "Dynamic" -> Ok (Dynamic)
-      | _ -> Error ("Cannot parse field allocation_method in resource " ^ name ^ " of type pip")
-    in
-    Ok (Pip.make
-      ~name:name
-      ~subscription:"DEFAULT"
-      ~address:address
-      ~resource_group:rg
-      ~location:location
-      ~allocation:ip_allocation)
-
-  let route_of_json json = 
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" json |>
-      generate_parse_string_result_required "name" "" "route"
-    in
-    let* prefix = match Safe.Util.member "address_prefix" json with
-    | `String s -> CIDR.of_string_opt s |> Option.to_result ~none:("Could not parse resource " ^ name ^ " of type route")
-    | _ -> Error ("Could not parse resource " ^ name ^ " of type route")
-    in
-    let ip_opt = match Safe.Util.member "next_hop_in_ip_address" json with
-    | `String s -> IPv4.of_string_opt s
-    | _ -> None
-    in
-    let next_hop_in_ip_address = match ip_opt with
-    | Some ip -> Resolved (StaticAppliance ip)
-    | None -> Unresolved
-    in
-    let* next_hop = match Safe.Util.member "next_hop_type" json with
-    | `String s -> next_hop_of_string_opt s ~ip:ip_opt |>
-      Option.to_result ~none:("Could not parse next hop of route " ^ name)
-    | _ -> Error ("Could not parse next hop of route " ^ name)
-    in
-    Ok (
-      Route_table.Route.make
-        ~name:name
-        ~address_prefix:prefix
-        ~next_hop:next_hop
-        ~next_hop_in_ip_address:next_hop_in_ip_address
-        ~source:UserDefined
-    )
-    
-
-  let route_table_of_json world json =
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values |>
-      generate_parse_string_result_required "name" "" "pip"
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "pip"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by route table " ^ name)
-    in
-    let* address = Safe.Util.member "address" json 
-      |> generate_parse_string_result_required "address" name "resource_group" in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type route table")
-    in
-    let* bgp_route_propagation_enabled = match Safe.Util.member "bgp_route_propagation_enabled" values with
-    | `Bool b -> Ok b
-    | _ -> Ok true
-    in
-    let tags = Safe.Util.member "tags" values 
-      |> parse_tags_lenient 
-      |> fst in 
-    let* routes = match Safe.Util.member "route" values with
-      | `List l -> List.map route_of_json l |> sequence_result_rev
-      | _ -> Error ("Could not parse field routes of resource " ^ name ^ " of type route table")
-    in
-    Ok (
-      Route_table.make
-      ~name:name
-      ~subscription:"DEFAULT"
-      ~address:address
-      ~location:location
-      ~resource_group:rg
-      ~bgp_route_propagation_enabled:bgp_route_propagation_enabled
-      ~routes:routes
-      ~tags:tags
-    )
-    
-
-
-
-  let from_file_robust path =
-    let content = In_channel.with_open_bin path In_channel.input_all in
-    let content = 
-      if String.length content >= 3 && 
-        content.[0] = '\xEF' && content.[1] = '\xBB' && content.[2] = '\xBF'
-      then String.sub content 3 (String.length content - 3)
-      else content
-    in
-    Yojson.Safe.from_string content
-  
-  let json_resources file = 
-    match from_file_robust file
-    |> Safe.Util.member "planned_values"
-    |> Safe.Util.member "root_module"
-    |> Safe.Util.member "resources"
-    with
-    | `Null -> None
-    | arr -> Some (Safe.Util.to_list arr)
-  
-    let json_config file = 
-    match from_file_robust file
-    |> Safe.Util.member "configuration"
-    |> Safe.Util.member "root_module"
-    |> Safe.Util.member "resources"
-    with
-    | `Null -> None
-    | arr -> Some (Safe.Util.to_list arr)
-
-  
-  let add_rg (world : World.t) (rg : Rg.t) =
-    let rgs' = AddressMap.add (Rg.get_address rg) rg world.resource_groups in
-    { world with resource_groups = rgs' }
-
-  let add_vnet (world : World.t) (vnet : Vnet.t) =
-    let vnets' = AddressMap.add (Vnet.get_address vnet) vnet world.vnets in
-    { world with vnets = vnets' }
-
-  let add_subnet (world : World.t) (subnet : Subnet.t) =
-    let subnets' = AddressMap.add (Subnet.get_address subnet) subnet world.subnets in
-    { world with subnets = subnets'}
-
-  let add_nsg (world : World.t) (nsg : Nsg.t) =
-    let nsgs' = AddressMap.add (Nsg.get_address nsg) nsg world.nsgs in
-    { world with nsgs = nsgs'}
-
-  let add_nic (world : World.t) (nic : Nic.t) =
-    let nics' = AddressMap.add (Nic.get_address nic) nic world.nics in
-    { world with nics = nics' }
-
-  let add_pip (world : World.t) (pip : Pip.t) =
-    let pips' = AddressMap.add (Pip.get_address pip) pip world.pips in
-    { world with pips = pips'}
-
-  let add_route_table (world : World.t) (rt : Route_table.t) =
-  let route_tables' = AddressMap.add (Route_table.get_address rt) rt world.route_tables in
-  { world with route_tables = route_tables' }
-  
-  let parse_resource_groups world rgs =
-    let parse_rg world rg_json =
-      match rg_of_json rg_json with
-      | Ok rg -> add_rg world rg
-      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
-    in
-    List.fold_left parse_rg world rgs
-
-  let parse_vnets world vnets =
-    let parse_vnet world vnet_json =
-      match vnet_of_json world vnet_json with
-      | Ok (vnet, subnets) ->
-        (match partition_results subnets with
-        | Error errors -> List.iter (fun e -> Logs.warn (fun m -> m "%s" e)) errors
-        | Ok _ -> ());
-        add_vnet world vnet
-      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
-    in
-    List.fold_left parse_vnet world vnets
-
-  let parse_subnets world subnets =
-    let parse_subnet world subnet_json =
-      match subnet_of_json world subnet_json with
-      | Ok subnet -> add_subnet world subnet
-      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
-    in
-    List.fold_left parse_subnet world subnets
-
-  let parse_nsgs world nsgs =
-    let parse_nsg world nsg_json =
-      match nsg_of_json world nsg_json with
-      | Ok nsg -> add_nsg world nsg
-      | Error e -> Logs.warn (fun m -> m "%s" e); world
-    in
-    List.fold_left parse_nsg world nsgs
-
-  let parse_nics world nics =
-    let parse_nic world nic_json =
-      match nic_of_json world nic_json with
-      | Ok nic -> add_nic world nic
-      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
-    in
-    List.fold_left parse_nic world nics
-
-  let parse_pips world pips =
-    let parse_pip world pip_json =
-      match pip_of_json world pip_json with
-      | Ok pip -> add_pip world pip
-      | Error e -> Logs.warn (fun m -> m "%s" e); world
-    in
-    List.fold_left parse_pip world pips
-
-  let parse_route_tables world route_tables =
-    let parse_route_table world rt_json =
-      match route_table_of_json world rt_json with
-      | Ok route_table -> add_route_table world route_table
-      | Error e -> Logs.warn (fun m -> m "%s" e); world
-    in
-    List.fold_left parse_route_table world route_tables
-    
-  let parse_resource json_resource (world : World.t) err =
-    let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
-    match resource_type with
-    | Some "azurerm_resource_group" -> 
-      (match rg_of_json json_resource with
-      | Ok rg -> (add_rg world rg, err)
-      | Error e -> (world, e::err))
-    | None -> (world, err)
-
+  (* ===== RAW WORLD + JSON LOADING ===== *)
 
   let raw_parse_resource json_resource (world : raw_world) =
     let resource_type : string option = Safe.Util.member "type" json_resource |> parse_json_string_opt in
@@ -810,7 +243,6 @@ module AzureTFParser = struct
       Logs.warn (fun m -> m "Resource with no type field");
       world
 
-  
   let raw_parse_resources json =
     match json with
     | Some arr ->
@@ -819,34 +251,465 @@ module AzureTFParser = struct
       Logs.warn (fun m -> m "Could not parse resource array");
       raw_world_empty
 
+  let from_file_robust path =
+    let content = In_channel.with_open_bin path In_channel.input_all in
+    let content =
+      if String.length content >= 3 &&
+        content.[0] = '\xEF' && content.[1] = '\xBB' && content.[2] = '\xBF'
+      then String.sub content 3 (String.length content - 3)
+      else content
+    in
+    Yojson.Safe.from_string content
 
-  let is_resolvable json =
-    let is_id_field address = 
-      let address_list = String.split_on_char '.' address in
-      match List.rev address_list with
-      | "id"::t -> true
+  let json_resources file =
+    match from_file_robust file
+    |> Safe.Util.member "planned_values"
+    |> Safe.Util.member "root_module"
+    |> Safe.Util.member "resources"
+    with
+    | `Null -> None
+    | arr -> Some (Safe.Util.to_list arr)
+
+  let json_config file =
+    match from_file_robust file
+    |> Safe.Util.member "configuration"
+    |> Safe.Util.member "root_module"
+    |> Safe.Util.member "resources"
+    with
+    | `Null -> None
+    | arr -> Some (Safe.Util.to_list arr)
+
+
+  (* ===== RESOURCE GROUPS ===== *)
+
+  let rg_of_json json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "name" "" "resource_group" in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "resource_group" in
+    let* managed_by = Safe.Util.member "managed_by" values
+      |> generate_parse_string_result "managed_by" name "resource_group" in
+    let tags = Safe.Util.member "tags" json
+      |> parse_tags_lenient
+      |> fst in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "resource_group"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type resource group")
+    in
+
+    Ok (Rg.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~managed_by:managed_by
+      ~tags:tags)
+
+  let add_rg (world : World.t) (rg : Rg.t) =
+    let rgs' = AddressMap.add (Rg.get_address rg) rg world.resource_groups in
+    { world with resource_groups = rgs' }
+
+  let parse_resource_groups world rgs =
+    let parse_rg world rg_json =
+      match rg_of_json rg_json with
+      | Ok rg -> add_rg world rg
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
+    in
+    List.fold_left parse_rg world rgs
+
+
+  (* ===== VNETS ===== *)
+
+  let inline_subnets_of_json vnet subnet_json =
+    let get_subnet_cidr_block subnet_name subnet_block =
+      match Parser.Network_types.CIDR.of_list_opt_strict subnet_block with
+      | Some l -> Ok l
+      | None -> Error  ("Malformed addresses for subnet " ^ subnet_name)
+    in
+
+    let single_inline_of_json json =
+      let (let*) = Result.bind in
+      let* name = Safe.Util.member "name" json
+        |> generate_parse_string_result_required "name" "" "subnet" in
+      let* address = Safe.Util.member "address" json
+        |> generate_parse_string_result_required "address" name "subnet" in
+      let* subnet_block = Safe.Util.member "subnet" json
+        |> string_list_of_json_opt
+        |> (fun l_opt ->
+          match l_opt with
+          | Some l -> get_subnet_cidr_block name l
+          | None -> (Ok []))
+      in
+      let rg = Vnet.get_rg vnet in
+      Ok (Subnet.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~resource_group:rg
+      ~vnet:vnet
+      ~addresses:subnet_block)
+
+    in let rec aux json_list acc =
+    match json_list with
+    | h::t -> (single_inline_of_json h)::acc
+    | [] -> acc
+    in
+    aux subnet_json []
+
+  let vnet_of_json world json =
+    let get_vnet_cidr_block vnet_name vnet_block =
+      match Parser.Network_types.CIDR.of_list_opt_strict vnet_block with
+      | Some l -> Ok l
+      | None -> Error  ("Malformed addresses for subnet " ^ vnet_name)
+    in
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "vnet" in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "vnet"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type vnet")
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "vnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by vnet " ^ name)
+    in
+    let addresses = Safe.Util.member "address_space" values
+    in
+    let* cidr_list = parse_address_block_opt addresses
+      |> Option.to_result ~none:("Cannot parse address block of vnet " ^ name)
+    in
+    let vnet = (Vnet.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~resource_group:rg
+      ~addresses:cidr_list) in
+    let inline_subnets = begin
+    match Safe.Util.member "subnet" values with
+    | `List subnet_json -> inline_subnets_of_json vnet subnet_json
+    | `Null -> []
+    | _ -> []
+    end in
+    Ok (vnet, inline_subnets)
+
+  let add_vnet (world : World.t) (vnet : Vnet.t) =
+    let vnets' = AddressMap.add (Vnet.get_address vnet) vnet world.vnets in
+    { world with vnets = vnets' }
+
+  let parse_vnets world vnets =
+    let parse_vnet world vnet_json =
+      match vnet_of_json world vnet_json with
+      | Ok (vnet, subnets) ->
+        (match partition_results subnets with
+        | Error errors -> List.iter (fun e -> Logs.warn (fun m -> m "%s" e)) errors
+        | Ok _ -> ());
+        add_vnet world vnet
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
+    in
+    List.fold_left parse_vnet world vnets
+
+
+  (* ===== SUBNETS ===== *)
+
+  let subnet_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "subnet"
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "vnet" in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "subnet"
+    in
+    let* vnet_name = Safe.Util.member "virtual_network_name" values
+      |> generate_parse_string_result_required "virtual_network_name" name "subnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by subnet " ^ name)
+    in
+    let* vnet =
+      AddressMap.fold (fun _ v acc ->
+        if Vnet.get_name v = vnet_name && Rg.get_name (Vnet.get_rg v) = rg_name
+        then Some v else acc)
+        world.vnets None
+      |> Option.to_result ~none:("Cannot find vnet required by subnet " ^ address)
+    in
+    let addresses = Safe.Util.member "address_prefixes" values
+    in
+    let* cidr_list = parse_address_block_opt addresses
+      |> Option.to_result ~none:("Cannot parse address block of subnet " ^ name)
+    in
+    Ok (Subnet.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~resource_group:rg
+      ~vnet:vnet
+      ~addresses:cidr_list)
+
+  let add_subnet (world : World.t) (subnet : Subnet.t) =
+    let subnets' = AddressMap.add (Subnet.get_address subnet) subnet world.subnets in
+    { world with subnets = subnets'}
+
+  let parse_subnets world subnets =
+    let parse_subnet world subnet_json =
+      match subnet_of_json world subnet_json with
+      | Ok subnet -> add_subnet world subnet
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
+    in
+    List.fold_left parse_subnet world subnets
+
+
+  (* ===== NSGs ===== *)
+
+  let endpoint_of_element (json : Safe.t) (kind : string) =
+    match json with
+    | `String s -> Nsg.SecurityRule.endpoint_of_list_opt [Some s] kind
+    | `List l -> Nsg.SecurityRule.endpoint_of_list_opt (List.map Safe.Util.to_string_option l) kind
+    | _ -> None
+
+  let endpoint_of_json (json : Safe.t) target =
+    if is_nonempty_json_string json (target ^ "_address_prefix")
+    then Nsg.SecurityRule.endpoint_of_list_opt
+        [(Safe.Util.member (target ^ "_address_prefix") json |> Safe.Util.to_string_option)]
+        "addresses"
+    else if is_nonempty_json_list json (target ^ "_address_prefixes")
+    then Nsg.SecurityRule.endpoint_of_list_opt
+        (Safe.Util.member (target ^ "_address_prefixes") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
+        "addresses"
+    else if is_nonempty_json_list json (target ^ "_application_security_group_ids")
+    then Nsg.SecurityRule.endpoint_of_list_opt
+        (Safe.Util.member (target ^ "_application_security_group_ids") json |> Safe.Util.to_list |> (List.map (Safe.Util.to_string_option)))
+        "application"
+    else None
+
+  let port_list_of_json (json : Safe.t) target =
+    if is_nonempty_json_string json (target ^ "_port_range")
+    then let (let*) = Option.bind in
+         let* port_range = Safe.Util.member (target ^ "_port_range") json |>
+            Safe.Util.to_string_option in
+          port_list_of_string_list_opt [port_range]
+    else if is_nonempty_json_list json (target ^ "_port_ranges")
+    then let (let*) = Option.bind in
+         let* port_ranges = Safe.Util.member (target ^ "_port_ranges") json |>
+         Safe.Util.to_list |>
+         List.map Safe.Util.to_string_option |>
+         sequence_rev in
+         port_list_of_string_list_opt port_ranges
+    else None
+
+  let rule_of_json rule =
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" rule |>
+      generate_parse_string_result_required "name" "" "security_rule"
+    in
+    let* description = Safe.Util.member "description" rule |>
+      generate_parse_string_result "description" name "security_rule"
+    in
+    let* access = Safe.Util.member "access" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      Nsg.SecurityRule.access_of_string_opt |>
+      Option.to_result ~none:("Could not parse access of rule " ^ name)
+    in
+    let* direction = Safe.Util.member "direction" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      Nsg.SecurityRule.direction_of_string_opt |>
+      Option.to_result ~none:("Could not parse direction of rule " ^ name)
+    in
+    let* protocol = Safe.Util.member "protocol" rule |>
+      Safe.Util.to_string_option |>
+      Option.value ~default:"" |>
+      protocol_of_string_opt |>
+      Option.to_result ~none:("Could not parse protocol of rule " ^ name)
+    in
+    let* dest_prefixes = endpoint_of_json rule "destination"|>
+      Option.to_result ~none:("Could not parse destination of rule " ^ name)
+    in
+    let* source_prefixes = endpoint_of_json rule "source"|>
+      Option.to_result ~none:("Could not parse source of rule " ^ name)
+    in
+    let* source_ports = port_list_of_json rule "source" |>
+      Option.to_result ~none:("Could not parse source ports of rule " ^ name)
+    in
+    let* dest_ports = port_list_of_json rule "destination" |>
+      Option.to_result ~none:("Could not parse destination ports of rule " ^ name)
+    in
+    let* priority = Safe.Util.member "priority" rule |>
+      Safe.Util.to_int_option |>
+      Option.to_result ~none:("Could not parse priority of rule " ^ name)
+    in
+    Ok (
+      Nsg.SecurityRule.make
+      ~name:name
+      ~description:description
+      ~protocol:protocol
+      ~source_ports:source_ports
+      ~destination_ports:dest_ports
+      ~source:source_prefixes
+      ~destination:dest_prefixes
+      ~access:access
+      ~priority:priority
+      ~direction:direction
+    )
+
+  let nsg_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "subnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
+    in
+    let* security_rules = Safe.Util.member "security_rule" values |>
+      Safe.Util.to_list |>
+      List.map (rule_of_json) |>
+      sequence_result_rev
+    in
+    let tags = Safe.Util.member "tags" values
+      |> parse_tags_lenient
+      |> fst in
+     Ok
+     (Nsg.make
+     ~name:name
+     ~subscription:"DEFAULT"
+     ~address:address
+     ~location:location
+     ~resource_group:rg
+     ~rule_list:security_rules
+     ~tags:tags)
+
+  let add_nsg (world : World.t) (nsg : Nsg.t) =
+    let nsgs' = AddressMap.add (Nsg.get_address nsg) nsg world.nsgs in
+    { world with nsgs = nsgs'}
+
+  let parse_nsgs world nsgs =
+    let parse_nsg world nsg_json =
+      match nsg_of_json world nsg_json with
+      | Ok nsg -> add_nsg world nsg
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
+    in
+    List.fold_left parse_nsg world nsgs
+
+
+  (* ===== NICs ===== *)
+
+  let ip_configuration_of_json ip_config_json =
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" ip_config_json |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* ip_type_string = Safe.Util.member "private_ip_address_version" ip_config_json |>
+      generate_parse_string_result_required "private_ip_address_version" name "ip_configuration"
+    in
+    let* ip_type =
+      ip_type_of_string_opt ip_type_string |>
+      Option.to_result ~none:("Could not parse private_ip_address_version of configuration" ^ name)
+    in
+    let* ip_allocation_string = Safe.Util.member "private_ip_address_allocation" ip_config_json |>
+      generate_parse_string_result_required "private_ip_address_allocation" name "ip_configuration"
+    in
+    let* ip_string = Safe.Util.member "private_ip_address" ip_config_json |>
+      generate_parse_string_result "" "" ""
+    in
+    let ip = match ip_allocation_string, ip_string with
+     | "Static", Some ip -> IPv4.of_string_opt ip
+     | _ -> None
+    in
+    let allocation = match ip with
+      | Some ip -> (Static ip : private_ip_assignment)
+      | _ -> Dynamic
+    in
+    Ok (Nic.IpConfiguration.make
+    ~name:name
+    ~subscription:"DEFAULT"
+    ~subnet:Unresolved
+    ~ip_address_version:ip_type
+    ~pip:Unresolved
+    ~private_address_allocation:allocation
+    ~primary:None)
+
+  (* TODO: tighten up into one pass *)
+  let ip_config_block_of_json (ip_config_json : Safe.t) =
+    match ip_config_json with
+    | `List ell -> sequence_result_rev @@ List.map ip_configuration_of_json ell
+    | _ -> Error "Could not parse IP configuration list"
+
+  let nic_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "nsg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "subnet"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by nsg " ^ name)
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
+    in
+    let* ip_configurations = Safe.Util.member "ip_configuration" values |>
+      ip_config_block_of_json
+    in
+     Ok
+     (Nic.make
+     ~name:name
+     ~subscription:"DEFAULT"
+     ~address:address
+     ~resource_group:rg
+     ~location:location
+     ~ip_configurations:ip_configurations)
+
+  let add_nic (world : World.t) (nic : Nic.t) =
+    let nics' = AddressMap.add (Nic.get_address nic) nic world.nics in
+    { world with nics = nics' }
+
+  let parse_nics world nics =
+    let parse_nic world nic_json =
+      match nic_of_json world nic_json with
+      | Ok nic -> add_nic world nic
+      | Error e -> Logs.err (fun m -> m "%s" e); raise (Parse_error e)
+    in
+    List.fold_left parse_nic world nics
+
+  let find_ip_config_json ipconfig json =
+    let is_name json name =
+      match Safe.Util.member "name" json |> Safe.Util.member "constant_value" with
+      | `String s -> s = name
       | _ -> false
     in
-    let resources = Safe.Util.member "references" json in
-    match resources with
-    | `List l -> begin 
-      match List.filter is_id_field (Safe.Util.filter_string l) with 
-      | h::t -> true
-      | [] -> false
-    end
-    | _ -> false
-  
-
-  let get_configuration_resource address json_list =
-    let rec aux address ell =
-    match ell with
-    | h::t -> 
-      if Safe.Util.member "address" h |> Safe.Util.to_string = address
-      then Some h 
-      else aux address t
-    | [] -> None
+    let rec aux json_list name =
+      match json_list with
+      | h::t -> if is_name h name then Some h else aux t name
+      | [] -> None
     in
-    aux address json_list
+    let name = Nic.IpConfiguration.get_name ipconfig in
+    aux json name
 
   let resolve_ip_config_dependencies ipconfig (world : World.t) ip_config_json =
     let resolved_subnet =
@@ -862,13 +725,13 @@ module AzureTFParser = struct
       | _ -> None
     in
     let resolved_pip =
-      let pip_references = 
+      let pip_references =
       match Safe.Util.member "public_ip_address_id" ip_config_json with
       | `Null -> []
-      | json -> Safe.Util.member "references" json |> 
+      | json -> Safe.Util.member "references" json |>
                 Safe.Util.to_list |>
                 Safe.Util.filter_string
-      in 
+      in
       match pip_references with
       | [id; address] -> AddressMap.find_opt address world.pips
       | _ -> None
@@ -877,33 +740,18 @@ module AzureTFParser = struct
     | Some subnet -> Ok (Nic.IpConfiguration.resolve ipconfig ~subnet:subnet ~pip:resolved_pip)
     | None -> Error ("Could not resolve subnet for NIC " ^ (Nic.IpConfiguration.get_name ipconfig))
 
-
-  let find_ip_config_json ipconfig json =
-    let is_name json name = 
-      match Safe.Util.member "name" json |> Safe.Util.member "constant_value" with
-      | `String s -> s = name
-      | _ -> false
-    in
-    let rec aux json_list name = 
-      match json_list with
-      | h::t -> if is_name h name then Some h else aux t name
-      | [] -> None
-    in
-    let name = Nic.IpConfiguration.get_name ipconfig in
-    aux json name
-
-  let resolve_ip_configurations ipconfigs world json = 
+  let resolve_ip_configurations ipconfigs world json =
     let (let*) = Result.bind in
     let rec aux ipconfigs acc =
       match ipconfigs with
-      | h::t -> 
+      | h::t ->
         let* ipconfig_json = find_ip_config_json h json |> Option.to_result ~none:"Missing IPconfig" in
         let* resolved_ipconfig = resolve_ip_config_dependencies h world ipconfig_json in
         aux t (resolved_ipconfig::acc)
       | [] -> Ok acc
     in
     aux ipconfigs []
-  
+
   let resolve_nic_dependencies nics world config_json =
     let resolve_nic_dependency nic =
       let (let*) = Result.bind in
@@ -927,123 +775,186 @@ module AzureTFParser = struct
         nics AddressMap.empty
     in
     { world with nics = nics' }
-  
-  let add_subnet_rt rt subnet_addr (world : World.t) =
-    let assocs' = { world.assocs with subnet_rt = AddressMap.add subnet_addr rt world.assocs.subnet_rt } in
-    { world with assocs = assocs' }
 
-  let add_subnet_nsg nsg subnet_addr (world : World.t) =
-    let assocs' = { world.assocs with subnet_nsg = AddressMap.add subnet_addr nsg world.assocs.subnet_nsg } in
-    { world with assocs = assocs' }
 
-  let add_nic_nsg nsg nic_addr (world : World.t) =
-    let assocs' = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } in
-    { world with assocs = assocs' }
+  (* ===== PIPs ===== *)
 
-  let resolve_association  ~first_id_type:first_id_type ~address:address ~second_id_type:second_id_type ~json:config_json = 
+  let pip_of_json world json =
+    let values = Safe.Util.member "values" json in
     let (let*) = Result.bind in
-    let* resource = get_configuration_resource address config_json 
-      |> Option.to_result ~none:("Could not resolve ids for route table association " ^ address) in
-    let expressions = Safe.Util.member "expressions" resource in
-    let* first_resolved = begin
-      let first_references = Safe.Util.member first_id_type expressions |>
-        Safe.Util.member "references" |> 
-        Safe.Util.to_list |>
-        Safe.Util.filter_string in
-      match first_references with
-      | [id; address] -> Some address
-      | _ -> None
-    end
-      |> Option.to_result ~none:("Could not resolve " ^ first_id_type ^ " of association " ^ address)
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "pip"
     in
-    let* second_resolved = begin
-      let second_references = Safe.Util.member second_id_type expressions |>
-        Safe.Util.member "references" |> 
-        Safe.Util.to_list |>
-        Safe.Util.filter_string in
-      match second_references with
-      | [id; address] -> Some address
-      | _ -> None
-    end
-      |> Option.to_result ~none:("Could not resolve " ^ second_id_type ^ " of association " ^ address)
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "pip"
     in
-    Ok (first_resolved, second_resolved)
-    
-  let resolve_route_table_associations (world : World.t) config_json rt_associations =
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by pip " ^ name)
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type pip")
+    in
+    let* ip_allocation_string = Safe.Util.member "allocation_method" values
+      |> generate_parse_string_result_required "allocation method" name "resource_group" in
+    let* ip_allocation = match ip_allocation_string with
+      | "Static" -> Ok (Static)
+      | "Dynamic" -> Ok (Dynamic)
+      | _ -> Error ("Cannot parse field allocation_method in resource " ^ name ^ " of type pip")
+    in
+    Ok (Pip.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~resource_group:rg
+      ~location:location
+      ~allocation:ip_allocation)
+
+  let add_pip (world : World.t) (pip : Pip.t) =
+    let pips' = AddressMap.add (Pip.get_address pip) pip world.pips in
+    { world with pips = pips'}
+
+  let parse_pips world pips =
+    let parse_pip world pip_json =
+      match pip_of_json world pip_json with
+      | Ok pip -> add_pip world pip
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
+    in
+    List.fold_left parse_pip world pips
+
+
+  (* ===== ROUTE TABLES ===== *)
+
+  let route_of_json json =
     let (let*) = Result.bind in
-    let resolve_route_table_association rt_association_json =
-      let values = Safe.Util.member "values" rt_association_json in
+    let* name = Safe.Util.member "name" json |>
+      generate_parse_string_result_required "name" "" "route"
+    in
+    let* prefix = match Safe.Util.member "address_prefix" json with
+    | `String s -> CIDR.of_string_opt s |> Option.to_result ~none:("Could not parse resource " ^ name ^ " of type route")
+    | _ -> Error ("Could not parse resource " ^ name ^ " of type route")
+    in
+    let ip_opt = match Safe.Util.member "next_hop_in_ip_address" json with
+    | `String s -> IPv4.of_string_opt s
+    | _ -> None
+    in
+    let next_hop_in_ip_address = match ip_opt with
+    | Some ip -> Resolved (StaticAppliance ip)
+    | None -> Unresolved
+    in
+    let* next_hop = match Safe.Util.member "next_hop_type" json with
+    | `String s -> next_hop_of_string_opt s ~ip:ip_opt |>
+      Option.to_result ~none:("Could not parse next hop of route " ^ name)
+    | _ -> Error ("Could not parse next hop of route " ^ name)
+    in
+    Ok (
+      Route_table.Route.make
+        ~name:name
+        ~address_prefix:prefix
+        ~next_hop:next_hop
+        ~next_hop_in_ip_address:next_hop_in_ip_address
+        ~source:UserDefined
+    )
+
+  let route_table_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values |>
+      generate_parse_string_result_required "name" "" "pip"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "pip"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by route table " ^ name)
+    in
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "resource_group" in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "pip"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type route table")
+    in
+    let* bgp_route_propagation_enabled = match Safe.Util.member "bgp_route_propagation_enabled" values with
+    | `Bool b -> Ok b
+    | _ -> Ok true
+    in
+    let tags = Safe.Util.member "tags" values
+      |> parse_tags_lenient
+      |> fst in
+    let* routes = match Safe.Util.member "route" values with
+      | `List l -> List.map route_of_json l |> sequence_result_rev
+      | _ -> Error ("Could not parse field routes of resource " ^ name ^ " of type route table")
+    in
+    Ok (
+      Route_table.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~resource_group:rg
+      ~bgp_route_propagation_enabled:bgp_route_propagation_enabled
+      ~routes:routes
+      ~tags:tags
+    )
+
+  let add_route_table (world : World.t) (rt : Route_table.t) =
+  let route_tables' = AddressMap.add (Route_table.get_address rt) rt world.route_tables in
+  { world with route_tables = route_tables' }
+
+  let parse_route_tables world route_tables =
+    let parse_route_table world rt_json =
+      match route_table_of_json world rt_json with
+      | Ok route_table -> add_route_table world route_table
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
+    in
+    List.fold_left parse_route_table world route_tables
+
+  let get_route_nics (json : Safe.t list) nics =
+    List.fold_left (
+      fun set json -> match json with
+      | `String s when AddressMap.mem s nics ->  AddressSet.add s set
+      | _ -> set
+    ) AddressSet.empty json
+    |> AddressSet.elements
+
+  let resolve_routes rt niclist =
+    let resolve_route route =
+      if not @@ Route_table.Route.next_hop_is_unresolved route
+      then route
+      else match niclist with
+      | [] -> Route_table.Route.resolve_next_hop route
+      | [address] -> Route_table.Route.resolve_next_hop ~address route
+      | list -> Route_table.Route.resolve_next_hop ~list route
+    in
+    let routes = List.map resolve_route (Route_table.get_routes rt) in
+    Route_table.resolve_routes routes rt
+
+  let resolve_route_table_dynamic_ips (world : World.t) config_json =
+    let rts = world.route_tables in
+    let resolve_route_table_dynamic_ip rt =
       let (let*) = Result.bind in
-      let* address = Safe.Util.member "address" rt_association_json
-        |> generate_parse_string_result_required "address" "" "route_table_association" in
-      let* first_address, second_address =
-        resolve_association
-          ~address:address
-          ~first_id_type:"route_table_id"
-          ~second_id_type:"subnet_id"
-          ~json:config_json
-      in
-      let* route_table = AddressMap.find_opt first_address world.route_tables
-        |> Option.to_result ~none:("Could not find route table " ^ first_address ^ " required by association " ^ address) in
-      let* subnet = AddressMap.find_opt second_address world.subnets
-        |> Option.to_result ~none:("Could not find subnet " ^ first_address ^ " required by association " ^ address) in
-      Ok (route_table, Subnet.get_address subnet)
+      let* resource = get_configuration_resource (Route_table.get_address rt) config_json
+        |> Option.to_result ~none:("Could not resolve ids for route table " ^ (Route_table.get_name rt)) in
+      let expressions = Safe.Util.member "expressions" resource in
+      let route = Safe.Util.member "route" expressions in
+      match Safe.Util.member "references" route with
+      | `List l -> Ok (resolve_routes rt (get_route_nics l world.nics))
+      | `Null -> Ok rt
+      | _ -> Error "Malformed route table in configuration"
     in
-    List.fold_left (fun world assoc_json ->
-      match resolve_route_table_association assoc_json with
-      | Ok (rt, subnet_addr) -> add_subnet_rt rt subnet_addr world
-      | Error e -> Logs.warn (fun m -> m "%s" e); world)
-    world rt_associations
+    let rts' =
+      AddressMap.fold (fun addr rt ok_map ->
+        match resolve_route_table_dynamic_ip rt with
+        | Ok rt' -> AddressMap.add addr rt' ok_map
+        | Error e -> Logs.warn (fun m -> m "%s" e); ok_map)
+        rts AddressMap.empty
+    in
+    { world with route_tables = rts' }
 
-  let resolve_nsg_associations (world : World.t) config_json nsg_assocs =
-    let (let*) = Result.bind in
-    let resolve_nsg_association assoc_json =
-      let (let*) = Result.bind in
-      let* address = Safe.Util.member "address" assoc_json
-        |> generate_parse_string_result_required "address" "" "nsg_association" in
-      let* first_address, second_address =
-        resolve_association
-          ~address:address
-          ~first_id_type:"network_security_group_id"
-          ~second_id_type:"subnet_id"
-          ~json:config_json
-      in
-      let* nsg = AddressMap.find_opt first_address world.nsgs
-        |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
-      let* subnet = AddressMap.find_opt second_address world.subnets
-        |> Option.to_result ~none:("Could not find subnet " ^ second_address ^ " required by association " ^ address) in
-      Ok (nsg, Subnet.get_address subnet)
-    in
-    List.fold_left (fun world assoc_json ->
-      match resolve_nsg_association assoc_json with
-      | Ok (nsg, subnet_addr) -> add_subnet_nsg nsg subnet_addr world
-      | Error e -> Logs.warn (fun m -> m "%s" e); world)
-    world nsg_assocs
 
-  let resolve_nic_nsg_associations (world : World.t) config_json nic_nsg_assocs =
-    let (let*) = Result.bind in
-    let resolve_nic_nsg_association assoc_json =
-      let (let*) = Result.bind in
-      let* address = Safe.Util.member "address" assoc_json
-        |> generate_parse_string_result_required "address" "" "nic_nsg_association" in
-      let* first_address, second_address =
-        resolve_association
-          ~address:address
-          ~first_id_type:"network_security_group_id"
-          ~second_id_type:"network_interface_id"
-          ~json:config_json
-      in
-      let* nsg = AddressMap.find_opt first_address world.nsgs
-        |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
-      let* nic = AddressMap.find_opt second_address world.nics
-        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
-      Ok (nsg, Nic.get_address nic)
-    in
-    List.fold_left (fun world assoc_json ->
-      match resolve_nic_nsg_association assoc_json with
-      | Ok (nsg, nic_addr) -> add_nic_nsg nsg nic_addr world
-      | Error e -> Logs.warn (fun m -> m "%s" e); world)
-    world nic_nsg_assocs
+  (* ===== VNET PEERINGS ===== *)
 
   let parse_bool_opt json =
     match json with
@@ -1115,37 +1026,6 @@ module AzureTFParser = struct
       ~remote_subnet_names:remote_subnet_names
       ~peer_complete_virtual_networks_enabled:peer_complete_virtual_networks_enabled)
 
-  let asg_of_json world json =
-    let values = Safe.Util.member "values" json in
-    let (let*) = Result.bind in
-    let* name = Safe.Util.member "name" values
-      |> generate_parse_string_result_required "name" "" "asg"
-    in
-    let* address = Safe.Util.member "address" json
-      |> generate_parse_string_result_required "address" name "asg"
-    in
-    let* rg_name = Safe.Util.member "resource_group_name" values
-      |> generate_parse_string_result_required "resource_group_name" name "asg"
-    in
-    let* rg = World.get_resource_group world "DEFAULT" rg_name
-      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by asg " ^ name)
-    in
-    let* location = match Safe.Util.member "location" values with
-    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "asg"
-    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type asg")
-    in
-    let tags = Safe.Util.member "tags" values
-      |> parse_tags_lenient
-      |> fst
-    in
-    Ok (Asg.make
-      ~name:name
-      ~subscription:"DEFAULT"
-      ~address:address
-      ~location:location
-      ~resource_group:rg
-      ~tags:tags)
-
   let add_vnet_peering (world : World.t) (peering : Vnet_peering.t) =
     let vnet_peerings' = AddressMap.add (Vnet_peering.get_address peering) peering world.vnet_peerings in
     { world with vnet_peerings = vnet_peerings' }
@@ -1157,46 +1037,6 @@ module AzureTFParser = struct
       | Error e -> Logs.warn (fun m -> m "%s" e); world
     in
     List.fold_left parse_vnet_peering world peerings
-
-  let add_asg (world : World.t) (asg : Asg.t) =
-    let asgs' = AddressMap.add (Asg.get_address asg) asg world.asgs in
-    { world with asgs = asgs' }
-
-  let parse_asgs world asgs =
-    let parse_asg world asg_json =
-      match asg_of_json world asg_json with
-      | Ok asg -> add_asg world asg
-      | Error e -> Logs.warn (fun m -> m "%s" e); world
-    in
-    List.fold_left parse_asg world asgs
-
-  let add_nic_asg asg nic_addr (world : World.t) =
-    let assocs' = { world.assocs with nic_asg = AddressMap.add nic_addr asg world.assocs.nic_asg } in
-    { world with assocs = assocs' }
-
-  let resolve_nic_asg_associations (world : World.t) config_json nic_asg_assocs =
-    let resolve_nic_asg_association assoc_json =
-      let (let*) = Result.bind in
-      let* address = Safe.Util.member "address" assoc_json
-        |> generate_parse_string_result_required "address" "" "nic_asg_association" in
-      let* first_address, second_address =
-        resolve_association
-          ~address:address
-          ~first_id_type:"application_security_group_id"
-          ~second_id_type:"network_interface_id"
-          ~json:config_json
-      in
-      let* asg = AddressMap.find_opt first_address world.asgs
-        |> Option.to_result ~none:("Could not find ASG " ^ first_address ^ " required by association " ^ address) in
-      let* nic = AddressMap.find_opt second_address world.nics
-        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
-      Ok (asg, Nic.get_address nic)
-    in
-    List.fold_left (fun world assoc_json ->
-      match resolve_nic_asg_association assoc_json with
-      | Ok (asg, nic_addr) -> add_nic_asg asg nic_addr world
-      | Error e -> Logs.warn (fun m -> m "%s" e); world)
-    world nic_asg_assocs
 
   let resolve_vnet_peering_remote_ref peering config_json (world : World.t) =
     let (let*) = Result.bind in
@@ -1229,54 +1069,208 @@ module AzureTFParser = struct
     in
     { world with vnet_peerings = peerings' }
 
-  let get_route_nics (json : Safe.t list) nics =
-    List.fold_left (
-      fun set json -> match json with
-      | `String s when AddressMap.mem s nics ->  AddressSet.add s set
-      | _ -> set
-    ) AddressSet.empty json 
-    |> AddressSet.elements
 
-  let resolve_routes rt niclist = 
-    let resolve_route route =
-      if not @@ Route_table.Route.next_hop_is_unresolved route
-      then route
-      else match niclist with
-      | [] -> Route_table.Route.resolve_next_hop route
-      | [address] -> Route_table.Route.resolve_next_hop ~address route
-      | list -> Route_table.Route.resolve_next_hop ~list route
+  (* ===== ASGs ===== *)
+
+  let asg_of_json world json =
+    let values = Safe.Util.member "values" json in
+    let (let*) = Result.bind in
+    let* name = Safe.Util.member "name" values
+      |> generate_parse_string_result_required "name" "" "asg"
     in
-    let routes = List.map resolve_route (Route_table.get_routes rt) in
-    Route_table.resolve_routes routes rt
+    let* address = Safe.Util.member "address" json
+      |> generate_parse_string_result_required "address" name "asg"
+    in
+    let* rg_name = Safe.Util.member "resource_group_name" values
+      |> generate_parse_string_result_required "resource_group_name" name "asg"
+    in
+    let* rg = World.get_resource_group world "DEFAULT" rg_name
+      |> Option.to_result ~none:("Could not find resource_group " ^ rg_name ^ " required by asg " ^ name)
+    in
+    let* location = match Safe.Util.member "location" values with
+    | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "asg"
+    | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type asg")
+    in
+    let tags = Safe.Util.member "tags" values
+      |> parse_tags_lenient
+      |> fst
+    in
+    Ok (Asg.make
+      ~name:name
+      ~subscription:"DEFAULT"
+      ~address:address
+      ~location:location
+      ~resource_group:rg
+      ~tags:tags)
 
-  let resolve_route_table_dynamic_ips (world : World.t) config_json =
-    let rts = world.route_tables in
-    let resolve_route_table_dynamic_ip rt =
+  let add_asg (world : World.t) (asg : Asg.t) =
+    let asgs' = AddressMap.add (Asg.get_address asg) asg world.asgs in
+    { world with asgs = asgs' }
+
+  let parse_asgs world asgs =
+    let parse_asg world asg_json =
+      match asg_of_json world asg_json with
+      | Ok asg -> add_asg world asg
+      | Error e -> Logs.warn (fun m -> m "%s" e); world
+    in
+    List.fold_left parse_asg world asgs
+
+
+  (* ===== ASSOCIATIONS ===== *)
+
+  let resolve_association  ~first_id_type:first_id_type ~address:address ~second_id_type:second_id_type ~json:config_json =
+    let (let*) = Result.bind in
+    let* resource = get_configuration_resource address config_json
+      |> Option.to_result ~none:("Could not resolve ids for route table association " ^ address) in
+    let expressions = Safe.Util.member "expressions" resource in
+    let* first_resolved = begin
+      let first_references = Safe.Util.member first_id_type expressions |>
+        Safe.Util.member "references" |>
+        Safe.Util.to_list |>
+        Safe.Util.filter_string in
+      match first_references with
+      | [id; address] -> Some address
+      | _ -> None
+    end
+      |> Option.to_result ~none:("Could not resolve " ^ first_id_type ^ " of association " ^ address)
+    in
+    let* second_resolved = begin
+      let second_references = Safe.Util.member second_id_type expressions |>
+        Safe.Util.member "references" |>
+        Safe.Util.to_list |>
+        Safe.Util.filter_string in
+      match second_references with
+      | [id; address] -> Some address
+      | _ -> None
+    end
+      |> Option.to_result ~none:("Could not resolve " ^ second_id_type ^ " of association " ^ address)
+    in
+    Ok (first_resolved, second_resolved)
+
+  let add_subnet_rt rt subnet_addr (world : World.t) =
+    let assocs' = { world.assocs with subnet_rt = AddressMap.add subnet_addr rt world.assocs.subnet_rt } in
+    { world with assocs = assocs' }
+
+  let resolve_route_table_associations (world : World.t) config_json rt_associations =
+    let (let*) = Result.bind in
+    let resolve_route_table_association rt_association_json =
+      let values = Safe.Util.member "values" rt_association_json in
       let (let*) = Result.bind in
-      let* resource = get_configuration_resource (Route_table.get_address rt) config_json
-        |> Option.to_result ~none:("Could not resolve ids for route table " ^ (Route_table.get_name rt)) in
-      let expressions = Safe.Util.member "expressions" resource in
-      let route = Safe.Util.member "route" expressions in
-      match Safe.Util.member "references" route with
-      | `List l -> Ok (resolve_routes rt (get_route_nics l world.nics))
-      | `Null -> Ok rt
-      | _ -> Error "Malformed route table in configuration"
+      let* address = Safe.Util.member "address" rt_association_json
+        |> generate_parse_string_result_required "address" "" "route_table_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"route_table_id"
+          ~second_id_type:"subnet_id"
+          ~json:config_json
+      in
+      let* route_table = AddressMap.find_opt first_address world.route_tables
+        |> Option.to_result ~none:("Could not find route table " ^ first_address ^ " required by association " ^ address) in
+      let* subnet = AddressMap.find_opt second_address world.subnets
+        |> Option.to_result ~none:("Could not find subnet " ^ first_address ^ " required by association " ^ address) in
+      Ok (route_table, Subnet.get_address subnet)
     in
-    let rts' =
-      AddressMap.fold (fun addr rt ok_map ->
-        match resolve_route_table_dynamic_ip rt with
-        | Ok rt' -> AddressMap.add addr rt' ok_map
-        | Error e -> Logs.warn (fun m -> m "%s" e); ok_map)
-        rts AddressMap.empty
+    List.fold_left (fun world assoc_json ->
+      match resolve_route_table_association assoc_json with
+      | Ok (rt, subnet_addr) -> add_subnet_rt rt subnet_addr world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world rt_associations
+
+  let add_subnet_nsg nsg subnet_addr (world : World.t) =
+    let assocs' = { world.assocs with subnet_nsg = AddressMap.add subnet_addr nsg world.assocs.subnet_nsg } in
+    { world with assocs = assocs' }
+
+  let resolve_nsg_associations (world : World.t) config_json nsg_assocs =
+    let (let*) = Result.bind in
+    let resolve_nsg_association assoc_json =
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" assoc_json
+        |> generate_parse_string_result_required "address" "" "nsg_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"network_security_group_id"
+          ~second_id_type:"subnet_id"
+          ~json:config_json
+      in
+      let* nsg = AddressMap.find_opt first_address world.nsgs
+        |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
+      let* subnet = AddressMap.find_opt second_address world.subnets
+        |> Option.to_result ~none:("Could not find subnet " ^ second_address ^ " required by association " ^ address) in
+      Ok (nsg, Subnet.get_address subnet)
     in
-    { world with route_tables = rts' }
-      
+    List.fold_left (fun world assoc_json ->
+      match resolve_nsg_association assoc_json with
+      | Ok (nsg, subnet_addr) -> add_subnet_nsg nsg subnet_addr world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nsg_assocs
+
+  let add_nic_nsg nsg nic_addr (world : World.t) =
+    let assocs' = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } in
+    { world with assocs = assocs' }
+
+  let resolve_nic_nsg_associations (world : World.t) config_json nic_nsg_assocs =
+    let (let*) = Result.bind in
+    let resolve_nic_nsg_association assoc_json =
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" assoc_json
+        |> generate_parse_string_result_required "address" "" "nic_nsg_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"network_security_group_id"
+          ~second_id_type:"network_interface_id"
+          ~json:config_json
+      in
+      let* nsg = AddressMap.find_opt first_address world.nsgs
+        |> Option.to_result ~none:("Could not find NSG " ^ first_address ^ " required by association " ^ address) in
+      let* nic = AddressMap.find_opt second_address world.nics
+        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
+      Ok (nsg, Nic.get_address nic)
+    in
+    List.fold_left (fun world assoc_json ->
+      match resolve_nic_nsg_association assoc_json with
+      | Ok (nsg, nic_addr) -> add_nic_nsg nsg nic_addr world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nic_nsg_assocs
+
+  let add_nic_asg asg nic_addr (world : World.t) =
+    let assocs' = { world.assocs with nic_asg = AddressMap.add nic_addr asg world.assocs.nic_asg } in
+    { world with assocs = assocs' }
+
+  let resolve_nic_asg_associations (world : World.t) config_json nic_asg_assocs =
+    let resolve_nic_asg_association assoc_json =
+      let (let*) = Result.bind in
+      let* address = Safe.Util.member "address" assoc_json
+        |> generate_parse_string_result_required "address" "" "nic_asg_association" in
+      let* first_address, second_address =
+        resolve_association
+          ~address:address
+          ~first_id_type:"application_security_group_id"
+          ~second_id_type:"network_interface_id"
+          ~json:config_json
+      in
+      let* asg = AddressMap.find_opt first_address world.asgs
+        |> Option.to_result ~none:("Could not find ASG " ^ first_address ^ " required by association " ^ address) in
+      let* nic = AddressMap.find_opt second_address world.nics
+        |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
+      Ok (asg, Nic.get_address nic)
+    in
+    List.fold_left (fun world assoc_json ->
+      match resolve_nic_asg_association assoc_json with
+      | Ok (asg, nic_addr) -> add_nic_asg asg nic_addr world
+      | Error e -> Logs.warn (fun m -> m "%s" e); world)
+    world nic_asg_assocs
+
+
+  (* ===== INDEX BUILDERS ===== *)
 
   let build_nic_ip_map (world : World.t) =
     let add_nic_to_ip_map address nic ip_map =
       let add_ipconfig_to_ip_map map ipconfig =
         match Nic.IpConfiguration.get_private_ip ipconfig with
-        | Some ip -> IPMap.add ip nic map 
+        | Some ip -> IPMap.add ip nic map
         | None -> ip_map
       in
       List.fold_left add_ipconfig_to_ip_map ip_map (Nic.get_ipconfigs nic)
@@ -1320,7 +1314,6 @@ module AzureTFParser = struct
   let index_nic_cidrs (world : World.t) (cidrworld : Cidrworld.t) =
     { cidrworld with nics = build_nic_cidr_map world }
 
-
   let build_subnet_to_nics (world : World.t) =
     AddressMap.fold (fun _ nic acc ->
       match Nic.get_ipconfigs nic
@@ -1332,6 +1325,9 @@ module AzureTFParser = struct
         AddressMap.add addr (nic :: existing) acc
       | None -> acc
     ) world.nics AddressMap.empty
+
+
+  (* ===== ENTRY POINTS ===== *)
 
   let get_resources file =
     let json = json_resources file in

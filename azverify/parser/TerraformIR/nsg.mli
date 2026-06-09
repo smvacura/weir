@@ -8,9 +8,10 @@ module SecurityRule : sig
 
   val compare : t -> t -> int
 
-  type endpoint = 
+  type endpoint =
   | Addresses of CIDR.t list
   | ApplicationGroups of string list
+  | ServiceTags of string list
   | Any
   [@@deriving show]
 
@@ -43,6 +44,8 @@ module SecurityRule : sig
   val get_dest_ports : t -> port list 
 
   val get_access : t -> access
+
+  val get_direction : t -> direction
 
 end
 

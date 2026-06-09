@@ -148,17 +148,24 @@ module CIDR = struct
 
   let get_interval cidr = (cidr.ip, Int32.logor cidr.ip (Int32.lognot cidr.mask))
 
+  let intersect cidr (b_lo, b_hi) =
+    let a_lo, a_hi = get_interval cidr in
+    let max x y = if Int32.unsigned_compare x y >= 0 then x else y in
+    let min x y = if Int32.unsigned_compare x y <= 0 then x else y in
+    let lo = max a_lo b_lo and hi = min a_hi b_hi in
+    if Int32.unsigned_compare lo hi <= 0 then Some (lo, hi) else None
+
   let get_mask cidr = cidr.mask
 
-let to_bit_list cidr =
-  let prefix_len =
-    let rec count m acc =
-      if m = 0l then acc else count (Int32.shift_left m 1) (acc + 1)
+  let to_bit_list cidr =
+    let prefix_len =
+      let rec count m acc =
+        if m = 0l then acc else count (Int32.shift_left m 1) (acc + 1)
+      in
+      count cidr.mask 0
     in
-    count cidr.mask 0
-  in
-  List.init prefix_len (fun i ->
-    Int32.logand (Int32.shift_right_logical cidr.ip (31 - i)) 1l <> 0l)
+    List.init prefix_len (fun i ->
+      Int32.logand (Int32.shift_right_logical cidr.ip (31 - i)) 1l <> 0l)
   
   let show cidr =
     Printf.sprintf "%s/%s" (IPv4.show cidr.ip) (IPv4Mask.show cidr.mask)

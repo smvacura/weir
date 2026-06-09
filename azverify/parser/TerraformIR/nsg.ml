@@ -8,16 +8,25 @@ module SecurityRule = struct
   type endpoint = 
   | Addresses of CIDR.t list
   | ApplicationGroups of string list
+  | ServiceTags of string list
   | Any
   [@@deriving show]
 
-  let addresses_of_string_list_opt list = 
+  (* A service tag (e.g. "Internet", "VirtualNetwork") arrives in the same field
+     as CIDRs. Terraform has already validated the value, so any prefix that is
+     neither "*" nor a CIDR is a tag. A None element is a missing value: fail. *)
+  let service_tags_of_string_list_opt list =
+    if List.exists Option.is_none list
+    then None
+    else Some (ServiceTags (List.filter_map Fun.id list))
+
+  let addresses_of_string_list_opt list =
     if List.mem (Some "*") list
     then Some Any
-    else 
+    else
       match CIDR.of_list_opt_strict list with
       | Some l -> Some (Addresses l)
-      | None -> None
+      | None -> service_tags_of_string_list_opt list
 
   let endpoint_of_list_opt list kind = 
     match kind with
@@ -90,6 +99,8 @@ module SecurityRule = struct
   let get_dest_ports rule = rule.destination_ports
 
   let get_access rule = rule.access
+
+  let get_direction rule = rule.direction
 
 end
 

@@ -34,6 +34,8 @@ module CIDR : sig
 
   val get_interval : t -> int32 * int32
 
+  val intersect : t -> int32 * int32 -> (int32 * int32) option
+
   val get_mask : t -> int32
 
   val to_bit_list : t -> bool list
