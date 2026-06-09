@@ -19,13 +19,16 @@
  (name verifier)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends 
+ (depends
   (ocaml (>= 5.4))
   subprocess
   ounit2
   yojson
   mlbdd
-  ppx_deriving)
+  ppx_deriving
+  cmdliner
+  fmt
+  logs)
  (tags
   ("add topics" "to describe" your project)))
 

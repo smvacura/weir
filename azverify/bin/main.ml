@@ -1,11 +1,30 @@
-let usage = "Usage: azverify diff <before.json> <after.json>"
+open Cmdliner
+
+let run logs_level before after =
+  Logs.set_level logs_level;
+  Logs.set_reporter (Logs_fmt.reporter ());
+  (try
+    Report.Reachability.get_reachability Fmt.stdout before after;
+    Format.pp_print_newline Fmt.stdout ()
+  with Frontends.AzureTF.AzureTFParser.Parse_error msg ->
+    Logs.err (fun m -> m "%s" msg);
+    exit 1)
+
+let diff_cmd =
+  let before =
+    Arg.(required & pos 0 (some non_dir_file) None &
+         info [] ~docv:"BEFORE" ~doc:"Terraform plan JSON before the change.")
+  in
+  let after =
+    Arg.(required & pos 1 (some non_dir_file) None &
+         info [] ~docv:"AFTER" ~doc:"Terraform plan JSON after the change.")
+  in
+  let info =
+    Cmd.info "diff"
+      ~doc:"Show reachability changes between two Terraform plan snapshots."
+  in
+  Cmd.v info Term.(const run $ Logs_cli.level () $ before $ after)
 
 let () =
-  if Array.length Sys.argv < 4 || Sys.argv.(1) <> "diff" then begin
-    Printf.eprintf "%s\n" usage;
-    exit 1
-  end;
-  let before_path = Sys.argv.(2) in
-  let after_path  = Sys.argv.(3) in
-  Report.Reachability.get_reachability Fmt.stdout before_path after_path;
-  Format.pp_print_newline Fmt.stdout ()
+  let info = Cmd.info "azverify" ~version:"%%VERSION%%" ~doc:"Azure network verifier." in
+  exit (Cmd.eval (Cmd.group info [diff_cmd]))

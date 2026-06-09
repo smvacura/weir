@@ -1,0 +1,9 @@
+# .dockerignore
+.git/
+_build/
+_opam/
+*.byte
+*.native
+README.md
+Dockerfile
+docker-compose.yml

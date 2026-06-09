@@ -3,4 +3,8 @@
  (name main)
  (libraries
   report
-  fmt))
+  fmt
+  cmdliner
+  logs
+  logs.fmt
+  logs.cli))

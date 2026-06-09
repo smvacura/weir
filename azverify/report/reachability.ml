@@ -1,11 +1,24 @@
 open Frontends
 open Pathfinder
+open Parser.Network_types
 
-let pp_examples fmt (examples : Diff.packet_examples) = 
+let show_endpoint ip (port : port) =
+  match port with
+  | Any          -> Printf.sprintf "%s:*"     (CIDR.show ip)
+  | Single n     -> Printf.sprintf "%s:%d"    (CIDR.show ip) n
+  | Range (a, b) -> Printf.sprintf "%s:%d-%d" (CIDR.show ip) a b
+
+let pp_header fmt (h : Encoder.packet_header) =
+  Fmt.pf fmt "%-24s  %-24s  %s"
+    (show_endpoint h.src_ip  h.src_port)
+    (show_endpoint h.dest_ip h.dest_port)
+    (show_protocol h.protocol)
+
+let pp_examples fmt (examples : Diff.packet_examples) =
   match examples with
-  | Single (hdr, _)    -> Encoder.pp_packet_header fmt hdr
-  | Sample (hdrs, _)   -> Fmt.(list ~sep:cut Encoder.pp_packet_header) fmt hdrs
-  | Exhaustive hdrs    -> Fmt.(list ~sep:cut Encoder.pp_packet_header) fmt hdrs
+  | Single (hdr, _)    -> pp_header fmt hdr
+  | Sample (hdrs, _)   -> Fmt.(list ~sep:cut pp_header) fmt hdrs
+  | Exhaustive hdrs    -> Fmt.(list ~sep:cut pp_header) fmt hdrs
 
 let pp_prefix fmt (d : Diff.packet_diff) = 
   match d.added, d.removed with

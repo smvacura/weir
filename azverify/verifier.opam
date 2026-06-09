@@ -17,6 +17,9 @@ depends: [
   "yojson"
   "mlbdd"
   "ppx_deriving"
+  "cmdliner"
+  "fmt"
+  "logs"
   "odoc" {with-doc}
 ]
 build: [
