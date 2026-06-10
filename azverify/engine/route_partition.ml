@@ -118,9 +118,10 @@ let partition_routes routes : route_map =
     | End -> 
         if route_equals_max event.route 
         then ( 
-          add_to_partition event.route !current_start event.ip;
-          mark_route_expired event.route; 
-          reshuffle_heap ();
+          if Int32.unsigned_compare event.ip !current_start >= 0 then
+            (add_to_partition event.route !current_start event.ip;
+            mark_route_expired event.route; 
+            reshuffle_heap ());
           current_start := (Int32.add event.ip 1l)
           )
         else (
