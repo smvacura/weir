@@ -89,6 +89,9 @@ let get_address rt =
 
 let get_routes rt = rt.routes
 
+let get_all_route_prefixes rt = 
+  List.map Route.get_prefix rt.routes
+
 let resolve_routes routes rt = 
   { rt with routes }
 

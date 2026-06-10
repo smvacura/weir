@@ -42,6 +42,8 @@ val get_address : t -> string
 
 val get_routes : t -> Route.t list
 
+val get_all_route_prefixes : t -> CIDR.t list
+
 val resolve_routes : Route.t list -> t -> t
 
 val make : name:string -> subscription:string -> address:string -> location:azure_location -> resource_group:Rg.t -> ?bgp_route_propagation_enabled:bool -> routes:Route.t list -> tags:tag list -> t

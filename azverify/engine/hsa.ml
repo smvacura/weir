@@ -65,17 +65,28 @@ let get_node_from_cidr_opt vnet_cidr graph =
 let get_node_from_addr_opt addr graph =
   get_node_opt (Hashtbl.find_opt graph.addr_index addr) graph
 
+type build_context = {
+  subnet_to_rt : Route_table.t AddressMap.t;
+  subnet_to_nsg : Nsg.t AddressMap.t;
+  subnet_index : Utils.subnet_index;
+  nic_to_subnet : Subnet.t AddressMap.t;
+  nic_to_nsg : Nsg.t AddressMap.t;
+  peering_index : Utils.peering_index;
+}
+
 (* let add_internet_node hsa_graph =
   let id = !(hsa_graph.next_id) in
   let node = {ip_range = CIDR.make (IPv4.of_octets_opt 0 0 0 0) (IPv4Mask.of_int32 0l)} in
   Hashtbl.replace hsa_graph.nodes id  *)
 
-let add_subnet subnet subnet_to_nsg hsa_graph =
+let add_subnet ctx subnet hsa_graph =
   let attached = Subnet.get_address subnet in
   let vnet = Subnet.get_vnet subnet in
   let ip_range = Subnet.get_cidrs subnet |> List.hd in
-  let nsg = AddressMap.find_opt attached subnet_to_nsg
-    |> Effective_nsg.enrich_nsg
+  let rt = AddressMap.find_opt attached ctx.subnet_to_rt
+    |> Option.value ~default:Route_table.empty in
+  let nsg = Effective_nsg.enrich_nsg
+    (AddressMap.find_opt attached ctx.subnet_to_nsg) (Some vnet) rt
   in
   let id = !(hsa_graph.next_id) in
   let node = { ip_range; attached; nsg } in
@@ -84,10 +95,17 @@ let add_subnet subnet subnet_to_nsg hsa_graph =
   Hashtbl.replace hsa_graph.cidr_index (vnet, ip_range) id;
   hsa_graph.next_id := id + 1
 
-let add_nic nic nic_to_nsg hsa_graph =
+let add_nic ctx nic hsa_graph =
   let address = Nic.get_address nic in
-  let nsg = AddressMap.find_opt address nic_to_nsg
-    |> Effective_nsg.enrich_nsg
+  let subnet_opt = AddressMap.find_opt address ctx.nic_to_subnet in
+  let vnet_opt = Option.map Subnet.get_vnet subnet_opt in
+  let rt = match subnet_opt with
+    | Some subnet ->
+      AddressMap.find_opt (Subnet.get_address subnet) ctx.subnet_to_rt
+      |> Option.value ~default:Route_table.empty
+    | None -> Route_table.empty in
+  let nsg = Effective_nsg.enrich_nsg
+    (AddressMap.find_opt address ctx.nic_to_nsg) vnet_opt rt
   in
   List.iter (fun ipconfig ->
       let config_name = Nic.IpConfiguration.get_name ipconfig in
@@ -121,14 +139,6 @@ let add_edge subnet_id node_id node effective_nsg interval graph man =
   push graph.in_list node_id edge;
   push graph.out_list subnet_id edge
 
-type build_context = {
-  subnet_to_rt : Route_table.t AddressMap.t;
-  subnet_to_nsg : Nsg.t AddressMap.t;
-  subnet_index : Utils.subnet_index;
-  nic_to_subnet : Subnet.t AddressMap.t;
-  nic_to_nsg : Nsg.t AddressMap.t;
-}
-
 let add_subnet_edges man ctx subnet_id subnet graph =
   let subnet_address = Subnet.get_address subnet in
   let vnet = Subnet.get_vnet subnet in
@@ -138,7 +148,7 @@ let add_subnet_edges man ctx subnet_id subnet graph =
   let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.subnet_index
     |> Effective_route_table.get_effective_routes
     |> Route_partition.partition_routes in
-  let effective_nsg = Effective_nsg.enrich_nsg source_nsg in
+  let effective_nsg = Effective_nsg.enrich_nsg source_nsg (Some vnet) rt in
   Hashtbl.iter (
     fun route interval ->
       let add addr_result subinterval =
@@ -171,10 +181,17 @@ let add_subnet_edges man ctx subnet_id subnet graph =
 
 let add_nic_edge ctx nic_id nic graph man =
   let nic_address = Nic.get_address nic in
-  let ensg = AddressMap.find_opt nic_address ctx.nic_to_nsg 
-    |> Effective_nsg.enrich_nsg
+  let subnet_opt = AddressMap.find_opt nic_address ctx.nic_to_subnet in
+  let vnet_opt = Option.map Subnet.get_vnet subnet_opt in
+  let rt = match subnet_opt with
+    | Some subnet ->
+      AddressMap.find_opt (Subnet.get_address subnet) ctx.subnet_to_rt
+      |> Option.value ~default:Route_table.empty
+    | None -> Route_table.empty in
+  let ensg = Effective_nsg.enrich_nsg
+    (AddressMap.find_opt nic_address ctx.nic_to_nsg) vnet_opt rt
   in
-  match AddressMap.find_opt nic_address ctx.nic_to_subnet with
+  match subnet_opt with
   | Some subnet -> begin
     match Hashtbl.find_opt graph.addr_index (Subnet.get_address subnet) with
     | Some node_id -> 
@@ -267,15 +284,15 @@ let build_graph world man =
     | Some subnet -> AddressMap.add address subnet acc
     | None -> acc
   ) world.nics AddressMap.empty in
-  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; } in
+  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; peering_index = Utils.get_peering_index world } in
   let t_assoc = ms_since t0 in
   let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
   AddressMap.iter (fun _addr subnet ->
-    add_subnet subnet subnet_to_nsg hsa_graph
+    add_subnet ctx subnet hsa_graph
   ) world.subnets;
   AddressMap.iter (fun _addr nic ->
-    add_nic nic nic_to_nsg hsa_graph
+    add_nic ctx nic hsa_graph
   ) world.nics;
   let t_nodes = ms_since t1 in
   let t2 = Unix.gettimeofday () in
@@ -311,15 +328,15 @@ let build_topological_graph world man =
     | Some subnet -> AddressMap.add address subnet acc
     | None -> acc
   ) world.nics AddressMap.empty in
-  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg } in
+  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; peering_index = Utils.get_peering_index world } in
   let t_assoc = ms_since t0 in
   let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
   AddressMap.iter (fun _addr subnet ->
-    add_subnet subnet subnet_to_nsg hsa_graph
+    add_subnet ctx subnet hsa_graph
   ) world.subnets;
   AddressMap.iter (fun _addr nic ->
-    add_nic nic nic_to_nsg hsa_graph
+    add_nic ctx nic hsa_graph
   ) world.nics;
   let t_nodes = ms_since t1 in
   let t2 = Unix.gettimeofday () in
