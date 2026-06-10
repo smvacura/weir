@@ -141,6 +141,11 @@ let encode_effective_route man interval_list =
     dor man acc @@ encode_interval man ~width:32 ~offset:(get_offset DestIP) (Int32.to_int lo) (Int32.to_int hi)
   ) (dfalse man) interval_list
 
+let encode_partial_header man protocol ports =
+    dand man
+      (encode_protocol  man ~offset:(get_offset Protocol) protocol)
+      (encode_port_list man ~offset:(get_offset DestPort) ports)
+
 let bits_to_int arr lo len =
   let v = ref 0 in
   for i = lo + len - 1 downto lo do

@@ -1,5 +1,5 @@
 (library
  (name report)
- (libraries parser pathfinder frontends fmt)
+ (libraries parser pathfinder frontends fmt check)
  (flags (:standard -w -a))
  (preprocess (pps ppx_deriving.show)))

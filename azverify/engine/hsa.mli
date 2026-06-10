@@ -24,6 +24,8 @@ type analyze_timing = {
 
 val build_graph : Terraform_ir.World.t -> Bdd.manager -> hsa_graph * build_timing
 
+val build_topological_graph : Terraform_ir.World.t -> Bdd.manager -> hsa_graph * build_timing
+
 val node_count : hsa_graph -> int
 
 val has_edge_between : hsa_graph -> resource_address -> resource_address -> bool
@@ -34,7 +36,7 @@ val reachable_packet_count : Terraform_ir.World.t -> resource_address -> resourc
 
 val run_analysis_timed : Terraform_ir.World.t -> analyze_timing
 
-val analyze : Bdd.manager -> Terraform_ir.World.t -> analysis_result
+val analyze : ?srcs:resource_address list -> Bdd.manager -> Terraform_ir.World.t -> analysis_result
 
 val reachable_pairs : analysis_result -> (resource_address * resource_address) list
 

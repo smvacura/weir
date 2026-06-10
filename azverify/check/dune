@@ -1,0 +1,5 @@
+(library
+ (name check)
+ (libraries parser terraform_ir constraints pathfinder)
+ (flags (:standard -w -a))
+ (preprocess (pps ppx_deriving.show)))

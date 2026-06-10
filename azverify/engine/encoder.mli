@@ -28,4 +28,6 @@ val encode_interval : manager -> width:int -> offset:int -> int -> int -> bdd
 
 val encode_effective_route : manager -> (int32 * int32) list -> bdd
 
+val encode_partial_header : manager -> protocol -> port list -> bdd
+
 val decode_single_packet : bool option array -> packet_header

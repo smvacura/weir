@@ -1,0 +1,5 @@
+(library
+ (name constraints)
+ (libraries yaml parser)
+ (flags (:standard -w -a))
+ (preprocess (pps ppx_deriving.show)))

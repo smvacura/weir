@@ -59,11 +59,16 @@ let get_node_opt f graph =
   let* node = Hashtbl.find_opt graph.nodes id in
   Some (id, node)
 
-let get_node_from_cidr_opt cidr graph =
-  get_node_opt (Hashtbl.find_opt graph.cidr_index cidr) graph
+let get_node_from_cidr_opt vnet_cidr graph =
+  get_node_opt (Hashtbl.find_opt graph.cidr_index vnet_cidr) graph
 
 let get_node_from_addr_opt addr graph =
   get_node_opt (Hashtbl.find_opt graph.addr_index addr) graph
+
+(* let add_internet_node hsa_graph =
+  let id = !(hsa_graph.next_id) in
+  let node = {ip_range = CIDR.make (IPv4.of_octets_opt 0 0 0 0) (IPv4Mask.of_int32 0l)} in
+  Hashtbl.replace hsa_graph.nodes id  *)
 
 let add_subnet subnet subnet_to_nsg hsa_graph =
   let attached = Subnet.get_address subnet in
@@ -136,23 +141,31 @@ let add_subnet_edges man ctx subnet_id subnet graph =
   let effective_nsg = Effective_nsg.enrich_nsg source_nsg in
   Hashtbl.iter (
     fun route interval ->
-      let add addr_result =
+      let add addr_result subinterval =
         Option.iter (fun (id, node) ->
-          add_edge subnet_id id node effective_nsg interval graph man
+          add_edge subnet_id id node effective_nsg subinterval graph man
         ) addr_result
       in
       match Route_table.Route.get_next_hop route with
       | VirtualAppliance -> begin
         match Route_table.Route.get_next_hop_ip route with
         | Resolved StaticAppliance ip ->
-          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph)
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph) interval
         | Resolved DynamicNic address ->
-          add (get_node_from_addr_opt address graph)
+          add (get_node_from_addr_opt address graph) interval
         | Resolved ApplianceSet set ->
-          List.iter (fun address -> add (get_node_from_addr_opt address graph)) set
+          List.iter (fun address -> add (get_node_from_addr_opt address graph) interval) set
         | _ -> ()
       end
-      | VirtualNetwork -> add (get_node_from_cidr_opt (vnet, (Route_table.Route.get_prefix route)) graph) 
+      | VirtualNetwork -> List.iter (
+        fun subnet ->
+          List.iter(
+            fun cidr ->
+              let subintervals = List.filter_map (CIDR.intersect cidr) interval in
+              if subintervals <> [] then
+                add (get_node_from_addr_opt (Subnet.get_address subnet) graph) subintervals
+          ) (Subnet.get_cidrs subnet)
+      ) (Utils.VnetMap.find_opt vnet ctx.subnet_index |> Option.value ~default:[])
       | _ -> ()
   ) effective_routes
 
@@ -173,6 +186,55 @@ let add_nic_edge ctx nic_id nic graph man =
     end
   | None -> ()
 
+
+let add_topological_edge subnet_id node_id interval graph man =
+  let decider = Encoder.encode_effective_route man interval in
+  let edge = { decider; src = subnet_id; dest = node_id } in
+  push graph.in_list node_id edge;
+  push graph.out_list subnet_id edge
+
+let add_topological_subnet_edges man ctx subnet_id subnet graph =
+  let subnet_address = Subnet.get_address subnet in
+  let vnet = Subnet.get_vnet subnet in
+  let rt = AddressMap.find_opt subnet_address ctx.subnet_to_rt
+    |> Option.value ~default:Route_table.empty in
+  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.subnet_index
+    |> Effective_route_table.get_effective_routes
+    |> Route_partition.partition_routes in
+  Hashtbl.iter (
+    fun route interval ->
+      let add addr_result =
+        Option.iter (fun (id, _node) ->
+          add_topological_edge subnet_id id interval graph man
+        ) addr_result
+      in
+      match Route_table.Route.get_next_hop route with
+      | VirtualAppliance -> begin
+        match Route_table.Route.get_next_hop_ip route with
+        | Resolved StaticAppliance ip ->
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph)
+        | Resolved DynamicNic address ->
+          add (get_node_from_addr_opt address graph)
+        | Resolved ApplianceSet set ->
+          List.iter (fun address -> add (get_node_from_addr_opt address graph)) set
+        | _ -> ()
+      end
+      | VirtualNetwork -> add (get_node_from_cidr_opt (vnet, (Route_table.Route.get_prefix route)) graph)
+      | _ -> ()
+  ) effective_routes
+
+let add_topological_nic_edge ctx nic_id nic graph man =
+  match AddressMap.find_opt (Nic.get_address nic) ctx.nic_to_subnet with
+  | Some subnet -> begin
+    match Hashtbl.find_opt graph.addr_index (Subnet.get_address subnet) with
+    | Some node_id ->
+      let decider = dtrue man in
+      let edge = { decider; src = nic_id; dest = node_id } in
+      push graph.in_list node_id edge;
+      push graph.out_list nic_id edge
+    | None -> ()
+    end
+  | None -> ()
 
 type build_timing = {
   association_build_ms : float;
@@ -238,6 +300,49 @@ let build_graph world man =
   } in
   (hsa_graph, timing)
 
+let build_topological_graph world man =
+  let t0 = Unix.gettimeofday () in
+  let subnet_to_nsg = world.World.assocs.subnet_nsg in
+  let subnet_to_rt  = world.World.assocs.subnet_rt in
+  let nic_to_nsg    = world.World.assocs.nic_nsg in
+  let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
+    let address = Nic.get_address nic in
+    match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
+    | Some subnet -> AddressMap.add address subnet acc
+    | None -> acc
+  ) world.nics AddressMap.empty in
+  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg } in
+  let t_assoc = ms_since t0 in
+  let t1 = Unix.gettimeofday () in
+  let hsa_graph = init_hsa_graph world in
+  AddressMap.iter (fun _addr subnet ->
+    add_subnet subnet subnet_to_nsg hsa_graph
+  ) world.subnets;
+  AddressMap.iter (fun _addr nic ->
+    add_nic nic nic_to_nsg hsa_graph
+  ) world.nics;
+  let t_nodes = ms_since t1 in
+  let t2 = Unix.gettimeofday () in
+  AddressMap.iter (fun _addr subnet ->
+    let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
+    add_topological_subnet_edges man ctx subnet_id subnet hsa_graph
+  ) world.subnets;
+  AddressMap.iter (fun _addr nic ->
+    List.iter (fun ipconfig ->
+      let config_name = Nic.IpConfiguration.get_name ipconfig in
+      let subaddress = Nic.get_address nic ^ "/" ^ config_name in
+      Option.iter (fun nic_id ->
+        add_topological_nic_edge ctx nic_id nic hsa_graph man
+      ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
+    ) (Nic.get_ipconfigs nic)
+  ) world.nics;
+  let timing = {
+    association_build_ms = t_assoc;
+    node_addition_ms     = t_nodes;
+    edge_addition_ms     = ms_since t2;
+    total_build_ms       = ms_since t0;
+  } in
+  (hsa_graph, timing)
 
 let compute_fixpoint src graph table man =
   let init_worklist () =
@@ -324,10 +429,19 @@ let get_decider graph src_addr dest_addr =
   | _ -> None
 
 
-let analyze man world =
+let analyze ?srcs man world =
   let graph, _ = build_graph world man in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
-  Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
+  let run_from src_id = compute_fixpoint src_id graph table man in
+  (match srcs with
+   | None -> Hashtbl.iter (fun src_id _src -> run_from src_id) graph.nodes
+   | Some addrs ->
+     List.iter
+       (fun addr ->
+         match Hashtbl.find_opt graph.addr_index addr with
+         | Some src_id -> run_from src_id
+         | None -> ())
+       addrs);
   {table; graph; man}
 
 let reachable_pairs {table; graph; man = _} =
