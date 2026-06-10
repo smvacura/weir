@@ -24,6 +24,7 @@
   subprocess
   ounit2
   yojson
+  yaml
   mlbdd
   ppx_deriving
   cmdliner

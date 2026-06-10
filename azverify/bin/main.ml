@@ -4,7 +4,7 @@ let run logs_level before after =
   Logs.set_level logs_level;
   Logs.set_reporter (Logs_fmt.reporter ());
   (try
-    Report.Reachability.get_reachability Fmt.stdout before after;
+    Report.Diff.print Fmt.stdout before after;
     Format.pp_print_newline Fmt.stdout ()
   with Frontends.AzureTF.AzureTFParser.Parse_error msg ->
     Logs.err (fun m -> m "%s" msg);
