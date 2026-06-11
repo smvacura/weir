@@ -1,6 +1,7 @@
 open Terraform_ir
 open Parser.Azure_types
 open Parser.Network_types
+open Utils
 
 type t = { bgp_route_propagation_enabled : bool; routes : Route_table.Route.t list }
 
@@ -17,15 +18,17 @@ let construct_vnetlocal_route_from_cidr name cidr =
 let vnetlocal_route_name vnet_name subnet_name =
   "system_route_" ^ subnet_name ^ "_in_" ^ vnet_name
 
-let construct_vnetlocal_route_from_subnet vnet_name subnet =
-  let address_blocks = Subnet.get_cidrs subnet in
-  List.map (construct_vnetlocal_route_from_cidr (vnetlocal_route_name vnet_name (Subnet.get_name subnet))) address_blocks
-
-let get_decomposed_vnet_routes vnet map =
+let get_vnet_routes vnet =
   let vnet_name = Vnet.get_name vnet in
-  match Utils.VnetMap.find_opt vnet map with
-  | Some subnets -> Some (List.concat_map (construct_vnetlocal_route_from_subnet vnet_name) subnets)
-  | None -> None
+  List.map (construct_vnetlocal_route_from_cidr ("system_route_" ^ vnet_name)) (Vnet.get_addresses vnet)
+
+let get_peered_routes vnet peer_idx =
+  let vnet_name = Vnet.get_name vnet in
+  let peered_cidrs = match VnetMap.find_opt vnet peer_idx with
+  | Some entries -> List.map fst entries
+  | None -> []
+  in
+  List.map (construct_vnetlocal_route_from_cidr ("peered_route_" ^ vnet_name)) peered_cidrs
 
 let make_exact_cidr ip mask =
   CIDR.make 
@@ -70,11 +73,9 @@ let filter_routes udrs lower_routes =
   List.filter (fun x -> not (List.exists (fun y -> (Route_table.Route.get_prefix y) = (Route_table.Route.get_prefix x)) udrs)) lower_routes
 
 
-let enrich_route_table (rt : Route_table.t) (vnet : Vnet.t) (map : Utils.subnet_index) =
+let enrich_route_table (rt : Route_table.t) (vnet : Vnet.t) (peer_idx : Utils.peering_index) =
   let filtered_system_routes = filter_routes (Route_table.get_routes rt) system_routes in
-  let new_routes = match get_decomposed_vnet_routes vnet map with
-  | Some routes -> filter_routes (Route_table.get_routes rt) routes @ filtered_system_routes
-  | None -> filtered_system_routes
-  in
-  { bgp_route_propagation_enabled = true; routes = Route_table.get_routes rt @ new_routes }
+  let vnet_routes = filter_routes (Route_table.get_routes rt) (get_vnet_routes vnet) in
+  let peered_routes = filter_routes (Route_table.get_routes rt) (get_peered_routes vnet peer_idx) in
+  { bgp_route_propagation_enabled = true; routes = Route_table.get_routes rt @ vnet_routes @ peered_routes @ filtered_system_routes }
 

@@ -86,7 +86,7 @@ let add_subnet ctx subnet hsa_graph =
   let rt = AddressMap.find_opt attached ctx.subnet_to_rt
     |> Option.value ~default:Route_table.empty in
   let nsg = Effective_nsg.enrich_nsg
-    (AddressMap.find_opt attached ctx.subnet_to_nsg) (Some vnet) rt
+    (AddressMap.find_opt attached ctx.subnet_to_nsg) (Some vnet) rt ctx.peering_index
   in
   let id = !(hsa_graph.next_id) in
   let node = { ip_range; attached; nsg } in
@@ -105,7 +105,7 @@ let add_nic ctx nic hsa_graph =
       |> Option.value ~default:Route_table.empty
     | None -> Route_table.empty in
   let nsg = Effective_nsg.enrich_nsg
-    (AddressMap.find_opt address ctx.nic_to_nsg) vnet_opt rt
+    (AddressMap.find_opt address ctx.nic_to_nsg) vnet_opt rt ctx.peering_index
   in
   List.iter (fun ipconfig ->
       let config_name = Nic.IpConfiguration.get_name ipconfig in
@@ -145,10 +145,10 @@ let add_subnet_edges man ctx subnet_id subnet graph =
   let rt = AddressMap.find_opt subnet_address ctx.subnet_to_rt
     |> Option.value ~default:Route_table.empty in
   let source_nsg = AddressMap.find_opt subnet_address ctx.subnet_to_nsg in
-  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.subnet_index
+  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.peering_index
     |> Effective_route_table.get_effective_routes
     |> Route_partition.partition_routes in
-  let effective_nsg = Effective_nsg.enrich_nsg source_nsg (Some vnet) rt in
+  let effective_nsg = Effective_nsg.enrich_nsg source_nsg (Some vnet) rt ctx.peering_index in
   Hashtbl.iter (
     fun route interval ->
       let add addr_result subinterval =
@@ -167,15 +167,15 @@ let add_subnet_edges man ctx subnet_id subnet graph =
           List.iter (fun address -> add (get_node_from_addr_opt address graph) interval) set
         | _ -> ()
       end
-      | VirtualNetwork -> List.iter (
-        fun subnet ->
-          List.iter(
-            fun cidr ->
-              let subintervals = List.filter_map (CIDR.intersect cidr) interval in
-              if subintervals <> [] then
-                add (get_node_from_addr_opt (Subnet.get_address subnet) graph) subintervals
+      | VirtualNetwork ->
+        let all_subnets = Utils.VnetMap.fold (fun _ subnets acc -> subnets @ acc) ctx.subnet_index [] in
+        List.iter (fun subnet ->
+          List.iter (fun cidr ->
+            let subintervals = List.filter_map (CIDR.intersect cidr) interval in
+            if subintervals <> [] then
+              add (get_node_from_addr_opt (Subnet.get_address subnet) graph) subintervals
           ) (Subnet.get_cidrs subnet)
-      ) (Utils.VnetMap.find_opt vnet ctx.subnet_index |> Option.value ~default:[])
+        ) all_subnets
       | _ -> ()
   ) effective_routes
 
@@ -189,7 +189,7 @@ let add_nic_edge ctx nic_id nic graph man =
       |> Option.value ~default:Route_table.empty
     | None -> Route_table.empty in
   let ensg = Effective_nsg.enrich_nsg
-    (AddressMap.find_opt nic_address ctx.nic_to_nsg) vnet_opt rt
+    (AddressMap.find_opt nic_address ctx.nic_to_nsg) vnet_opt rt ctx.peering_index
   in
   match subnet_opt with
   | Some subnet -> begin
@@ -215,7 +215,7 @@ let add_topological_subnet_edges man ctx subnet_id subnet graph =
   let vnet = Subnet.get_vnet subnet in
   let rt = AddressMap.find_opt subnet_address ctx.subnet_to_rt
     |> Option.value ~default:Route_table.empty in
-  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.subnet_index
+  let effective_routes = Effective_route_table.enrich_route_table rt vnet ctx.peering_index
     |> Effective_route_table.get_effective_routes
     |> Route_partition.partition_routes in
   Hashtbl.iter (

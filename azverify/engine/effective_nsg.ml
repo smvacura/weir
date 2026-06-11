@@ -1,5 +1,6 @@
 open Terraform_ir.Nsg
 open Parser.Network_types
+open Utils
 
 type t = { rules : SecurityRule.t list}
 
@@ -11,7 +12,12 @@ let make_exact_cidr ip mask =
   (Option.get (IPv4Mask.of_string_opt mask))
 
 
-let vnetlocal_default_rules vnet rt = [
+let vnetlocal_default_rules vnet rt peering_idx = 
+  let peered_cidrs = match VnetMap.find_opt vnet peering_idx with
+  | Some entries -> List.filter_map (fun (cidr, allowed) -> if allowed then Some cidr else None) entries
+  | None -> []
+  in
+  [
     SecurityRule.make
     ~name:"AllowVNetInBound"
     ~description:(Some "Allow all 'Vnet' traffic")
@@ -19,7 +25,7 @@ let vnetlocal_default_rules vnet rt = [
     ~source_ports:[Any]
     ~destination_ports:[Any]
     ~source:(SecurityRule.Addresses 
-      ((Terraform_ir.Vnet.get_addresses vnet) @ (Terraform_ir.Route_table.get_all_route_prefixes rt))
+      ((Terraform_ir.Vnet.get_addresses vnet) @ (Terraform_ir.Route_table.get_all_route_prefixes rt) @ peered_cidrs)
     )
     ~destination:SecurityRule.Any
     ~access:SecurityRule.Allow
@@ -32,7 +38,7 @@ let vnetlocal_default_rules vnet rt = [
     ~source_ports:[Any]
     ~destination_ports:[Any]
     ~source:(SecurityRule.Addresses 
-      ((Terraform_ir.Vnet.get_addresses vnet) @ (Terraform_ir.Route_table.get_all_route_prefixes rt))
+      ((Terraform_ir.Vnet.get_addresses vnet) @ (Terraform_ir.Route_table.get_all_route_prefixes rt) @ peered_cidrs)
     )
     ~destination:SecurityRule.Any
     ~access:SecurityRule.Allow
@@ -68,9 +74,9 @@ let deny_default_rules = [
     ~direction:SecurityRule.Inbound
 ]
 
-let enrich_nsg nsg_opt vnet_opt rt =
+let enrich_nsg nsg_opt vnet_opt rt peering_idx =
   let vnetlocal = match vnet_opt with
-    | Some vnet -> vnetlocal_default_rules vnet rt
+    | Some vnet -> vnetlocal_default_rules vnet rt peering_idx
     | None -> []
   in
   let default_rules = vnetlocal @ internet_default_rules @ deny_default_rules in

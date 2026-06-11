@@ -111,8 +111,8 @@ let partition_routes routes : route_map =
         then (
           if Int32.unsigned_compare event.ip !current_start > 0 then
             close_interval !current_start (Int32.sub event.ip 1l);
-          current_start := event.ip; 
-          RouteHeap.add route_heap event.route;
+            current_start := event.ip; 
+            RouteHeap.add route_heap event.route;
           )
         else RouteHeap.add route_heap event.route; 
     | End -> 

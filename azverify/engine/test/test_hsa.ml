@@ -19,14 +19,14 @@ let test_rg =
 
 let cidr s = Option.get (CIDR.of_string_opt s)
 
-let make_vnet name =
+let make_vnet ?(addresses = []) name =
   Vnet.make
     ~name
     ~subscription:"DEFAULT"
     ~address:("azurerm_virtual_network." ^ name)
     ~location:EastUs
     ~resource_group:test_rg
-    ~addresses:[]
+    ~addresses
 
 let make_subnet vnet name cidr_str =
   Subnet.make
@@ -99,6 +99,25 @@ let attach_nsg_to_nic nsg nic (world : World.t) =
   let nic_addr = Nic.get_address nic in
   { world with assocs = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } }
 
+let make_peering name local_vnet remote_vnet allow_access =
+  Vnet_peering.make
+    ~name
+    ~subscription:"DEFAULT"
+    ~address:("azurerm_virtual_network_peering." ^ name)
+    ~resource_group:test_rg
+    ~local_vnet:(Resolved local_vnet)
+    ~remote_vnet:(Resolved remote_vnet)
+    ~allow_virtual_network_access:allow_access
+    ~allow_forwarded_traffic:None
+    ~allow_gateway_transit:None
+    ~use_remote_gateways:None
+    ~local_subnet_names:None
+    ~remote_subnet_names:None
+    ~peer_complete_virtual_networks_enabled:None
+
+let add_peering_to_world peering (world : World.t) =
+  { world with vnet_peerings = AddressMap.add (Vnet_peering.get_address peering) peering world.vnet_peerings }
+
 let nic_node_addr nic = Nic.get_address nic ^ "/ipconfig1"
 
 (* --- BDD helpers --- *)
@@ -110,14 +129,20 @@ let man () = Pathfinder.Bdd.init () ~vars:32
 let ip_as_int32 ip_str =
   fst (CIDR.get_interval (Option.get (CIDR.of_string_opt (ip_str ^ "/32"))))
 
-let permits_dest_ip mgr bdd ip_str =
+let make_ip_cube mgr offset ip_str =
   let ip_int = Int32.to_int (ip_as_int32 ip_str) in
-  let cube =
-    List.init 32 (fun i ->
-      if (ip_int lsr i) land 1 = 1 then ithvar mgr i
-      else dnot mgr (ithvar mgr i))
-    |> List.fold_left (dand mgr) (dtrue mgr)
-  in
+  List.init 32 (fun i ->
+    if (ip_int lsr i) land 1 = 1 then ithvar mgr (offset + i)
+    else dnot mgr (ithvar mgr (offset + i)))
+  |> List.fold_left (dand mgr) (dtrue mgr)
+
+let permits_dest_ip mgr bdd ip_str =
+  let cube = make_ip_cube mgr 0 ip_str in
+  sat_count mgr (dand mgr bdd cube) > 0.5
+
+(* Fix both dest IP (bits 0-31) and src IP (bits 32-63) and check satisfiability. *)
+let permits_src_dest_ip mgr bdd src_str dst_str =
+  let cube = dand mgr (make_ip_cube mgr 0 dst_str) (make_ip_cube mgr 32 src_str) in
   sat_count mgr (dand mgr bdd cube) > 0.5
 
 (* --- Tests --- *)
@@ -190,7 +215,7 @@ let nic_connectivity_tests = "nic_connectivity" >::: [
 let subnet_connectivity_tests = "subnet_connectivity" >::: [
 
   "subnets_in_same_vnet_are_connected" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
     let sa = make_subnet vnet "subnet-a" "10.0.1.0/24" in
     let sb = make_subnet vnet "subnet-b" "10.0.2.0/24" in
     let world =
@@ -231,7 +256,7 @@ let bdd_tests = "bdd_semantics" >::: [
   (* With allow-all NSGs, the decider on the A→B edge is determined by
      the winning route intervals: it permits IPs in subnet B's CIDR only. *)
   "vnetlocal_edge_permits_dest_in_target_cidr" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
     let sa = make_subnet vnet "subnet-a" "10.0.1.0/24" in
     let sb = make_subnet vnet "subnet-b" "10.0.2.0/24" in
     let nsg_a = allow_all_nsg "nsg-a" in
@@ -253,7 +278,7 @@ let bdd_tests = "bdd_semantics" >::: [
         (permits_dest_ip mgr bdd "10.0.2.1"));
 
   "vnetlocal_edge_denies_dest_outside_target_cidr" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
     let sa = make_subnet vnet "subnet-a" "10.0.1.0/24" in
     let sb = make_subnet vnet "subnet-b" "10.0.2.0/24" in
     let nsg_a = allow_all_nsg "nsg-a" in
@@ -311,11 +336,76 @@ let bdd_tests = "bdd_semantics" >::: [
 
 ]
 
+(* VNet peering: routes are always injected regardless of allow_virtual_network_access.
+   The flag controls only whether the peered CIDR is added to AllowVNetInBound on the
+   destination subnet's NSG.  Tests use permits_src_dest_ip so we check the specific
+   (src, dst) pair rather than "any source reaches this dest". *)
+let peering_tests = "vnet_peering" >::: [
+
+  (* With allow_virtual_network_access = true, the peered CIDR is added to
+     AllowVNetInBound on the destination NSG, permitting traffic from the remote subnet. *)
+  "peered_traffic_permitted_when_access_allowed" >:: (fun _ ->
+    let vnet_a = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet-a" in
+    let vnet_b = make_vnet ~addresses:[cidr "10.1.0.0/16"] "vnet-b" in
+    let sa = make_subnet vnet_a "subnet-a" "10.0.1.0/24" in
+    let sb = make_subnet vnet_b "subnet-b" "10.1.1.0/24" in
+    let peer_a_to_b = make_peering "peer-a-to-b" vnet_a vnet_b (Some true) in
+    let peer_b_to_a = make_peering "peer-b-to-a" vnet_b vnet_a (Some true) in
+    let nsg_b = make_nsg "nsg-b" [] in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet_a
+      |> add_vnet_to_world vnet_b
+      |> add_subnet_to_world sa
+      |> add_subnet_to_world sb
+      |> add_peering_to_world peer_a_to_b
+      |> add_peering_to_world peer_b_to_a
+      |> attach_nsg_to_subnet nsg_b sb
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
+    | None -> assert_failure "expected edge from subnet-a to subnet-b"
+    | Some bdd ->
+      assert_bool "traffic from peered subnet should be permitted by AllowVNetInBound"
+        (permits_src_dest_ip mgr bdd "10.0.1.4" "10.1.1.4"));
+
+  (* With allow_virtual_network_access = false, the peered CIDR is excluded from
+     AllowVNetInBound; DenyAllInbound catches traffic from the remote subnet. *)
+  "peered_traffic_blocked_when_access_denied" >:: (fun _ ->
+    let vnet_a = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet-a" in
+    let vnet_b = make_vnet ~addresses:[cidr "10.1.0.0/16"] "vnet-b" in
+    let sa = make_subnet vnet_a "subnet-a" "10.0.1.0/24" in
+    let sb = make_subnet vnet_b "subnet-b" "10.1.1.0/24" in
+    let peer_a_to_b = make_peering "peer-a-to-b" vnet_a vnet_b (Some false) in
+    let peer_b_to_a = make_peering "peer-b-to-a" vnet_b vnet_a (Some false) in
+    let nsg_b = make_nsg "nsg-b" [] in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet_a
+      |> add_vnet_to_world vnet_b
+      |> add_subnet_to_world sa
+      |> add_subnet_to_world sb
+      |> add_peering_to_world peer_a_to_b
+      |> add_peering_to_world peer_b_to_a
+      |> attach_nsg_to_subnet nsg_b sb
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
+    | None -> assert_failure "expected edge from subnet-a to subnet-b (route still exists)"
+    | Some bdd ->
+      assert_bool "traffic from peered subnet should be blocked when access is denied"
+        (not (permits_src_dest_ip mgr bdd "10.0.1.4" "10.1.1.4")));
+
+]
+
 let suite = "hsa_suite" >::: [
   node_count_tests;
   nic_connectivity_tests;
   subnet_connectivity_tests;
   bdd_tests;
+  peering_tests;
 ]
 
 let () = run_test_tt_main suite

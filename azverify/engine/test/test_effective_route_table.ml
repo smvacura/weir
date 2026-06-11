@@ -18,23 +18,14 @@ let test_rg =
 
 let cidr s = Option.get (CIDR.of_string_opt s)
 
-let make_vnet name =
+let make_vnet ?(addresses = []) name =
   Vnet.make
     ~name
     ~subscription:"DEFAULT"
     ~address:("azurerm_virtual_network." ^ name)
     ~location:EastUs
     ~resource_group:test_rg
-    ~addresses:[]
-
-let make_subnet vnet name cidr_strs =
-  Subnet.make
-    ~name
-    ~subscription:"DEFAULT"
-    ~address:("azurerm_subnet." ^ name)
-    ~resource_group:test_rg
-    ~vnet
-    ~addresses:(List.map cidr cidr_strs)
+    ~addresses
 
 let make_udr name cidr_str =
   Route_table.Route.make
@@ -55,11 +46,8 @@ let make_rt routes =
     ~routes
     ~tags:[]
 
-let subnet_index vnet subnets =
-  Pathfinder.Utils.VnetMap.(add vnet subnets empty)
-
-let enrich ?(udrs = []) vnet subnets =
-  ERT.get_effective_routes (ERT.enrich_route_table (make_rt udrs) vnet (subnet_index vnet subnets))
+let enrich ?(udrs = []) vnet =
+  ERT.get_effective_routes (ERT.enrich_route_table (make_rt udrs) vnet Pathfinder.Utils.VnetMap.empty)
 
 (* --- Helpers --- *)
 
@@ -89,34 +77,31 @@ let count_routes_for routes prefix_str =
 
 (* --- Tests --- *)
 
-(* VNet-local system routes: one VirtualNetwork route per subnet CIDR. *)
+(* VNet-local system routes: one VirtualNetwork route per VNet address space CIDR. *)
 let vnet_local_tests = "vnet_local_routes" >::: [
 
-  "single_subnet_single_cidr" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
-    let routes = enrich vnet [subnet] in
+  "single_address_space_produces_one_route" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let routes = enrich vnet in
+    assert_route_hop routes "10.0.0.0/16" "VirtualNetwork");
+
+  "subnets_do_not_produce_separate_routes" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let routes = enrich vnet in
+    assert_route_hop routes "10.0.0.0/16" "VirtualNetwork";
+    assert_equal 1
+      (List.length (List.filter (fun r -> show_contains r "VirtualNetwork") routes))
+      ~msg:"subnets share the VNet-level route, not individual routes");
+
+  (* A VNet with two address spaces produces one VirtualNetwork route per space. *)
+  "vnet_with_two_address_spaces_produces_two_routes" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/24"; cidr "10.0.1.0/24"] "vnet" in
+    let routes = enrich vnet in
+    assert_route_hop routes "10.0.0.0/24" "VirtualNetwork";
     assert_route_hop routes "10.0.1.0/24" "VirtualNetwork");
 
-  "two_subnets_produce_separate_routes" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
-    let sa = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
-    let sb = make_subnet vnet "subnet-b" ["10.0.2.0/24"] in
-    let routes = enrich vnet [sa; sb] in
-    assert_route_hop routes "10.0.1.0/24" "VirtualNetwork";
-    assert_route_hop routes "10.0.2.0/24" "VirtualNetwork");
-
-  (* A dual-stack or dual-prefix subnet produces one VirtualNetwork route per CIDR. *)
-  "subnet_with_two_cidrs" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"; "10.0.2.0/24"] in
-    let routes = enrich vnet [subnet] in
-    assert_route_hop routes "10.0.1.0/24" "VirtualNetwork";
-    assert_route_hop routes "10.0.2.0/24" "VirtualNetwork");
-
-  (* When the VNet is absent from the subnet index there are no VirtualNetwork routes,
-     only the five default system routes. *)
-  "vnet_absent_from_index_has_no_vnetlocal_routes" >:: (fun _ ->
+  (* A VNet with no address spaces produces no VirtualNetwork routes. *)
+  "vnet_with_no_addresses_has_no_vnetlocal_routes" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
     let routes =
       ERT.get_effective_routes
@@ -125,7 +110,7 @@ let vnet_local_tests = "vnet_local_routes" >::: [
     assert_route_hop routes "0.0.0.0/0" "Internet";
     assert_equal 0
       (List.length (List.filter (fun r -> show_contains r "VirtualNetwork") routes))
-      ~msg:"no VirtualNetwork routes expected when vnet is absent from subnet index");
+      ~msg:"no VirtualNetwork routes expected when vnet has no address spaces");
 
 ]
 
@@ -134,16 +119,14 @@ let default_system_route_tests = "default_system_routes" >::: [
 
   "default_internet_route" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
-    let routes = enrich vnet [subnet] in
+    let routes = enrich vnet in
     assert_route_hop routes "0.0.0.0/0" "Internet");
 
   (* Azure drops traffic to RFC 1918 / RFC 6598 ranges not covered by the VNet
      by adding four None (Drop) system routes. *)
   "rfc1918_and_shared_space_drop_routes" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
-    let routes = enrich vnet [subnet] in
+    let routes = enrich vnet in
     assert_route_hop routes "10.0.0.0/8"     "Drop";
     assert_route_hop routes "172.16.0.0/12"  "Drop";
     assert_route_hop routes "192.168.0.0/16" "Drop";
@@ -157,9 +140,8 @@ let override_tests = "user_route_overrides" >::: [
 
   "udr_overrides_internet_default" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr = make_udr "force-drop-default" "0.0.0.0/0" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    let routes = enrich ~udrs:[udr] vnet in
     (* UDR must be present and the Internet system route must be absent *)
     assert_route_hop routes "0.0.0.0/0" "Drop";
     assert_equal 1 (count_routes_for routes "0.0.0.0/0")
@@ -167,9 +149,8 @@ let override_tests = "user_route_overrides" >::: [
 
   "udr_overrides_rfc1918_drop_route" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr = make_udr "custom-10" "10.0.0.0/8" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    let routes = enrich ~udrs:[udr] vnet in
     assert_route_hop routes "10.0.0.0/8" "Drop";
     assert_equal 1 (count_routes_for routes "10.0.0.0/8")
       ~msg:"only one 10.0.0.0/8 route should exist when UDR overrides the system None route");
@@ -178,45 +159,40 @@ let override_tests = "user_route_overrides" >::: [
      covering prefix — both coexist and LPM picks the winner at forwarding time. *)
   "more_specific_udr_does_not_suppress_system_route" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr = make_udr "custom-specific" "10.1.0.0/24" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    let routes = enrich ~udrs:[udr] vnet in
     assert_route_hop routes "10.0.0.0/8" "Drop";
     assert_route_hop routes "10.1.0.0/24" "Drop");
 
   "udr_at_unrelated_prefix_preserved" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr = make_udr "custom-docs" "203.0.113.0/24" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    let routes = enrich ~udrs:[udr] vnet in
     assert_route_hop routes "203.0.113.0/24" "Drop");
 
   "udr_overrides_carrier_grade_nat_drop_route" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr = make_udr "custom-cgn" "100.64.0.0/10" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
+    let routes = enrich ~udrs:[udr] vnet in
     assert_route_hop routes "100.64.0.0/10" "Drop";
     assert_equal 1 (count_routes_for routes "100.64.0.0/10")
       ~msg:"only one 100.64.0.0/10 route should exist when UDR overrides the CGN system route");
 
-  (* A UDR whose prefix matches a subnet CIDR should shadow the VirtualNetwork system route;
+  (* A UDR whose prefix matches the VNet address space should shadow the VirtualNetwork system route;
      only one route for that prefix should appear in the table. *)
   "udr_overrides_vnet_local_route" >:: (fun _ ->
-    let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
-    let udr = make_udr "custom-vnet-local" "10.0.1.0/24" in
-    let routes = enrich ~udrs:[udr] vnet [subnet] in
-    assert_route_hop routes "10.0.1.0/24" "Drop";
-    assert_equal 1 (count_routes_for routes "10.0.1.0/24")
-      ~msg:"only one route for subnet CIDR when UDR overrides the VNet-local system route");
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let udr = make_udr "custom-vnet-local" "10.0.0.0/16" in
+    let routes = enrich ~udrs:[udr] vnet in
+    assert_route_hop routes "10.0.0.0/16" "Drop";
+    assert_equal 1 (count_routes_for routes "10.0.0.0/16")
+      ~msg:"only one route for VNet CIDR when UDR overrides the VNet-local system route");
 
   "multiple_udrs_all_preserved" >:: (fun _ ->
     let vnet = make_vnet "vnet" in
-    let subnet = make_subnet vnet "subnet-a" ["10.0.1.0/24"] in
     let udr1 = make_udr "custom-a" "203.0.113.0/24" in
     let udr2 = make_udr "custom-b" "198.51.100.0/24" in
-    let routes = enrich ~udrs:[udr1; udr2] vnet [subnet] in
+    let routes = enrich ~udrs:[udr1; udr2] vnet in
     assert_route_hop routes "203.0.113.0/24" "Drop";
     assert_route_hop routes "198.51.100.0/24" "Drop");
 

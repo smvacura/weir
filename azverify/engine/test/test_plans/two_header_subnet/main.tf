@@ -52,6 +52,18 @@ resource "azurerm_network_security_group" "dest_nsg" {
     source_address_prefix      = "10.1.1.24"
     destination_address_prefix = "10.1.2.24"
   }
+
+  security_rule {
+    name                       = "deny-all-else"
+    priority                   = 200
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
 resource "azurerm_subnet_network_security_group_association" "dest_nsg_assoc" {

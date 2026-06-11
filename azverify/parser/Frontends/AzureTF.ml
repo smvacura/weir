@@ -581,10 +581,9 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
     in
-    let* security_rules = Safe.Util.member "security_rule" values |>
-      Safe.Util.to_list |>
-      List.map (rule_of_json) |>
-      sequence_result_rev
+    let* security_rules = (match Safe.Util.member "security_rule" values with
+      | `Null | `List [] -> Ok []
+      | v -> v |> Safe.Util.to_list |> List.map rule_of_json |> sequence_result_rev)
     in
     let tags = Safe.Util.member "tags" values
       |> parse_tags_lenient
