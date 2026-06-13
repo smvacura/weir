@@ -1,5 +1,4 @@
 # Weir
-
 A networking verifier for Azure-based Terraform plans.
 
 ### Examples
