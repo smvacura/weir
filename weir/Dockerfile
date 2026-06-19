@@ -7,7 +7,7 @@ FROM ocaml/opam:ubuntu-22.04-ocaml-5.4 AS build
 WORKDIR /home/opam/src
 
 # Install dependencies first so this layer is cached across source-only changes.
-COPY --chown=opam:opam dune-project verifier.opam ./
+COPY --chown=opam:opam dune-project weir.opam ./
 RUN opam update && opam install . --deps-only --yes
 
 # Build the weir binary into _build/install/default/bin.
