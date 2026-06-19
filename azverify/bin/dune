@@ -1,5 +1,5 @@
 (executable
- (public_name azverify)
+ (public_name weir)
  (name main)
  (libraries
   report

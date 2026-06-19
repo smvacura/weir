@@ -61,5 +61,5 @@ let check_cmd =
   Cmd.v info Term.(const run_check $ Logs_cli.level () $ policy $ plan)
 
 let () =
-  let info = Cmd.info "azverify" ~version:"%%VERSION%%" ~doc:"Azure network verifier." in
+  let info = Cmd.info "weir" ~version:"%%VERSION%%" ~doc:"Azure network verifier." in
   exit (Cmd.eval (Cmd.group info [diff_cmd; check_cmd]))

@@ -1,0 +1,4 @@
+(library
+ (name crosscheck)
+ (libraries parser terraform_ir reference pathfinder)
+ (flags (:standard -w -a)))

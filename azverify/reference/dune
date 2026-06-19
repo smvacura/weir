@@ -1,0 +1,5 @@
+(library
+ (name reference)
+ (libraries parser terraform_ir)
+ (flags (:standard -w -a))
+ (preprocess (pps ppx_deriving.show)))

@@ -1,0 +1,7 @@
+(test
+ (name test_reachability)
+ (libraries
+  reference
+  parser
+  terraform_ir
+  ounit2))
