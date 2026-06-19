@@ -3,9 +3,9 @@
 set -e
 
 base_paths=(
-    "../azverify/parser/test/test_plans"
-    "../azverify/engine/test/test_plans"
-    "../azverify/engine/bench/test_plans"
+    "../weir/parser/test/test_plans"
+    "../weir/engine/test/test_plans"
+    "../weir/engine/bench/test_plans"
 )
 providers_src="$(pwd)/providers.tf"
 

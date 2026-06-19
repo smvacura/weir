@@ -2,7 +2,7 @@
 
 set -e
 
-base_path="../azverify/bin/test_plans"
+base_path="../weir/bin/test_plans"
 providers_src="$(pwd)/providers.tf"
 
 for scenario in "$base_path"/*/; do

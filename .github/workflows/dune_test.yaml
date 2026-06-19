@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     defaults:
       run:
-        working-directory: azverify
+        working-directory: weir
     steps:
       - uses: actions/checkout@v4
       - uses: ocaml/setup-ocaml@v3.0.0
