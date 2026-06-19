@@ -146,10 +146,12 @@ let encode_partial_header man protocol ports =
       (encode_protocol  man ~offset:(get_offset Protocol) protocol)
       (encode_port_list man ~offset:(get_offset DestPort) ports)
 
+let safe_get arr i = if i < Array.length arr then arr.(i) else None
+
 let bits_to_int arr lo len =
   let v = ref 0 in
   for i = lo + len - 1 downto lo do
-    let b = match arr.(i) with Some p -> p | None -> false in
+    let b = match safe_get arr i with Some p -> p | None -> false in
     v := (!v lsl 1) lor (if b then 1 else 0)
   done;
   !v
@@ -167,4 +169,4 @@ let decode_single_packet arr =
     src_ip = bits_to_int arr (get_offset SrcIP) 32 |> Int32.of_int |> IPv4.of_int32 |> (fun ip -> CIDR.make ip (IPv4Mask.of_mask_length 32));
     dest_port = Single (bits_to_int arr (get_offset DestPort) 16);
     src_port = Single (bits_to_int arr (get_offset SrcPort) 16);
-    protocol = protocol_of_bits (Array.get arr (get_offset Protocol)) (Array.get arr (get_offset Protocol + 1))}
+    protocol = protocol_of_bits (safe_get arr (get_offset Protocol)) (safe_get arr (get_offset Protocol + 1))}

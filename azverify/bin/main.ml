@@ -1,10 +1,22 @@
 open Cmdliner
 
-let run logs_level before after =
+let run_show logs_level plan =
   Logs.set_level logs_level;
   Logs.set_reporter (Logs_fmt.reporter ());
   (try
-    Report.Diff.print Fmt.stdout before after;
+    Report.Diff.print_new Fmt.stdout plan;
+    Format.pp_print_newline Fmt.stdout ()
+  with Frontends.AzureTF.AzureTFParser.Parse_error msg ->
+    Logs.err (fun m -> m "%s" msg);
+    exit 1)
+
+let run logs_level if_new before after =
+  Logs.set_level logs_level;
+  Logs.set_reporter (Logs_fmt.reporter ());
+  (try
+    if (not (Sys.file_exists before)) && if_new
+    then Report.Diff.print_new Fmt.stdout after
+    else Report.Diff.print Fmt.stdout before after;
     Format.pp_print_newline Fmt.stdout ()
   with Frontends.AzureTF.AzureTFParser.Parse_error msg ->
     Logs.err (fun m -> m "%s" msg);
@@ -30,20 +42,35 @@ let run_check logs_level policy_path plan_path =
     Logs.err (fun m -> m "%s" msg);
     exit 1
 
+let show_cmd =
+  let plan =
+    Arg.(required & pos 0 (some non_dir_file) None &
+         info [] ~docv:"PLAN" ~doc:"Terraform plan JSON for a new deployment.")
+  in
+  let info =
+    Cmd.info "show"
+      ~doc:"Show all reachability in a new Terraform plan (no prior state)."
+  in
+  Cmd.v info Term.(const run_show $ Logs_cli.level () $ plan)
+
 let diff_cmd =
   let before =
-    Arg.(required & pos 0 (some non_dir_file) None &
+    Arg.(required & pos 0 (some string) None &
          info [] ~docv:"BEFORE" ~doc:"Terraform plan JSON before the change.")
   in
   let after =
     Arg.(required & pos 1 (some non_dir_file) None &
          info [] ~docv:"AFTER" ~doc:"Terraform plan JSON after the change.")
   in
+  let if_new =
+    Arg.(value & flag &
+         info ["show-if-new"] ~doc:"If BEFORE does not exist, show all reachability in AFTER as new.")
+  in
   let info =
     Cmd.info "diff"
       ~doc:"Show reachability changes between two Terraform plan snapshots."
   in
-  Cmd.v info Term.(const run $ Logs_cli.level () $ before $ after)
+  Cmd.v info Term.(const run $ Logs_cli.level () $ if_new $ before $ after)
 
 let check_cmd =
   let policy =
@@ -62,4 +89,4 @@ let check_cmd =
 
 let () =
   let info = Cmd.info "weir" ~version:"%%VERSION%%" ~doc:"Azure network verifier." in
-  exit (Cmd.eval (Cmd.group info [diff_cmd; check_cmd]))
+  exit (Cmd.eval (Cmd.group info [show_cmd; diff_cmd; check_cmd]))

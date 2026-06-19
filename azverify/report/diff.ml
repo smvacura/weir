@@ -39,3 +39,8 @@ let print fmt before_path after_path =
   let after_world  = AzureTF.AzureTFParser.get_resources after_path in
   let diffs = Pathfinder.Diff.compute before_world after_world in
   Fmt.(list ~sep:cut pp_packet_diff) fmt diffs
+
+let print_new fmt plan_path =
+  let world = AzureTF.AzureTFParser.get_resources plan_path in
+  let diffs = Pathfinder.Diff.compute Terraform_ir.World.empty world in
+  Fmt.(list ~sep:cut pp_packet_diff) fmt diffs
