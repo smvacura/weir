@@ -1234,8 +1234,10 @@ module AzureTFParser = struct
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world nic_nsg_assocs
 
-  let add_nic_asg asg nic_addr (world : World.t) =
-    let assocs' = { world.assocs with nic_asg = AddressMap.add nic_addr asg world.assocs.nic_asg } in
+  let add_nic_asg asg nic (world : World.t) =
+    let asg_addr = Asg.get_address asg in
+    let existing = Option.value ~default:[] (AddressMap.find_opt asg_addr world.assocs.asg_to_nics) in
+    let assocs' = { world.assocs with asg_to_nics = AddressMap.add asg_addr (nic :: existing) world.assocs.asg_to_nics } in
     { world with assocs = assocs' }
 
   let resolve_nic_asg_associations (world : World.t) config_json nic_asg_assocs =
@@ -1254,11 +1256,11 @@ module AzureTFParser = struct
         |> Option.to_result ~none:("Could not find ASG " ^ first_address ^ " required by association " ^ address) in
       let* nic = AddressMap.find_opt second_address world.nics
         |> Option.to_result ~none:("Could not find NIC " ^ second_address ^ " required by association " ^ address) in
-      Ok (asg, Nic.get_address nic)
+      Ok (asg, nic)
     in
     List.fold_left (fun world assoc_json ->
       match resolve_nic_asg_association assoc_json with
-      | Ok (asg, nic_addr) -> add_nic_asg asg nic_addr world
+      | Ok (asg, nic) -> add_nic_asg asg nic world
       | Error e -> Logs.warn (fun m -> m "%s" e); world)
     world nic_asg_assocs
 

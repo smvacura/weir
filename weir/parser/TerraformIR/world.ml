@@ -4,7 +4,7 @@ type assocs = {
   subnet_nsg     : Nsg.t AddressMap.t;
   subnet_rt      : Route_table.t AddressMap.t;
   nic_nsg        : Nsg.t AddressMap.t;
-  nic_asg        : Asg.t AddressMap.t;
+  asg_to_nics    : Nic.t list AddressMap.t;
   subnet_to_nics : Nic.t list AddressMap.t;
 }
 
@@ -25,7 +25,7 @@ let equal_assocs a1 a2 =
   AddressMap.equal (=) a1.subnet_nsg a2.subnet_nsg &&
   AddressMap.equal (=) a1.subnet_rt a2.subnet_rt &&
   AddressMap.equal (=) a1.nic_nsg a2.nic_nsg &&
-  AddressMap.equal (=) a1.nic_asg a2.nic_asg &&
+  AddressMap.equal (List.equal (=)) a1.asg_to_nics a2.asg_to_nics &&
   AddressMap.equal (List.equal (=)) a1.subnet_to_nics a2.subnet_to_nics
 
 let equal t1 t2 =
@@ -44,7 +44,7 @@ let empty_assocs = {
   subnet_nsg     = AddressMap.empty;
   subnet_rt      = AddressMap.empty;
   nic_nsg        = AddressMap.empty;
-  nic_asg        = AddressMap.empty;
+  asg_to_nics    = AddressMap.empty;
   subnet_to_nics = AddressMap.empty;
 }
 
@@ -89,4 +89,4 @@ let show world =
   "subnet_nsg: " ^ show_assoc_map world.assocs.subnet_nsg ^ "\n" ^
   "subnet_rt: " ^ show_assoc_map world.assocs.subnet_rt ^ "\n" ^
   "nic_nsg: " ^ show_assoc_map world.assocs.nic_nsg ^ "\n" ^
-  "nic_asg: " ^ show_assoc_map world.assocs.nic_asg ^ "\n"
+  "asg_to_nics: " ^ show_assoc_map world.assocs.asg_to_nics ^ "\n"

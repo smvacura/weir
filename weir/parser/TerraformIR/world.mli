@@ -4,7 +4,7 @@ type assocs = {
   subnet_nsg     : Nsg.t AddressMap.t;
   subnet_rt      : Route_table.t AddressMap.t;
   nic_nsg        : Nsg.t AddressMap.t;
-  nic_asg        : Asg.t AddressMap.t;
+  asg_to_nics    : Nic.t list AddressMap.t;
   subnet_to_nics : Nic.t list AddressMap.t;
 }
 

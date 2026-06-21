@@ -562,7 +562,7 @@ let simple_asg_world =
   let asgs = AddressMap.add (Asg.get_address asg) asg AddressMap.empty in
   let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
   let assocs = { World.empty.assocs with
-    nic_asg = AddressMap.add (Nic.get_address nic) asg AddressMap.empty;
+    asg_to_nics = AddressMap.add (Asg.get_address asg) [nic] AddressMap.empty;
     subnet_to_nics = AddressMap.add (Subnet.get_address subnet) [nic] AddressMap.empty;
   } in
   ({resource_groups; vnets; subnets; asgs; nics;
