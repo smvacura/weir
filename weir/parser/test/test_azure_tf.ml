@@ -506,6 +506,70 @@ let nic_no_subnet_world =
     vnet_peerings = AddressMap.empty;
     asgs = AddressMap.empty} : World.t)
 
+let simple_asg_world =
+  let rg = Rg.make
+    ~name:"asg-rg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_resource_group.main"
+    ~location:EastUs
+    ~managed_by:None
+    ~tags:[]
+  in
+  let vnet = Vnet.make
+    ~name:"main-vnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_virtual_network.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.0.0/16"]))
+  in
+  let subnet = Subnet.make
+    ~name:"main-subnet"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_subnet.main"
+    ~resource_group:rg
+    ~vnet:vnet
+    ~addresses:(Option.get (CIDR.of_list_opt_strict [Some "10.0.1.0/24"]))
+  in
+  let asg = Asg.make
+    ~name:"main-asg"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_application_security_group.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~tags:[]
+  in
+  let ipconfig = Nic.IpConfiguration.make
+    ~name:"internal"
+    ~subscription:"DEFAULT"
+    ~subnet:(Resolved subnet)
+    ~ip_address_version:IPv4
+    ~pip:(Resolved None)
+    ~private_address_allocation:Dynamic
+    ~primary:None
+  in
+  let nic = Nic.make
+    ~name:"main-nic"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_network_interface.main"
+    ~location:EastUs
+    ~resource_group:rg
+    ~ip_configurations:[ipconfig]
+  in
+  let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
+  let vnets = AddressMap.add (Vnet.get_address vnet) vnet AddressMap.empty in
+  let subnets = AddressMap.add (Subnet.get_address subnet) subnet AddressMap.empty in
+  let asgs = AddressMap.add (Asg.get_address asg) asg AddressMap.empty in
+  let nics = AddressMap.add (Nic.get_address nic) nic AddressMap.empty in
+  let assocs = { World.empty.assocs with
+    nic_asg = AddressMap.add (Nic.get_address nic) asg AddressMap.empty;
+    subnet_to_nics = AddressMap.add (Subnet.get_address subnet) [nic] AddressMap.empty;
+  } in
+  ({resource_groups; vnets; subnets; asgs; nics;
+    nsgs = AddressMap.empty; pips = AddressMap.empty;
+    route_tables = AddressMap.empty; assocs;
+    vnet_peerings = AddressMap.empty} : World.t)
+
 let simple_vnet_peering_world =
   let rg = Rg.make
     ~name:"network-rg"
@@ -645,7 +709,13 @@ let basic_tests = "simple_graphs" >::: [
     ~cmp:World.equal
     ~printer:World.show
     simple_vnet_peering_world
-    (AzureTFParser.get_resources "test_plans/simple_vnet_peering/plan.json"))
+    (AzureTFParser.get_resources "test_plans/simple_vnet_peering/plan.json"));
+  "simple_asg" >:: (fun _ ->
+    assert_equal
+    ~cmp:World.equal
+    ~printer:World.show
+    simple_asg_world
+    (AzureTFParser.get_resources "test_plans/simple_asg/plan.json"))
 ]
 
 let suite = "azure_tf_tests" >::: [

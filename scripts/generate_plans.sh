@@ -11,6 +11,10 @@ providers_src="$(pwd)/providers.tf"
 
 for dir in "${base_paths[@]/%//*}"; do
   if [ -d "$dir" ]; then
+    if [ -f "$dir/plan.json" ]; then
+      echo "Skipping $dir (plan.json already exists)"
+      continue
+    fi
     echo "Processing $dir"
     
     cp "$providers_src" "$dir/"

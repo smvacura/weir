@@ -9,6 +9,10 @@ for scenario in "$base_path"/*/; do
   for side in before after; do
     dir="$scenario$side"
     if [ -d "$dir" ]; then
+      if [ -f "$dir/plan.json" ]; then
+        echo "Skipping $dir (plan.json already exists)"
+        continue
+      fi
       echo "Processing $dir"
 
       cp "$providers_src" "$dir/"

@@ -8,6 +8,10 @@ $basePaths = @(
 $providersSrc = Join-Path $PWD "providers.tf"
 
 $basePaths | ForEach-Object { Get-ChildItem -Path $_ -Directory } | ForEach-Object {
+    if (Test-Path (Join-Path $_.FullName "plan.json")) {
+        Write-Host "Skipping $($_.FullName) (plan.json already exists)"
+        return
+    }
     Write-Host "Processing $($_.FullName)"
     
     Copy-Item $providersSrc -Destination $_.FullName

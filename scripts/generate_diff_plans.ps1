@@ -8,6 +8,10 @@ Get-ChildItem -Path $basePath -Directory | ForEach-Object {
     foreach ($side in @("before", "after")) {
         $dir = Join-Path $scenario.FullName $side
         if (Test-Path $dir -PathType Container) {
+            if (Test-Path (Join-Path $dir "plan.json")) {
+                Write-Host "Skipping $dir (plan.json already exists)"
+                continue
+            }
             Write-Host "Processing $dir"
 
             Copy-Item $providersSrc -Destination $dir
