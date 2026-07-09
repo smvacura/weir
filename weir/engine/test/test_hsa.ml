@@ -118,6 +118,23 @@ let make_peering name local_vnet remote_vnet allow_access =
 let add_peering_to_world peering (world : World.t) =
   { world with vnet_peerings = AddressMap.add (Vnet_peering.get_address peering) peering world.vnet_peerings }
 
+let make_asg name =
+  Asg.make
+    ~name
+    ~subscription:"DEFAULT"
+    ~address:("azurerm_application_security_group." ^ name)
+    ~location:EastUs
+    ~resource_group:test_rg
+    ~tags:[]
+
+let add_asg_to_world asg (world : World.t) =
+  { world with asgs = AddressMap.add (Asg.get_address asg) asg world.asgs }
+
+let add_nic_to_asg asg nic (world : World.t) =
+  let asg_addr = Asg.get_address asg in
+  let existing = Option.value ~default:[] (AddressMap.find_opt asg_addr world.assocs.asg_to_nics) in
+  { world with assocs = { world.assocs with asg_to_nics = AddressMap.add asg_addr (nic :: existing) world.assocs.asg_to_nics } }
+
 let nic_node_addr nic = Nic.get_address nic ^ "/ipconfig1"
 
 (* --- BDD helpers --- *)
@@ -400,12 +417,85 @@ let peering_tests = "vnet_peering" >::: [
 
 ]
 
+let asg_rule direction src_asg_addr =
+  Nsg.SecurityRule.make
+    ~name:"AllowFromAsg"
+    ~description:None
+    ~protocol:Any
+    ~source_ports:[Any]
+    ~destination_ports:[Any]
+    ~source:(Nsg.SecurityRule.ApplicationGroups [src_asg_addr])
+    ~destination:Nsg.SecurityRule.Any
+    ~access:Nsg.SecurityRule.Allow
+    ~priority:100
+    ~direction
+
+(* An NSG rule with ApplicationGroups source should allow only traffic whose
+   source IP belongs to a member NIC; non-member IPs hit DenyAllInbound. *)
+let asg_tests = "asg_resolution" >::: [
+
+  "asg_member_ip_is_permitted" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let sa = make_subnet vnet "subnet-a" "10.0.1.0/24" in
+    let sb = make_subnet vnet "subnet-b" "10.0.2.0/24" in
+    let asg = make_asg "asg1" in
+    let member_nic = make_nic "member-nic" sa "10.0.1.4" in
+    let nsg_b = make_nsg "nsg-b" [asg_rule Nsg.SecurityRule.Inbound (Asg.get_address asg)] in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet
+      |> add_subnet_to_world sa
+      |> add_subnet_to_world sb
+      |> add_nic_to_world member_nic
+      |> add_asg_to_world asg
+      |> add_nic_to_asg asg member_nic
+      |> attach_nsg_to_subnet nsg_b sb
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
+    | None -> assert_failure "expected edge from subnet-a to subnet-b"
+    | Some bdd ->
+      assert_bool "ASG member's IP should be permitted by the ApplicationGroups rule"
+        (permits_src_dest_ip mgr bdd "10.0.1.4" "10.0.2.1"));
+
+  (* Traffic from outside the VNet CIDR skips AllowVNetInBound and hits
+     DenyAllInbound unless covered by an explicit allow rule.  An external
+     IP not in the ASG should therefore be denied. *)
+  "external_non_member_ip_is_denied" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let sa = make_subnet vnet "subnet-a" "10.0.1.0/24" in
+    let sb = make_subnet vnet "subnet-b" "10.0.2.0/24" in
+    let asg = make_asg "asg1" in
+    let member_nic = make_nic "member-nic" sa "10.0.1.4" in
+    let nsg_b = make_nsg "nsg-b" [asg_rule Nsg.SecurityRule.Inbound (Asg.get_address asg)] in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet
+      |> add_subnet_to_world sa
+      |> add_subnet_to_world sb
+      |> add_nic_to_world member_nic
+      |> add_asg_to_world asg
+      |> add_nic_to_asg asg member_nic
+      |> attach_nsg_to_subnet nsg_b sb
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    match get_decider graph (Subnet.get_address sa) (Subnet.get_address sb) with
+    | None -> assert_failure "expected edge from subnet-a to subnet-b"
+    | Some bdd ->
+      assert_bool "external IP not in the ASG should be denied by DenyAllInbound"
+        (not (permits_src_dest_ip mgr bdd "203.0.113.1" "10.0.2.1")));
+
+]
+
 let suite = "hsa_suite" >::: [
   node_count_tests;
   nic_connectivity_tests;
   subnet_connectivity_tests;
   bdd_tests;
   peering_tests;
+  asg_tests;
 ]
 
 let () = run_test_tt_main suite
