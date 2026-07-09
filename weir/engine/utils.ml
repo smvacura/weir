@@ -6,6 +6,7 @@ module VnetMap = Map.Make(Vnet)
 type subnet_index = Subnet.t list VnetMap.t
 (** [(cidr, allow_virtual_network_access)] per peered VNet, keyed by local VNet. *)
 type peering_index = (CIDR.t * bool) list VnetMap.t
+type asg_index = CIDR.t list AddressMap.t
 
 let get_subnet_index (world : World.t) =
   let map = VnetMap.empty in
@@ -43,3 +44,11 @@ let get_peering_index (world : World.t) =
   fold_resolved_peerings
     (fun lv rv peering map -> add_remote_cidrs lv rv (access_allowed peering) map)
     world VnetMap.empty
+
+let nic_cidrs nic =
+  Nic.get_ipconfigs nic
+  |> List.filter_map Nic.IpConfiguration.get_private_cidr
+  |> List.concat
+
+let get_asg_index (world : World.t) =
+  AddressMap.map (fun nics -> List.concat_map nic_cidrs nics) world.assocs.asg_to_nics

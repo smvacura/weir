@@ -102,6 +102,9 @@ module SecurityRule = struct
 
   let get_direction rule = rule.direction
 
+  let map_endpoints f rule =
+    { rule with source = f rule.source; destination = f rule.destination }
+
 end
 
 type t = {

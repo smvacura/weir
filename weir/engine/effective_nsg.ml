@@ -1,5 +1,6 @@
 open Terraform_ir.Nsg
 open Parser.Network_types
+open Parser.Azure_types
 open Utils
 
 type t = { rules : SecurityRule.t list}
@@ -74,12 +75,23 @@ let deny_default_rules = [
     ~direction:SecurityRule.Inbound
 ]
 
-let enrich_nsg nsg_opt vnet_opt rt peering_idx =
+let resolve_endpoint asg_idx = function
+  | SecurityRule.ApplicationGroups asgs ->
+    let cidrs = List.concat_map (fun asg ->
+      Option.value ~default:[] (Parser.Tf_types.AddressMap.find_opt asg asg_idx)
+    ) asgs in
+    SecurityRule.Addresses cidrs
+  | ep -> ep
+
+let resolve_asg asg_idx rule =
+  SecurityRule.map_endpoints (resolve_endpoint asg_idx) rule
+
+let enrich_nsg nsg_opt vnet_opt rt peering_idx asg_idx =
   let vnetlocal = match vnet_opt with
     | Some vnet -> vnetlocal_default_rules vnet rt peering_idx
     | None -> []
   in
   let default_rules = vnetlocal @ internet_default_rules @ deny_default_rules in
   match nsg_opt with
-  | Some nsg -> { rules = (get_rules nsg) @ default_rules}
-  | None -> { rules = []}
+  | Some nsg -> { rules = List.map (resolve_asg asg_idx) (get_rules nsg) @ default_rules }
+  | None -> { rules = [] }

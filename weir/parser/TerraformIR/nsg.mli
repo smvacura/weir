@@ -47,6 +47,8 @@ module SecurityRule : sig
 
   val get_direction : t -> direction
 
+  val map_endpoints : (endpoint -> endpoint) -> t -> t
+
 end
 
 type t
