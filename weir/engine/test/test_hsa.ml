@@ -181,13 +181,14 @@ let node_count_tests = "node_count" >::: [
     in
     let mgr = man () in
     let graph, _ = build_graph world mgr in
-    assert_equal 3 (node_count graph)
-      ~msg:"expected 2 subnet nodes + 1 NIC node");
+    assert_equal 4 (node_count graph)
+      ~msg:"expected 2 subnet nodes + 1 NIC node + 1 Internet node");
 
-  "empty_world_has_no_nodes" >:: (fun _ ->
+  "empty_world_has_only_internet_node" >:: (fun _ ->
     let mgr = man () in
     let graph, _ = build_graph World.empty mgr in
-    assert_equal 0 (node_count graph));
+    assert_equal 1 (node_count graph)
+      ~msg:"expected only the Internet sentinel node");
 
 ]
 

@@ -5,6 +5,8 @@ open Utils
 
 type t = { rules : SecurityRule.t list}
 
+let empty = { rules = [] }
+
 let get_effective_rules ensg = ensg.rules
 
 let make_exact_cidr ip mask =

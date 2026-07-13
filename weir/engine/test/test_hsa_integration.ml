@@ -25,8 +25,8 @@ let integration_tests = "hsa_integration" >::: [
     let world = get_world () in
     let man = init () in
     let graph, _ = build_graph world man in
-    assert_equal 2 (node_count graph)
-      ~msg:"expected 2 nodes" ~printer:string_of_int);
+    assert_equal 3 (node_count graph)
+      ~msg:"expected 2 nodes + 1 Internet node" ~printer:string_of_int);
 
   "edge_exists_src_to_dest" >:: (fun _ ->
     let world = get_world () in
@@ -101,8 +101,8 @@ let peering_allowed_tests = "peering_access_allowed_integration" >::: [
     let world = Lazy.force peering_allowed_world in
     let man = init () in
     let graph, _ = build_graph world man in
-    assert_equal 2 (node_count graph)
-      ~msg:"expected 2 nodes" ~printer:string_of_int);
+    assert_equal 3 (node_count graph)
+      ~msg:"expected 2 nodes + 1 Internet node" ~printer:string_of_int);
 
   "edge_exists_subnet_a_to_subnet_b" >:: (fun _ ->
     let world = Lazy.force peering_allowed_world in
@@ -134,8 +134,8 @@ let peering_denied_tests = "peering_access_denied_integration" >::: [
     let world = Lazy.force peering_denied_world in
     let man = init () in
     let graph, _ = build_graph world man in
-    assert_equal 2 (node_count graph)
-      ~msg:"expected 2 nodes" ~printer:string_of_int);
+    assert_equal 3 (node_count graph)
+      ~msg:"expected 2 nodes + 1 Internet node" ~printer:string_of_int);
 
   "edge_exists_subnet_a_to_subnet_b" >:: (fun _ ->
     let world = Lazy.force peering_denied_world in

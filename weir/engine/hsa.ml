@@ -75,10 +75,13 @@ type build_context = {
   asg_index : Utils.asg_index;
 }
 
-(* let add_internet_node hsa_graph =
+let add_internet_node hsa_graph =
   let id = !(hsa_graph.next_id) in
-  let node = {ip_range = CIDR.make (IPv4.of_octets_opt 0 0 0 0) (IPv4Mask.of_int32 0l)} in
-  Hashtbl.replace hsa_graph.nodes id  *)
+  let node = {ip_range = CIDR.make (Option.get @@ IPv4.of_octets_opt 0 0 0 0) (IPv4Mask.of_int32 0l); attached = "$internet"; nsg = Effective_nsg.empty} in
+  Hashtbl.replace hsa_graph.nodes id node;
+  Hashtbl.replace hsa_graph.addr_index "$internet" id;
+  hsa_graph.next_id := id + 1
+
 
 let add_subnet ctx subnet hsa_graph =
   let attached = Subnet.get_address subnet in
@@ -289,6 +292,7 @@ let build_graph world man =
   let t_assoc = ms_since t0 in
   let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
+  add_internet_node hsa_graph;
   AddressMap.iter (fun _addr subnet ->
     add_subnet ctx subnet hsa_graph
   ) world.subnets;
