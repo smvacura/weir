@@ -99,6 +99,29 @@ let attach_nsg_to_nic nsg nic (world : World.t) =
   let nic_addr = Nic.get_address nic in
   { world with assocs = { world.assocs with nic_nsg = AddressMap.add nic_addr nsg world.assocs.nic_nsg } }
 
+let attach_rt_to_subnet rt subnet (world : World.t) =
+  let subnet_addr = Subnet.get_address subnet in
+  { world with assocs = { world.assocs with subnet_rt = AddressMap.add subnet_addr rt world.assocs.subnet_rt } }
+
+let make_udr name cidr_str next_hop =
+  Route_table.Route.make
+    ~name
+    ~address_prefix:(cidr cidr_str)
+    ~next_hop
+    ~next_hop_in_ip_address:Unresolved
+    ~source:UserDefined
+
+let make_rt routes =
+  Route_table.make
+    ~name:"test-rt"
+    ~subscription:"DEFAULT"
+    ~address:"azurerm_route_table.test"
+    ~location:EastUs
+    ~resource_group:test_rg
+    ~bgp_route_propagation_enabled:false
+    ~routes
+    ~tags:[]
+
 let make_peering name local_vnet remote_vnet allow_access =
   Vnet_peering.make
     ~name
@@ -490,6 +513,61 @@ let asg_tests = "asg_resolution" >::: [
 
 ]
 
+(* Every world has an implicit 0.0.0.0/0 -> Internet system route (see
+   effective_route_table.ml), so a subnet with no overriding UDR should always
+   have an edge to the Internet sentinel node. *)
+let internet_tests = "internet_connectivity" >::: [
+
+  "subnet_with_no_udr_reaches_internet" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let subnet = make_subnet vnet "subnet-a" "10.0.1.0/24" in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet
+      |> add_subnet_to_world subnet
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    assert_bool "subnet should have an outgoing edge to the Internet node"
+      (has_edge_between graph (Subnet.get_address subnet) "$internet"));
+
+  "internet_edge_permits_public_destination" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let subnet = make_subnet vnet "subnet-a" "10.0.1.0/24" in
+    let nsg = allow_all_nsg "nsg-a" in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet
+      |> add_subnet_to_world subnet
+      |> attach_nsg_to_subnet nsg subnet
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    match get_decider graph (Subnet.get_address subnet) "$internet" with
+    | None -> assert_failure "expected edge from subnet-a to the Internet node"
+    | Some bdd ->
+      assert_bool "decider should permit traffic to a public destination"
+        (permits_dest_ip mgr bdd "8.8.8.8"));
+
+  (* A UDR overriding 0.0.0.0/0 to Drop replaces the implicit Internet route,
+     so no edge to the Internet node should exist. *)
+  "udr_override_of_default_route_removes_internet_edge" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let subnet = make_subnet vnet "subnet-a" "10.0.1.0/24" in
+    let rt = make_rt [make_udr "drop-default" "0.0.0.0/0" Drop] in
+    let world =
+      World.empty
+      |> add_vnet_to_world vnet
+      |> add_subnet_to_world subnet
+      |> attach_rt_to_subnet rt subnet
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    assert_bool "Drop UDR should override the implicit Internet route"
+      (not (has_edge_between graph (Subnet.get_address subnet) "$internet")));
+
+]
+
 let suite = "hsa_suite" >::: [
   node_count_tests;
   nic_connectivity_tests;
@@ -497,6 +575,7 @@ let suite = "hsa_suite" >::: [
   bdd_tests;
   peering_tests;
   asg_tests;
+  internet_tests;
 ]
 
 let () = run_test_tt_main suite

@@ -180,6 +180,7 @@ let add_subnet_edges man ctx subnet_id subnet graph =
               add (get_node_from_addr_opt (Subnet.get_address subnet) graph) subintervals
           ) (Subnet.get_cidrs subnet)
         ) all_subnets
+      | Internet -> add (get_node_from_addr_opt "$internet" graph) interval
       | _ -> ()
   ) effective_routes
 
@@ -241,6 +242,7 @@ let add_topological_subnet_edges man ctx subnet_id subnet graph =
         | _ -> ()
       end
       | VirtualNetwork -> add (get_node_from_cidr_opt (vnet, (Route_table.Route.get_prefix route)) graph)
+      | Internet -> add (get_node_from_addr_opt "$internet" graph)
       | _ -> ()
   ) effective_routes
 
