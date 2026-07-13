@@ -42,3 +42,7 @@ The Weir engine is built around a technique known as "Header Space Analysis." Th
 Right now, Weir only operates on a barebones set of resources, currently subnets, vnets, route tables, NSGs, NICs, and peerings. Any other resources that can impact network reachability (eg NAT gateways, Azure firewalls) can lead to the actual state of the network to diverge from the Weir modeled network. I am continuously adding new resources.
 
 Additionally, the network flow is forward-only. Weir does not yet check that a `SYN-ACK` packet can return to the source, and thus cannot guarantee a TCP connection. I am currently adding the stateful backward pass to enable this.
+
+### Roadmap
+
+The first extension will be bidirectionality without NAT
