@@ -5,6 +5,7 @@ open Terraform_ir
 open Constraints.Ast
 
 type check_result = {
+  name: string;
   src: resource_address;
   dest: resource_address;
   ports: port list;

@@ -6,6 +6,7 @@ open Terraform_ir
 open Constraints.Ast
 
 type check_result = {
+  name: string;
   src: resource_address;
   dest: resource_address;
   ports: port list;
@@ -27,6 +28,7 @@ let check_rule man results (rule : rule) =
     | Unreachable -> not (reachable man rule results)
   in
   {
+    name = rule.name;
     src = rule.src;
     dest = rule.dst;
     ports = rule.on.ports;

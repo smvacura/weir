@@ -11,7 +11,8 @@ let pp_status fmt sat =
   else Fmt.(styled `Red   string) fmt "FAIL"
 
 let pp_check_result fmt (r : Check.Check_rules.check_result) =
-  Fmt.pf fmt "%a  %a -> %a  [%s %s]"
+  Fmt.pf fmt "rule %s: %a  %a -> %a  [%s %s]"
+    r.name
     pp_status r.sat
     Fmt.(styled `Bold string) r.src
     Fmt.(styled `Bold string) r.dest
