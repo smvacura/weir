@@ -18,5 +18,13 @@ let pp_check_result fmt (r : Check.Check_rules.check_result) =
     (show_protocol r.protocol)
     (ports_to_string r.ports)
 
+let pp_summary fmt results =
+  let total = List.length results in
+  let passed = List.length (List.filter (fun (r : Check.Check_rules.check_result) -> r.sat) results) in
+  let style = if passed = total then `Green else `Red in
+  Fmt.(styled style (fun fmt () -> pf fmt "%d/%d rules passed" passed total)) fmt ()
+
 let print fmt results =
-  Fmt.(list ~sep:cut pp_check_result) fmt results
+  Fmt.pf fmt "%a@,@,%a"
+    Fmt.(list ~sep:cut pp_check_result) results
+    pp_summary results
