@@ -59,6 +59,7 @@ type t = {
   address : string;
   location : azure_location;
   resource_group : Rg.t;
+  ip_forwarding_enabled : bool;
   ip_configurations : IpConfiguration.t list;
 } [@@deriving show]
 
@@ -70,8 +71,10 @@ let get_ipconfigs nic = nic.ip_configurations
 
 let get_rg nic = nic.resource_group
 
-let make ~name:name ~subscription:subscription ~address:address ~location:location ~resource_group:resource_group ~ip_configurations:ip_configurations =
-  {name; subscription; address; location; resource_group; ip_configurations}
+let get_ip_forwarding_enabled nic = nic.ip_forwarding_enabled
+
+let make ~name:name ~subscription:subscription ~address:address ~location:location ~resource_group:resource_group ~ip_forwarding_enabled:ip_forwarding_enabled ~ip_configurations:ip_configurations =
+  {name; subscription; address; location; resource_group; ip_forwarding_enabled; ip_configurations}
 
 let resolve_ipconfigs nic ipconfigs' = {nic with ip_configurations = ipconfigs'}
 

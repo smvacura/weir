@@ -54,6 +54,7 @@ let make_nic name subnet ip_str =
     ~address:("azurerm_network_interface." ^ name)
     ~location:EastUs
     ~resource_group:test_rg
+    ~ip_forwarding_enabled:false
     ~ip_configurations:[make_ipconfig "ipconfig1" subnet ip_str]
 
 let allow_all_rule direction =

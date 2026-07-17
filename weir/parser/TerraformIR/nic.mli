@@ -39,11 +39,15 @@ val get_id : t -> IdKey.t
 
 val get_ipconfigs : t -> IpConfiguration.t list
 
+val get_ip_forwarding_enabled : t -> bool
+
 val make : name:string ->
     subscription:string ->
     address:string ->
     location:azure_location ->
-    resource_group:Rg.t -> ip_configurations:IpConfiguration.t list -> t
+    resource_group:Rg.t ->
+    ip_forwarding_enabled:bool ->
+    ip_configurations:IpConfiguration.t list -> t
 
 val resolve_ipconfigs : t -> IpConfiguration.t list -> t
 

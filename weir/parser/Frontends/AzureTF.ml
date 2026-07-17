@@ -672,6 +672,12 @@ module AzureTFParser = struct
     | `String s -> loc_of_string_opt s |> generate_loc_parse_result name "nsg"
     | _ -> Error ("Cannot parse field location in resource " ^ name ^ " of type nsg")
     in
+    (* Terraform emits null when the attribute is unset, not false; Azure's
+       default is false, so absent and null both mean "does not forward". *)
+    let* ip_forwarding_enabled = match Safe.Util.member "ip_forwarding_enabled" values with
+    | `Bool b -> Ok b
+    | _ -> Ok false
+    in
     let* ip_configurations = Safe.Util.member "ip_configuration" values |>
       ip_config_block_of_json
     in
@@ -682,6 +688,7 @@ module AzureTFParser = struct
      ~address:address
      ~resource_group:rg
      ~location:location
+     ~ip_forwarding_enabled:ip_forwarding_enabled
      ~ip_configurations:ip_configurations)
 
   let add_nic (world : World.t) (nic : Nic.t) =

@@ -137,6 +137,7 @@ let simple_nic_world =
   ~address:"azurerm_network_interface.main"
   ~location:EastUs
   ~resource_group:rg
+  ~ip_forwarding_enabled:false
   ~ip_configurations:[ipconfig]
   in
   let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
@@ -191,6 +192,7 @@ let static_nic_world =
   ~address:"azurerm_network_interface.main"
   ~location:EastUs
   ~resource_group:rg
+  ~ip_forwarding_enabled:false
   ~ip_configurations:[ipconfig]
   in
   let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
@@ -275,6 +277,7 @@ let pip_nic_world =
     ~address:"azurerm_network_interface.this"
     ~location:EastUs
     ~resource_group:rg
+    ~ip_forwarding_enabled:false
     ~ip_configurations:[ipconfig]
   in
   let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
@@ -450,6 +453,7 @@ let dynamic_nic_udr_world =
     ~address:"azurerm_network_interface.appliance"
     ~location:EastUs
     ~resource_group:rg
+    ~ip_forwarding_enabled:false
     ~ip_configurations:[ipconfig]
   in
   let route = Route_table.Route.make
@@ -554,6 +558,7 @@ let simple_asg_world =
     ~address:"azurerm_network_interface.main"
     ~location:EastUs
     ~resource_group:rg
+    ~ip_forwarding_enabled:false
     ~ip_configurations:[ipconfig]
   in
   let resource_groups = AddressMap.add (Rg.get_address rg) rg AddressMap.empty in
