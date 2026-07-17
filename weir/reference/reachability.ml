@@ -16,7 +16,21 @@ type node = {
   routes    : Route_table.Route.t list;
 }
 
-type graph = (string, node) Hashtbl.t
+(* A NIC a VirtualAppliance route can name as its next hop. [forwards] mirrors
+   the NIC's ip_forwarding_enabled: Azure drops at a NIC that does not forward,
+   so an appliance without it black-holes everything routed through it. *)
+type appliance = {
+  subnet_address : string;
+  forwards       : bool;
+}
+
+(* Routes name an appliance either by IP (StaticAppliance) or by NIC address
+   (DynamicNic / ApplianceSet), so it is indexed both ways, once per graph. *)
+type graph = {
+  nodes            : (string, node) Hashtbl.t;
+  appliance_by_nic : appliance AddressMap.t;
+  appliance_by_ip  : appliance IPMap.t;
+}
 
 (* --- effective routes, built independently (no Effective_route_table) --- *)
 
@@ -69,8 +83,38 @@ let effective_routes vnet_cidrs rt_opt =
   let system = List.filter (fun s -> not (List.exists (same_prefix s) udrs)) (default_routes vnet_cidrs) in
   udrs @ system
 
-let build_graph (world : World.t) : graph =
-  let g = Hashtbl.create (AddressMap.cardinal world.subnets) in
+let appliance_of_ipconfig nic ipconfig =
+  match Nic.IpConfiguration.get_subnet ipconfig with
+  | None -> None
+  | Some subnet ->
+    Some { subnet_address = Subnet.get_address subnet;
+           forwards = Nic.get_ip_forwarding_enabled nic }
+
+let index_appliance_by_nic nics =
+  AddressMap.fold
+    (fun addr nic acc ->
+      match List.filter_map (appliance_of_ipconfig nic) (Nic.get_ipconfigs nic) with
+      | a :: _ -> AddressMap.add addr a acc
+      | [] -> acc)
+    nics
+    AddressMap.empty
+
+(* Only statically-allocated NICs land here: a dynamic NIC has no address until
+   Azure assigns one, which is why the parser resolves those to a NIC address
+   instead of an IP. *)
+let index_appliance_by_ip nics =
+  let add_ipconfig nic acc ipconfig =
+    match Nic.IpConfiguration.get_private_ip ipconfig, appliance_of_ipconfig nic ipconfig with
+    | Some ip, Some a -> IPMap.add ip a acc
+    | _ -> acc
+  in
+  AddressMap.fold
+    (fun _ nic acc -> List.fold_left (add_ipconfig nic) acc (Nic.get_ipconfigs nic))
+    nics
+    IPMap.empty
+
+let build_nodes (world : World.t) =
+  let nodes = Hashtbl.create (AddressMap.cardinal world.subnets) in
   AddressMap.iter
     (fun addr subnet ->
       let vnet_t = Subnet.get_vnet subnet in
@@ -78,20 +122,25 @@ let build_graph (world : World.t) : graph =
       let nsg = AddressMap.find_opt addr world.assocs.subnet_nsg in
       let routes = effective_routes (Vnet.get_addresses vnet_t)
                      (AddressMap.find_opt addr world.assocs.subnet_rt) in
-      Hashtbl.replace g addr
+      Hashtbl.replace nodes addr
         { address = addr; vnet = Vnet.get_address vnet_t;
           vnet_cidrs = Vnet.get_addresses vnet_t; cidr; nsg; routes })
     world.subnets;
-  g
+  nodes
 
-let node_in_vnet_owning g ~vnet ip =
+let build_graph (world : World.t) : graph =
+  { nodes            = build_nodes world;
+    appliance_by_nic = index_appliance_by_nic world.nics;
+    appliance_by_ip  = index_appliance_by_ip world.nics }
+
+let node_in_vnet_owning nodes ~vnet ip =
   Hashtbl.fold
     (fun _ (n : node) acc ->
       match acc, n.cidr with
       | Some _, _ -> acc
       | None, Some c when n.vnet = vnet && Packet.ip_in_cidr ip c -> Some n
       | None, _ -> None)
-    g
+    nodes
     None
 
 (* --- NSG rule scan with Azure default rules --- *)
@@ -169,31 +218,69 @@ let longest_prefix routes ip =
 let open_nsg = Nsg.SecurityRule.Outbound
 let in_nsg   = Nsg.SecurityRule.Inbound
 
-(* Azure has no L2 segment inside a subnet: every packet, including
-   same-subnet traffic, is matched against the effective routes by LPM. (See
-   the "Within-Subnet1" UDR in the docs' routing example — without it, a
-   VNet-wide UDR to an appliance captures intra-subnet traffic, and "Azure
-   doesn't create default routes for subnet address ranges".) So there is no
-   deliver-before-routing shortcut: the egress NSG is scanned, LPM picks one
-   route, and only a VirtualNetwork next hop delivers — to whichever subnet of
-   this VNet owns the destination, possibly [src] itself, whose ingress NSG is
-   then scanned. One LPM decision, one delivery; nothing to walk until
-   appliance next hops are resolved. *)
-let reachable_in g ~src pkt =
-  match Hashtbl.find_opt g src with
+(* The parser resolves a route's next-hop IP from the route table's config
+   references, which are per-table rather than per-route: a table naming several
+   appliance NICs gives every route in it the whole set. A set is therefore a
+   candidate list the parser could not narrow, not an Azure concept, so any
+   candidate that forwards the packet counts. *)
+let appliances_for g ref =
+  match ref with
+  | Unresolved | Resolved Unresolvable -> []
+  | Resolved (StaticAppliance ip) -> Option.to_list (IPMap.find_opt ip g.appliance_by_ip)
+  | Resolved (DynamicNic address) -> Option.to_list (AddressMap.find_opt address g.appliance_by_nic)
+  | Resolved (ApplianceSet set) ->
+    List.filter_map (fun a -> AddressMap.find_opt a g.appliance_by_nic) set
+
+let already_visited visited (node : node) = List.mem node.address visited
+
+let deliver_to_owner g ~vnet pkt =
+  match node_in_vnet_owning g.nodes ~vnet pkt.Packet.dest_ip with
+  | Some target -> nsg_permits target in_nsg pkt
   | None -> false
-  | Some cur ->
-    nsg_permits cur open_nsg pkt
-    && (match longest_prefix cur.routes pkt.Packet.dest_ip with
-        | Some route ->
-          (match Route_table.Route.get_next_hop route with
-           | VirtualNetwork ->
-             (match node_in_vnet_owning g ~vnet:cur.vnet pkt.Packet.dest_ip with
-              | Some target -> nsg_permits target in_nsg pkt
-              | None -> false)
-           (* VirtualAppliance needs NIC-node resolution (deferred); Internet /
-              VirtualGateway leave the intra-VNet scope; Drop is a drop. *)
-           | VirtualAppliance | Internet | VirtualGateway | Drop -> false)
+
+(* Azure has no L2 segment inside a subnet: every packet, including same-subnet
+   traffic, is matched against the effective routes by LPM. (See the
+   "Within-Subnet1" UDR in the docs' routing example — without it, a VNet-wide
+   UDR to an appliance captures intra-subnet traffic, and "Azure doesn't create
+   default routes for subnet address ranges".) So there is no
+   deliver-before-routing shortcut: the egress NSG is scanned, LPM picks one
+   route, and only a VirtualNetwork next hop delivers.
+
+   A VirtualAppliance next hop instead hands the packet to the appliance's NIC
+   and re-routes from the subnet that hosts it, so forwarding is a walk. The
+   packet is not rewritten along the way: a NAT-ing appliance would change the
+   header, and modelling that would need appliance-internal semantics Azure
+   itself does not define. Revisiting a node ends the walk — the same node makes
+   the same LPM decision for the same destination, so a repeat is a routing
+   loop, not progress. *)
+let rec route_from g ~visited node pkt =
+  if already_visited visited node then false
+  else
+    nsg_permits node open_nsg pkt
+    && (match longest_prefix node.routes pkt.Packet.dest_ip with
+        | Some route -> follow_hop g ~visited:(node.address :: visited) ~from:node route pkt
         | None -> false)
+
+and follow_hop g ~visited ~from route pkt =
+  match Route_table.Route.get_next_hop route with
+  | VirtualNetwork -> deliver_to_owner g ~vnet:from.vnet pkt
+  | VirtualAppliance ->
+    appliances_for g (Route_table.Route.get_next_hop_ip route)
+    |> List.exists (fun a -> hop_through_appliance g ~visited a pkt)
+  (* Internet / VirtualGateway leave the intra-VNet scope; Drop is a drop. *)
+  | Internet | VirtualGateway | Drop -> false
+
+and hop_through_appliance g ~visited appliance pkt =
+  match Hashtbl.find_opt g.nodes appliance.subnet_address with
+  | None -> false
+  | Some node ->
+    nsg_permits node in_nsg pkt
+    && appliance.forwards
+    && route_from g ~visited node pkt
+
+let reachable_in g ~src pkt =
+  match Hashtbl.find_opt g.nodes src with
+  | None -> false
+  | Some cur -> route_from g ~visited:[] cur pkt
 
 let reachable world ~src pkt = reachable_in (build_graph world) ~src pkt

@@ -63,8 +63,39 @@ let make_rt name routes =
     ~bgp_route_propagation_enabled:true
     ~tags:[]
 
+let make_ipconfig subnet ip_str =
+  Nic.IpConfiguration.make
+    ~name:"ipconfig1"
+    ~subscription:"DEFAULT"
+    ~subnet:(Resolved subnet)
+    ~ip_address_version:IPv4
+    ~pip:(Resolved None)
+    ~private_address_allocation:(Static (Option.get (IPv4.of_string_opt ip_str)))
+    ~primary:(Some true)
+
+let make_nic ~forwards name subnet ip_str =
+  Nic.make
+    ~name
+    ~subscription:"DEFAULT"
+    ~address:("azurerm_network_interface." ^ name)
+    ~location:EastUs
+    ~resource_group:test_rg
+    ~ip_forwarding_enabled:forwards
+    ~ip_configurations:[make_ipconfig subnet ip_str]
+
+let appliance_udr name prefix ip_str =
+  Route_table.Route.make
+    ~name
+    ~address_prefix:(cidr prefix)
+    ~next_hop:VirtualAppliance
+    ~next_hop_in_ip_address:(Resolved (StaticAppliance (Option.get (IPv4.of_string_opt ip_str))))
+    ~source:UserDefined
+
 let add_subnet_to_world subnet (world : World.t) =
   { world with subnets = AddressMap.add (Subnet.get_address subnet) subnet world.subnets }
+
+let add_nic_to_world nic (world : World.t) =
+  { world with nics = AddressMap.add (Nic.get_address nic) nic world.nics }
 
 let add_vnet_to_world vnet (world : World.t) =
   { world with vnets = AddressMap.add (Vnet.get_address vnet) vnet world.vnets }
@@ -205,8 +236,74 @@ let reserved_prefix_tests = "reserved_prefix_coverage" >::: [
 
 ]
 
+(* --- Forwarding through a virtual appliance ---
+
+   Doc anchor ("Routing example", route ID2 "Within-VNet1" -> Virtual
+   appliance): a UDR naming a virtual appliance hands the packet to the
+   appliance's NIC, which then routes onward from its own subnet, rather than
+   ending the path.
+
+   Doc anchor (https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-network-interface,
+   "Enable or disable IP forwarding"): IP forwarding lets a NIC "receive network
+   traffic not destined for one of the IP addresses assigned to ... the network
+   interface", and "You must enable IP forwarding for every network interface
+   that receives traffic not destined for its own IP address." A NIC without it
+   drops transit traffic. *)
+
+let three_subnet_world ~forwards =
+  let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet1" in
+  let src = make_subnet vnet "subnet_src" "10.0.0.0/24" in
+  let nva_subnet = make_subnet vnet "subnet_nva" "10.0.1.0/24" in
+  let dst = make_subnet vnet "subnet_dst" "10.0.2.0/24" in
+  let nva = make_nic ~forwards "nva" nva_subnet "10.0.1.10" in
+  let rt = make_rt "rt_src" [appliance_udr "to-nva" "10.0.2.0/24" "10.0.1.10"] in
+  let world =
+    World.empty |> add_vnet_to_world vnet
+    |> add_subnet_to_world src |> add_subnet_to_world nva_subnet
+    |> add_subnet_to_world dst
+    |> add_nic_to_world nva
+    |> attach_rt_to_subnet rt src
+  in
+  (world, Subnet.get_address src)
+
+let appliance_routing_tests = "appliance_routing" >::: [
+
+  (* The appliance subnet has no UDR, so its VnetLocal system route delivers
+     the packet onward to the subnet owning the destination. *)
+  "appliance_with_ip_forwarding_relays_to_destination" >:: (fun _ ->
+    let (world, src) = three_subnet_world ~forwards:true in
+    assert_bool "a forwarding appliance relays the packet to the destination subnet"
+      (reachable world src (packet "10.0.0.4" "10.0.2.5")));
+
+  "appliance_without_ip_forwarding_drops" >:: (fun _ ->
+    let (world, src) = three_subnet_world ~forwards:false in
+    assert_bool "a NIC without ip_forwarding_enabled drops transit traffic"
+      (not (reachable world src (packet "10.0.0.4" "10.0.2.5"))));
+
+  (* Two appliances pointing their /24 UDR at each other: the walk must end at
+     the repeated node rather than recurse forever. *)
+  "mutual_appliance_udrs_terminate" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet1" in
+    let s_a = make_subnet vnet "subnet_a" "10.0.1.0/24" in
+    let s_b = make_subnet vnet "subnet_b" "10.0.2.0/24" in
+    let nva_a = make_nic ~forwards:true "nva_a" s_a "10.0.1.10" in
+    let nva_b = make_nic ~forwards:true "nva_b" s_b "10.0.2.10" in
+    let rt_a = make_rt "rt_a" [appliance_udr "a-to-b" "10.0.3.0/24" "10.0.2.10"] in
+    let rt_b = make_rt "rt_b" [appliance_udr "b-to-a" "10.0.3.0/24" "10.0.1.10"] in
+    let world =
+      World.empty |> add_vnet_to_world vnet
+      |> add_subnet_to_world s_a |> add_subnet_to_world s_b
+      |> add_nic_to_world nva_a |> add_nic_to_world nva_b
+      |> attach_rt_to_subnet rt_a s_a |> attach_rt_to_subnet rt_b s_b
+    in
+    assert_bool "a routing loop terminates and delivers nothing"
+      (not (reachable world (Subnet.get_address s_a) (packet "10.0.1.4" "10.0.3.5"))));
+
+]
+
 let () =
   run_test_tt_main ("reference_reachability" >::: [
     intra_subnet_routing_tests;
     reserved_prefix_tests;
+    appliance_routing_tests;
   ])
