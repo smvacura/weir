@@ -569,6 +569,76 @@ let internet_tests = "internet_connectivity" >::: [
 
 ]
 
+(* --- Appliance next hops ---
+
+   A UDR to a virtual appliance names a NIC either by IP (StaticAppliance, when
+   the plan carries a literal next_hop_in_ip_address) or by resource address
+   (DynamicNic, when Terraform only learns the IP after apply). Either way the
+   routed subnet should get an edge to that NIC's node. *)
+
+let appliance_world make_ref =
+  let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+  let src = make_subnet vnet "subnet-src" "10.0.1.0/24" in
+  let nva_subnet = make_subnet vnet "subnet-nva" "10.0.2.0/24" in
+  let dst = make_subnet vnet "subnet-dst" "10.0.3.0/24" in
+  let nva = make_nic "nva" nva_subnet "10.0.2.10" in
+  let udr =
+    Route_table.Route.make
+      ~name:"to-nva"
+      ~address_prefix:(cidr "10.0.3.0/24")
+      ~next_hop:VirtualAppliance
+      ~next_hop_in_ip_address:(make_ref nva)
+      ~source:UserDefined
+  in
+  let world =
+    World.empty
+    |> add_vnet_to_world vnet
+    |> add_subnet_to_world src
+    |> add_subnet_to_world nva_subnet
+    |> add_subnet_to_world dst
+    |> add_nic_to_world nva
+    |> attach_rt_to_subnet (make_rt [udr]) src
+  in
+  (world, src, nva)
+
+let appliance_tests = "appliance_next_hop" >::: [
+
+  (* Control: the same /24 prefix with a VirtualNetwork next hop does build its
+     edge. That pins the fixture and the route partition as sound, so a failure
+     below is the appliance branch and nothing else. *)
+  "vnetlocal_udr_at_same_prefix_builds_edge" >:: (fun _ ->
+    let vnet = make_vnet ~addresses:[cidr "10.0.0.0/16"] "vnet" in
+    let src = make_subnet vnet "subnet-src" "10.0.1.0/24" in
+    let dst = make_subnet vnet "subnet-dst" "10.0.3.0/24" in
+    let rt = make_rt [make_udr "to-dst" "10.0.3.0/24" VirtualNetwork] in
+    let world =
+      World.empty |> add_vnet_to_world vnet
+      |> add_subnet_to_world src |> add_subnet_to_world dst
+      |> attach_rt_to_subnet rt src
+    in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    assert_bool "a VirtualNetwork UDR at 10.0.3.0/24 should build an edge to subnet-dst"
+      (get_decider graph (Subnet.get_address src) (Subnet.get_address dst) <> None));
+
+  "static_appliance_udr_builds_edge_to_nic" >:: (fun _ ->
+    let ip = Option.get (IPv4.of_string_opt "10.0.2.10") in
+    let (world, src, nva) = appliance_world (fun _ -> Resolved (StaticAppliance ip)) in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    assert_bool "StaticAppliance UDR should build an edge to the appliance NIC"
+      (get_decider graph (Subnet.get_address src) (nic_node_addr nva) <> None));
+
+  "dynamic_nic_udr_builds_edge_to_nic" >:: (fun _ ->
+    let (world, src, nva) =
+      appliance_world (fun nic -> Resolved (DynamicNic (Nic.get_address nic))) in
+    let mgr = man () in
+    let graph, _ = build_graph world mgr in
+    assert_bool "DynamicNic UDR should build an edge to the appliance NIC"
+      (get_decider graph (Subnet.get_address src) (nic_node_addr nva) <> None));
+
+]
+
 let suite = "hsa_suite" >::: [
   node_count_tests;
   nic_connectivity_tests;
@@ -577,6 +647,7 @@ let suite = "hsa_suite" >::: [
   peering_tests;
   asg_tests;
   internet_tests;
+  appliance_tests;
 ]
 
 let () = run_test_tt_main suite
