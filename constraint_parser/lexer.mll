@@ -75,6 +75,7 @@ rule token = parse
   | ','           { COMMA }
   | '.'           { DOT }
   | ':'           { COLON }
+  | ';'           { SEMICOLON }
 
   (* port/protool (eg 443/tcp) *)
   | (digit+ as port) '/' (alpha+ as proto)  { PORT_PROTO (int_of_string port, proto) }
