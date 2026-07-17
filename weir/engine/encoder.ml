@@ -106,8 +106,13 @@ let encode_security_rule man rule =
     ]
     |> List.fold_left (dand man) (dtrue man)
 
-let encode_nsg ensg man =
+let encode_nsg ?direction ensg man  =
   let rules = Effective_nsg.get_effective_rules ensg
+  |> List.filter ( fun r ->
+    match direction with
+    | Some d -> SecurityRule.get_direction r = d
+    | None -> true
+  )
   |> List.sort SecurityRule.compare
   in
   match rules with

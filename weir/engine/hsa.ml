@@ -121,8 +121,8 @@ let add_nic ctx nic hsa_graph =
 let add_edge subnet_id node_id node effective_nsg interval graph man =
   let decider = dand man (dand man
   (Encoder.encode_effective_route man interval) 
-  (Encoder.encode_nsg effective_nsg man))
-  (Encoder.encode_nsg node.nsg man) in
+  (Encoder.encode_nsg ~direction:Outbound effective_nsg man))
+  (Encoder.encode_nsg ~direction:Inbound node.nsg man) in
   let edge = { decider; src = subnet_id; dest = node_id} in
   push graph.in_list node_id edge;
   push graph.out_list subnet_id edge

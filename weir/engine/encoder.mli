@@ -1,4 +1,5 @@
 open Parser.Network_types
+open Terraform_ir.Nsg
 
 open Bdd
 
@@ -20,7 +21,7 @@ type packet_header = {
 
 val get_offset : header_segment -> int
 
-val encode_nsg : Effective_nsg.t -> manager -> bdd
+val encode_nsg : ?direction:SecurityRule.direction -> Effective_nsg.t -> manager -> bdd
 
 val encode_route_cidrs : manager -> offset:int -> CIDR.t list -> bdd
 
