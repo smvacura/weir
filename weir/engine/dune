@@ -1,5 +1,5 @@
 (library
  (name engine)
  (libraries parser terraform_ir mlbdd unix)
- (flags (:standard -w -26-27-32-34-69 -warn-error -a))
+ (flags (:standard -warn-error -a))
  (preprocess (pps ppx_deriving.show)))

@@ -48,11 +48,6 @@ let push tbl k v =
     | Some e -> Hashtbl.replace tbl k (v::e)
     | None -> Hashtbl.add tbl k [v]
 
-let push_mult tbl k v = 
-  match Hashtbl.find_opt tbl k with
-  | Some e -> Hashtbl.replace tbl k (e @ v)
-  | None -> Hashtbl.add tbl k v
-
 let get_node_opt f graph =
   let (let*) = Option.bind in
   let* id = f in
@@ -123,18 +118,7 @@ let add_nic ctx nic hsa_graph =
       | None -> ()
     ) (Nic.get_ipconfigs nic)
 
-let get_subnets vnet subnets =
-  let rec aux subnets acc =
-    match subnets with
-    | [] -> acc
-    | h::t -> if Terraform_ir.Subnet.get_vnet h = vnet
-              then aux t (h::acc)
-              else aux t acc
-  in
-  aux subnets []
-
-
-let add_edge subnet_id node_id node effective_nsg interval graph man = 
+let add_edge subnet_id node_id node effective_nsg interval graph man =
   let decider = dand man (dand man
   (Encoder.encode_effective_route man interval) 
   (Encoder.encode_nsg effective_nsg man))

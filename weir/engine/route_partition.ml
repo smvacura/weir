@@ -20,21 +20,14 @@ type event = {
   route : Route.t
 }
 
-let get_route_mask route =
-  Parser.Network_types.CIDR.get_mask (Route.get_prefix route)
-
 module OrderedEvent = struct
-  type t = event
-
-  let compare e1 e2 = 
+  let compare e1 e2 =
     match Int32.unsigned_compare e1.ip e2.ip with
     | 0 -> compare (Route.get_source e1.route) (Route.get_source e2.route)
     | i -> i
 end
 module RouteHeap = Pqueue.MakeMax(Route)
 
-
-type validity_index = (Route.t, validity) Hashtbl.t
 
 let get_events routes =
   let rec aux routes acc =

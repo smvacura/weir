@@ -3,9 +3,6 @@ open Terraform_ir.Nsg
 
 open Bdd
 
-type bit_encoding = 
-| Specific of bool list
-| Any
 
 type header_segment =
 | DestIP
@@ -24,13 +21,7 @@ type packet_header = {
 }
 [@@deriving show]
 
-let get_ip_bit_loc segment bit_loc = 
-  match segment with
-  | DestIP -> bit_loc
-  | SrcIP -> 32 + bit_loc
-  | _ -> 0
-
-let get_offset segment = 
+let get_offset segment =
   match segment with
   | DestIP -> 0
   | SrcIP -> 32
@@ -105,11 +96,6 @@ let encode_port_list man ~offset ports =
   List.fold_left (fun acc port ->
     dor man acc @@ encode_port man ~offset port
   ) (dfalse man) ports
-
-let encode_allow man allow =
-  match allow with
-  | SecurityRule.Allow -> dtrue man
-  | SecurityRule.Deny -> dfalse man
 
 let encode_security_rule man rule =
     [ encode_endpoint man ~offset:(get_offset SrcIP) (SecurityRule.get_src_ip rule); 

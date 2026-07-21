@@ -1,6 +1,5 @@
 open Terraform_ir.Nsg
 open Parser.Network_types
-open Parser.Azure_types
 open Utils
 
 type t = { rules : SecurityRule.t list}

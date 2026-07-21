@@ -15,9 +15,6 @@ let construct_vnetlocal_route_from_cidr name cidr =
     ~next_hop_in_ip_address:Unresolved
     ~source:System
 
-let vnetlocal_route_name vnet_name subnet_name =
-  "system_route_" ^ subnet_name ^ "_in_" ^ vnet_name
-
 let get_vnet_routes vnet =
   let vnet_name = Vnet.get_name vnet in
   List.map (construct_vnetlocal_route_from_cidr ("system_route_" ^ vnet_name)) (Vnet.get_addresses vnet)

@@ -9,7 +9,6 @@ type peering_index = (CIDR.t * bool) list VnetMap.t
 type asg_index = CIDR.t list AddressMap.t
 
 let get_subnet_index (world : World.t) =
-  let map = VnetMap.empty in
   let add_subnet subnet map =
     let vnet = Subnet.get_vnet subnet in
     match VnetMap.find_opt vnet map with
@@ -18,7 +17,7 @@ let get_subnet_index (world : World.t) =
   in
   let rec aux subnets map =
     match subnets with
-    | (address, subnet)::t -> aux t (add_subnet subnet map)
+    | (_, subnet)::t -> aux t (add_subnet subnet map)
     | [] -> map
   in
   aux (AddressMap.to_list world.subnets) VnetMap.empty
