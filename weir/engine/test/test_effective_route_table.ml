@@ -3,7 +3,7 @@ open Parser.Network_types
 open Parser.Azure_types
 open Terraform_ir
 
-module ERT = Pathfinder.Effective_route_table
+module ERT = Engine.Effective_route_table
 
 (* --- Fixtures --- *)
 
@@ -47,7 +47,7 @@ let make_rt routes =
     ~tags:[]
 
 let enrich ?(udrs = []) vnet =
-  ERT.get_effective_routes (ERT.enrich_route_table (make_rt udrs) vnet Pathfinder.Utils.VnetMap.empty)
+  ERT.get_effective_routes (ERT.enrich_route_table (make_rt udrs) vnet Engine.Utils.VnetMap.empty)
 
 (* --- Helpers --- *)
 
@@ -105,7 +105,7 @@ let vnet_local_tests = "vnet_local_routes" >::: [
     let vnet = make_vnet "vnet" in
     let routes =
       ERT.get_effective_routes
-        (ERT.enrich_route_table (make_rt []) vnet Pathfinder.Utils.VnetMap.empty)
+        (ERT.enrich_route_table (make_rt []) vnet Engine.Utils.VnetMap.empty)
     in
     assert_route_hop routes "0.0.0.0/0" "Internet";
     assert_equal 0

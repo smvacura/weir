@@ -23,26 +23,26 @@ let show_intervals ivs =
 let partition_tests = "partition_tests" >::: [
   "single_route_at_zero" >:: (fun _ ->
     let route_a = make_route "route-a" "0.0.0.0/0" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a] in
+    let result = Engine.Route_partition.partition_routes [route_a] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     assert_equal [(lo, hi)] (sorted_partitions result route_a));
 
   "host_route" >:: (fun _ ->
     let route_a = make_route "route-a" "192.168.1.1/32" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a] in
+    let result = Engine.Route_partition.partition_routes [route_a] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     assert_equal [(lo, hi)] (sorted_partitions result route_a));
 
   "single_route" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/8" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a] in
+    let result = Engine.Route_partition.partition_routes [route_a] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     assert_equal [(lo, hi)] (sorted_partitions result route_a));
 
   "disjoint_routes" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "192.168.0.0/16" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b] in
     let lo_a, hi_a = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     assert_equal [(lo_a, hi_a)] (sorted_partitions result route_a);
@@ -51,7 +51,7 @@ let partition_tests = "partition_tests" >::: [
   "overlapping_routes" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "10.1.0.0/16" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b] in
     let lo_a, hi_a = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     assert_equal
@@ -67,7 +67,7 @@ let partition_tests = "partition_tests" >::: [
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "10.1.0.0/16" in
     let route_c = make_route "route-c" "10.3.0.0/16" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b; route_c] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b; route_c] in
     let lo_a, hi_a = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     let lo_c, hi_c = CIDR.get_interval (Route_table.Route.get_prefix route_c) in
@@ -86,7 +86,7 @@ let partition_tests = "partition_tests" >::: [
   "nested_at_low_end" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "10.0.0.0/16" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b] in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     let _, hi_a    = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     assert_equal [(lo_b, hi_b)] (sorted_partitions result route_b)
@@ -103,7 +103,7 @@ let partition_tests = "partition_tests" >::: [
   "nested_at_high_end" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "10.255.0.0/16" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b] in
     let lo_a, _    = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     assert_equal [(lo_b, hi_b)] (sorted_partitions result route_b)
@@ -118,7 +118,7 @@ let partition_tests = "partition_tests" >::: [
   "adjacent_routes" >:: (fun _ ->
     let route_a = make_route "route-a" "10.0.0.0/9" in
     let route_b = make_route "route-b" "10.128.0.0/9" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b] in
     let lo_a, hi_a = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     assert_equal [(lo_a, hi_a)] (sorted_partitions result route_a)
@@ -132,7 +132,7 @@ let partition_tests = "partition_tests" >::: [
     let route_a = make_route "route-a" "10.0.0.0/8" in
     let route_b = make_route "route-b" "10.1.0.0/16" in
     let route_c = make_route "route-c" "10.1.1.0/24" in
-    let result = Pathfinder.Route_partition.partition_routes [route_a; route_b; route_c] in
+    let result = Engine.Route_partition.partition_routes [route_a; route_b; route_c] in
     let lo_a, hi_a = CIDR.get_interval (Route_table.Route.get_prefix route_a) in
     let lo_b, hi_b = CIDR.get_interval (Route_table.Route.get_prefix route_b) in
     let lo_c, hi_c = CIDR.get_interval (Route_table.Route.get_prefix route_c) in
@@ -152,7 +152,7 @@ let source_priority_tests = "source_priority_tests" >::: [
   "udr_shadows_system_same_prefix" >:: (fun _ ->
     let sys = make_route ~source:System      "sys" "0.0.0.0/0" in
     let udr = make_route ~source:UserDefined "udr" "0.0.0.0/0" in
-    let result = Pathfinder.Route_partition.partition_routes [sys; udr] in
+    let result = Engine.Route_partition.partition_routes [sys; udr] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix udr) in
     assert_equal [(lo, hi)] (sorted_partitions result udr)
       ~msg:"UDR should own the full range";
@@ -163,7 +163,7 @@ let source_priority_tests = "source_priority_tests" >::: [
   "bgp_shadows_system_same_prefix" >:: (fun _ ->
     let sys = make_route ~source:System "sys" "0.0.0.0/0" in
     let bgp = make_route ~source:Bgp    "bgp" "0.0.0.0/0" in
-    let result = Pathfinder.Route_partition.partition_routes [sys; bgp] in
+    let result = Engine.Route_partition.partition_routes [sys; bgp] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix bgp) in
     assert_equal [(lo, hi)] (sorted_partitions result bgp)
       ~msg:"BGP route should own the full range";
@@ -174,7 +174,7 @@ let source_priority_tests = "source_priority_tests" >::: [
   "udr_shadows_bgp_same_prefix" >:: (fun _ ->
     let bgp = make_route ~source:Bgp        "bgp" "0.0.0.0/0" in
     let udr = make_route ~source:UserDefined "udr" "0.0.0.0/0" in
-    let result = Pathfinder.Route_partition.partition_routes [bgp; udr] in
+    let result = Engine.Route_partition.partition_routes [bgp; udr] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix udr) in
     assert_equal [(lo, hi)] (sorted_partitions result udr)
       ~msg:"UDR should own the full range";
@@ -187,7 +187,7 @@ let source_priority_tests = "source_priority_tests" >::: [
     let sys0  = make_route ~source:System      "sys-0"  "0.0.0.0/0" in
     let sys8  = make_route ~source:System      "sys-8"  "10.0.0.0/8" in
     let udr8  = make_route ~source:UserDefined "udr-8"  "10.0.0.0/8" in
-    let result = Pathfinder.Route_partition.partition_routes [sys0; sys8; udr8] in
+    let result = Engine.Route_partition.partition_routes [sys0; sys8; udr8] in
     let lo0, hi0 = CIDR.get_interval (Route_table.Route.get_prefix sys0) in
     let lo8, hi8 = CIDR.get_interval (Route_table.Route.get_prefix udr8) in
     assert_equal [(lo8, hi8)] (sorted_partitions result udr8)
@@ -207,7 +207,7 @@ let source_priority_tests = "source_priority_tests" >::: [
   "source_priority_at_inner_prefix" >:: (fun _ ->
     let sys = make_route ~source:System      "sys" "10.1.0.0/24" in
     let udr = make_route ~source:UserDefined "udr" "10.1.0.0/24" in
-    let result = Pathfinder.Route_partition.partition_routes [sys; udr] in
+    let result = Engine.Route_partition.partition_routes [sys; udr] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix udr) in
     assert_equal [(lo, hi)] (sorted_partitions result udr)
       ~printer:show_intervals
@@ -221,7 +221,7 @@ let source_priority_tests = "source_priority_tests" >::: [
     let sys = make_route ~source:System      "sys" "0.0.0.0/0" in
     let bgp = make_route ~source:Bgp        "bgp" "0.0.0.0/0" in
     let udr = make_route ~source:UserDefined "udr" "0.0.0.0/0" in
-    let result = Pathfinder.Route_partition.partition_routes [sys; bgp; udr] in
+    let result = Engine.Route_partition.partition_routes [sys; bgp; udr] in
     let lo, hi = CIDR.get_interval (Route_table.Route.get_prefix udr) in
     assert_equal [(lo, hi)] (sorted_partitions result udr)
       ~printer:show_intervals
@@ -239,7 +239,7 @@ let source_priority_tests = "source_priority_tests" >::: [
   "more_specific_udr_inside_system_route" >:: (fun _ ->
     let sys8  = make_route ~source:System      "sys-8"  "10.0.0.0/8" in
     let udr24 = make_route ~source:UserDefined "udr-24" "10.1.1.0/24" in
-    let result = Pathfinder.Route_partition.partition_routes [sys8; udr24] in
+    let result = Engine.Route_partition.partition_routes [sys8; udr24] in
     let lo8,  hi8  = CIDR.get_interval (Route_table.Route.get_prefix sys8) in
     let lo24, hi24 = CIDR.get_interval (Route_table.Route.get_prefix udr24) in
     assert_equal [(lo24, hi24)] (sorted_partitions result udr24)
@@ -257,7 +257,7 @@ let source_priority_tests = "source_priority_tests" >::: [
     let sys0  = make_route ~source:System      "sys-0"  "0.0.0.0/0" in
     let udr8  = make_route ~source:UserDefined "udr-8"  "10.0.0.0/8" in
     let sys24 = make_route ~source:System      "sys-24" "10.1.1.0/24" in
-    let result = Pathfinder.Route_partition.partition_routes [sys0; udr8; sys24] in
+    let result = Engine.Route_partition.partition_routes [sys0; udr8; sys24] in
     let lo0,  hi0  = CIDR.get_interval (Route_table.Route.get_prefix sys0) in
     let lo8,  hi8  = CIDR.get_interval (Route_table.Route.get_prefix udr8) in
     let lo24, hi24 = CIDR.get_interval (Route_table.Route.get_prefix sys24) in

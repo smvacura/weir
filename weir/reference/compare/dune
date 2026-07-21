@@ -1,4 +1,4 @@
 (library
  (name crosscheck)
- (libraries parser terraform_ir reference pathfinder)
+ (libraries parser terraform_ir reference engine)
  (flags (:standard -w -a)))

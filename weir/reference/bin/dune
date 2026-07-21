@@ -1,4 +1,4 @@
 (executables
  (names run_reach crosscheck_run)
- (libraries parser terraform_ir frontends reference crosscheck pathfinder)
+ (libraries parser terraform_ir frontends reference crosscheck engine)
  (flags (:standard -w -a)))

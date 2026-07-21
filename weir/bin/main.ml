@@ -32,7 +32,7 @@ let run_check logs_level policy_path plan_path =
       exit 1
     | Ok policy ->
       let world = Frontends.AzureTF.AzureTFParser.get_resources plan_path in
-      let man = Pathfinder.Bdd.init () in
+      let man = Engine.Bdd.init () in
       let results = Check.Check_rules.compute man policy.Constraints.Ast.rules world in
       Report.Constraints.print Fmt.stdout results;
       Format.pp_print_newline Fmt.stdout ();

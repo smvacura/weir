@@ -1,6 +1,6 @@
 open OUnit2
-open Pathfinder.Encoder
-open Pathfinder.Bdd
+open Engine.Encoder
+open Engine.Bdd
 
 
 let eval mgr bdd x =

@@ -1,6 +1,6 @@
 (executable
  (name bench)
- (libraries pathfinder frontends parser terraform_ir))
+ (libraries engine frontends parser terraform_ir))
 
 (rule
  (alias bench)

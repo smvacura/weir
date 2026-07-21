@@ -1,7 +1,7 @@
 (test
  (name test_route_partition)
  (libraries
-  pathfinder
+  engine
   parser
   terraform_ir
   ounit2))
@@ -9,7 +9,7 @@
 (test
  (name test_effective_route_table)
  (libraries
-  pathfinder
+  engine
   parser
   terraform_ir
   ounit2))
@@ -17,13 +17,13 @@
 (test
   (name test_encoder)
   (libraries
-   pathfinder
+   engine
    ounit2))
 
 (test
   (name test_hsa)
   (libraries
-   pathfinder
+   engine
    parser
    terraform_ir
    ounit2))
@@ -31,7 +31,7 @@
 (test
   (name test_hsa_integration)
   (libraries
-   pathfinder
+   engine
    frontends
    parser
    terraform_ir

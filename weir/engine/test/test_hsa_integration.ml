@@ -2,9 +2,9 @@ open OUnit2
 open Frontends.AzureTF
 open Parser.Tf_types
 open Parser.Network_types
-open Pathfinder.Hsa
-open Pathfinder.Bdd
-open Pathfinder.Encoder
+open Engine.Hsa
+open Engine.Bdd
+open Engine.Encoder
 
 let plan_path = "test_plans/single_header_subnet/plan.json"
 

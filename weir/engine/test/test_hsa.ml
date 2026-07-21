@@ -3,8 +3,8 @@ open Parser.Network_types
 open Parser.Azure_types
 open Parser.Tf_types
 open Terraform_ir
-open Pathfinder.Hsa
-open Pathfinder.Bdd
+open Engine.Hsa
+open Engine.Bdd
 
 (* --- Fixtures --- *)
 
@@ -163,7 +163,7 @@ let nic_node_addr nic = Nic.get_address nic ^ "/ipconfig1"
 
 (* --- BDD helpers --- *)
 
-let man () = Pathfinder.Bdd.init () ~vars:32
+let man () = Engine.Bdd.init () ~vars:32
 
 (* Evaluate a BDD with DestIP bits fixed to the given IP; all other fields free.
    Returns true iff any satisfying assignment exists for those DestIP values. *)
