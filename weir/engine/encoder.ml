@@ -21,6 +21,18 @@ type packet_header = {
 }
 [@@deriving show]
 
+let make_exact_cidr ip mask =
+  CIDR.make 
+  (Option.get (IPv4.of_string_opt ip))
+  (Option.get (IPv4Mask.of_string_opt mask))
+
+let private_cidrs = [
+    make_exact_cidr "10.0.0.0" "8"; 
+    make_exact_cidr "172.16.0.0" "12"; 
+    make_exact_cidr "192.168.0.0" "16";
+    make_exact_cidr "100.64.0.0" "10";
+  ]
+
 let get_offset segment =
   match segment with
   | DestIP -> 0
@@ -80,10 +92,21 @@ let encode_route_cidrs man ~offset cidr_list =
     dor man acc @@ encode_cidr_membership man ~offset cidr
   ) (dfalse man) cidr_list 
 
+let encode_service_tag man ~offset tag = 
+  match tag with
+  | "Internet" -> (dnot man (encode_route_cidrs man ~offset private_cidrs))
+  | _ -> dfalse man
+
+let encode_service_tag_list man ~offset tags =
+  List.fold_left (
+    fun acc tag -> dor man acc (encode_service_tag man ~offset tag)
+  ) (dfalse man) tags
+
 let encode_endpoint man ~offset endpoint = 
   match endpoint with
   | SecurityRule.Addresses cidrs -> encode_route_cidrs man ~offset cidrs
   | SecurityRule.Any -> dtrue man
+  | SecurityRule.ServiceTags tags -> encode_service_tag_list man ~offset tags
   | _ -> dfalse man
 
 let encode_port man ~offset port =
