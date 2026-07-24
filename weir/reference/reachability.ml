@@ -147,11 +147,31 @@ let node_in_vnet_owning nodes ~vnet ip =
 
 let ip_in_any cidrs ip = List.exists (Packet.ip_in_cidr ip) cidrs
 
+(* Service tags whose address set is a fixed constant, so they resolve without
+   any deployment context. Internet is everything outside the reserved private
+   ranges (the same four the system routes drop, unfiltered by VNet coverage:
+   the tag is a fixed set, not a routing decision); AzureLoadBalancer is the
+   host VIP where Azure health probes originate. VirtualNetwork is
+   deployment-relative and Storage-family needs Azure's published list, so
+   neither is resolved here. *)
+let internet_excluded_cidrs =
+  [ cidr_exn "10.0.0.0/8";     cidr_exn "172.16.0.0/12";
+    cidr_exn "192.168.0.0/16"; cidr_exn "100.64.0.0/10" ]
+
+let azure_lb_cidr = cidr_exn "168.63.129.16/32"
+
+let service_tag_allows_ip tag ip =
+  match tag with
+  | "Internet"          -> not (ip_in_any internet_excluded_cidrs ip)
+  | "AzureLoadBalancer" -> Packet.ip_in_cidr ip azure_lb_cidr
+  | _                   -> false   (* VirtualNetwork / Storage-family unresolved *)
+
 let endpoint_allows_ip (e : Nsg.SecurityRule.endpoint) ip =
   match e with
   | Any                 -> true
   | Addresses cidrs     -> ip_in_any cidrs ip
-  | ApplicationGroups _ -> false   (* ASG / service-tag membership is not resolved *)
+  | ServiceTags tags    -> List.exists (fun tag -> service_tag_allows_ip tag ip) tags
+  | ApplicationGroups _ -> false   (* ASG membership is not resolved *)
 
 let port_in p (r : port) =
   match r with
