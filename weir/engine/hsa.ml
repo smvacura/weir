@@ -111,7 +111,8 @@ let add_nic ctx nic hsa_graph =
       let subaddress = address ^ "/" ^ config_name in
       let id = !(hsa_graph.next_id) in
       match Nic.IpConfiguration.get_private_ip ipconfig with
-      | Some ip -> let node = { ip_range = CIDR.make ip (IPv4Mask.of_int32 32l); attached = subaddress; nsg} in
+      | Some ip -> let node = { ip_range = CIDR.make ip (IPv4Mask.of_mask_length 32); attached = subaddress; nsg} in
+                   Hashtbl.replace hsa_graph.cidr_index (Option.get vnet_opt, node.ip_range) id;
                    Hashtbl.replace hsa_graph.addr_index subaddress id;
                    Hashtbl.replace hsa_graph.nodes id node;
                    hsa_graph.next_id := id + 1
@@ -148,7 +149,7 @@ let add_subnet_edges man ctx subnet_id subnet graph =
       | VirtualAppliance -> begin
         match Route_table.Route.get_next_hop_ip route with
         | Resolved StaticAppliance ip ->
-          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph) interval
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_mask_length 32)) graph) interval
         | Resolved DynamicNic address ->
           add (get_node_from_addr_opt address graph) interval
         | Resolved ApplianceSet set ->
@@ -218,7 +219,7 @@ let add_topological_subnet_edges man ctx subnet_id subnet graph =
       | VirtualAppliance -> begin
         match Route_table.Route.get_next_hop_ip route with
         | Resolved StaticAppliance ip ->
-          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph)
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_mask_length 32)) graph)
         | Resolved DynamicNic address ->
           add (get_node_from_addr_opt address graph)
         | Resolved ApplianceSet set ->
