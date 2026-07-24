@@ -95,6 +95,7 @@ let encode_route_cidrs man ~offset cidr_list =
 let encode_service_tag man ~offset tag = 
   match tag with
   | "Internet" -> (dnot man (encode_route_cidrs man ~offset private_cidrs))
+  | "AzureLoadBalancer" -> encode_cidr_membership man ~offset (make_exact_cidr "168.63.129.16" "32")
   | _ -> dfalse man
 
 let encode_service_tag_list man ~offset tags =
@@ -122,10 +123,10 @@ let encode_port_list man ~offset ports =
 
 let encode_security_rule man rule =
     [ encode_endpoint man ~offset:(get_offset SrcIP) (SecurityRule.get_src_ip rule); 
-    encode_endpoint man ~offset:(get_offset DestIP) (SecurityRule.get_dest_ip rule); 
-    encode_port_list man ~offset:(get_offset SrcPort) (SecurityRule.get_src_ports rule); 
-    encode_port_list man ~offset:(get_offset DestPort) (SecurityRule.get_dest_ports rule); 
-    encode_protocol man ~offset:(get_offset Protocol) (SecurityRule.get_protocol rule);
+      encode_endpoint man ~offset:(get_offset DestIP) (SecurityRule.get_dest_ip rule); 
+      encode_port_list man ~offset:(get_offset SrcPort) (SecurityRule.get_src_ports rule); 
+      encode_port_list man ~offset:(get_offset DestPort) (SecurityRule.get_dest_ports rule); 
+      encode_protocol man ~offset:(get_offset Protocol) (SecurityRule.get_protocol rule);
     ]
     |> List.fold_left (dand man) (dtrue man)
 
