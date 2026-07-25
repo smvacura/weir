@@ -68,7 +68,11 @@ type build_context = {
   nic_to_nsg : Nsg.t AddressMap.t;
   peering_index : Utils.peering_index;
   asg_index : Utils.asg_index;
+  nic_index : (resource_address, node_id) Hashtbl.t;
 }
+
+let get_nodes_from_nic address hsa ctx =
+  List.filter_map (fun id -> get_node_opt (Some id) hsa ) (Hashtbl.find_all ctx.nic_index address)
 
 let add_internet_node hsa_graph =
   let id = !(hsa_graph.next_id) in
@@ -111,9 +115,11 @@ let add_nic ctx nic hsa_graph =
       let subaddress = address ^ "/" ^ config_name in
       let id = !(hsa_graph.next_id) in
       match Nic.IpConfiguration.get_private_ip ipconfig with
-      | Some ip -> let node = { ip_range = CIDR.make ip (IPv4Mask.of_int32 32l); attached = subaddress; nsg} in
+      | Some ip -> let node = { ip_range = CIDR.make ip (IPv4Mask.of_mask_length 32); attached = subaddress; nsg} in
+                   Hashtbl.replace hsa_graph.cidr_index (Option.get vnet_opt, node.ip_range) id;
                    Hashtbl.replace hsa_graph.addr_index subaddress id;
                    Hashtbl.replace hsa_graph.nodes id node;
+                   Hashtbl.add ctx.nic_index address id;
                    hsa_graph.next_id := id + 1
       | None -> ()
     ) (Nic.get_ipconfigs nic)
@@ -148,11 +154,17 @@ let add_subnet_edges man ctx subnet_id subnet graph =
       | VirtualAppliance -> begin
         match Route_table.Route.get_next_hop_ip route with
         | Resolved StaticAppliance ip ->
-          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph) interval
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_mask_length 32)) graph) interval
         | Resolved DynamicNic address ->
-          add (get_node_from_addr_opt address graph) interval
+          List.iter (
+            fun node -> add node interval
+          ) (List.map Option.some (get_nodes_from_nic address graph ctx))
         | Resolved ApplianceSet set ->
-          List.iter (fun address -> add (get_node_from_addr_opt address graph) interval) set
+          List.iter (
+            fun address -> List.iter (
+              fun node -> add node interval
+            ) (List.map Option.some (get_nodes_from_nic address graph ctx))
+          ) set
         | _ -> ()
       end
       | VirtualNetwork ->
@@ -218,7 +230,7 @@ let add_topological_subnet_edges man ctx subnet_id subnet graph =
       | VirtualAppliance -> begin
         match Route_table.Route.get_next_hop_ip route with
         | Resolved StaticAppliance ip ->
-          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_int32 32l)) graph)
+          add (get_node_from_cidr_opt (vnet, CIDR.make ip (IPv4Mask.of_mask_length 32)) graph)
         | Resolved DynamicNic address ->
           add (get_node_from_addr_opt address graph)
         | Resolved ApplianceSet set ->
@@ -274,7 +286,15 @@ let build_graph world man =
     | Some subnet -> AddressMap.add address subnet acc
     | None -> acc
   ) world.nics AddressMap.empty in
-  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; peering_index = Utils.get_peering_index world; asg_index = Utils.get_asg_index world } in
+  let ctx = { 
+    subnet_to_rt; 
+    subnet_to_nsg; 
+    subnet_index = Utils.get_subnet_index world; 
+    nic_to_subnet; nic_to_nsg; 
+    peering_index = Utils.get_peering_index world;
+    asg_index = Utils.get_asg_index world ;
+    nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
+    } in
   let t_assoc = ms_since t0 in
   let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
@@ -319,7 +339,15 @@ let build_topological_graph world man =
     | Some subnet -> AddressMap.add address subnet acc
     | None -> acc
   ) world.nics AddressMap.empty in
-  let ctx = { subnet_to_rt; subnet_to_nsg; subnet_index = Utils.get_subnet_index world; nic_to_subnet; nic_to_nsg; peering_index = Utils.get_peering_index world; asg_index = Utils.get_asg_index world } in
+  let ctx = { 
+    subnet_to_rt; 
+    subnet_to_nsg; 
+    subnet_index = Utils.get_subnet_index world; 
+    nic_to_subnet; nic_to_nsg; 
+    peering_index = Utils.get_peering_index world;
+    asg_index = Utils.get_asg_index world ;
+    nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
+    } in
   let t_assoc = ms_since t0 in
   let t1 = Unix.gettimeofday () in
   let hsa_graph = init_hsa_graph world in
