@@ -18,9 +18,10 @@ type verdict = {
    dropped from the result. *)
 val compare_packets : World.t -> Reference.Packet.t list -> verdict list
 
-(* A representative TCP/443 packet for every ordered pair of subnets (host .4 of
-   each), for a deterministic cross-check that doesn't depend on the engine's
-   witness picker. *)
+(* A representative TCP/443 packet for every ordered pair of subnets (each
+   endpoint is a real attached NIC's private IP, falling back to a synthetic
+   host if the subnet has no NIC), for a deterministic cross-check that
+   doesn't depend on the engine's witness picker. *)
 val sample_pairwise : World.t -> Reference.Packet.t list
 
 (* Sample one witness packet from every (src<>dst) pair the engine reports

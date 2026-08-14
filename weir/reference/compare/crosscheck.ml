@@ -84,17 +84,47 @@ let compare_packets world pkts =
       | _ -> None)
     pkts
 
+let ip_to_int32 ip =
+  fst (CIDR.get_interval (CIDR.make ip (IPv4Mask.of_mask_length 32)))
+
+let fallback_host s =
+  let lo, _ = CIDR.get_interval (List.hd (Subnet.get_cidrs s)) in
+  Int32.add lo 4l
+
+let nic_ips (world : World.t) addr =
+  match AddressMap.find_opt addr world.assocs.subnet_to_nics with
+  | Some nics -> List.concat_map (fun nic ->
+      List.filter_map Nic.IpConfiguration.get_private_ip (Nic.get_ipconfigs nic)
+    ) nics
+  | None -> []
+
+(* Real NIC private IP, so cross-subnet pairs exercise actual host traffic
+   instead of an address no NIC owns; subnets with no attached NIC (e.g.
+   gateway subnets) fall back to the synthetic host. *)
+let primary_host world (addr, s) =
+  match nic_ips world addr with
+  | ip :: _ -> ip_to_int32 ip
+  | [] -> fallback_host s
+
+(* A second real NIC in the same subnet, so self-pairs (src = dst) test
+   genuine intra-subnet host-to-host traffic rather than a host addressing
+   itself; subnets with only one NIC fall back to the primary host. *)
+let secondary_host world (addr, s) =
+  match nic_ips world addr with
+  | _ :: ip :: _ -> ip_to_int32 ip
+  | _ -> primary_host world (addr, s)
+
 let sample_pairwise (world : World.t) =
   let subnets = AddressMap.bindings world.subnets in
-  let host (_, s) =
-    let lo, _ = CIDR.get_interval (List.hd (Subnet.get_cidrs s)) in
-    Int32.add lo 4l
+  let same_subnet (a_addr, _) (b_addr, _) = a_addr = b_addr in
+  let dest_host a b =
+    if same_subnet a b then secondary_host world b else primary_host world b
   in
   List.concat_map
     (fun a ->
       List.map
         (fun b ->
-          Packet.make ~src_ip:(host a) ~dest_ip:(host b)
+          Packet.make ~src_ip:(primary_host world a) ~dest_ip:(dest_host a b)
             ~src_port:40000 ~dest_port:443 ~protocol:Tcp)
         subnets)
     subnets
