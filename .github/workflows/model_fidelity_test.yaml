@@ -17,12 +17,22 @@ jobs:
         working-directory: weir
     steps:
       - uses: actions/checkout@v4
-      - uses: ocaml/setup-ocaml@v3.0.0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ocaml:
+              - 'weir/**'
+      - if: steps.filter.outputs.ocaml == 'true'
+        uses: ocaml/setup-ocaml@v3.0.0
         with:
           ocaml-compiler: "5.4"
-      - run: opam install . --deps-only --with-test
-      - run: opam exec -- dune build
-      - id: crosscheck
+      - if: steps.filter.outputs.ocaml == 'true'
+        run: opam install . --deps-only --with-test
+      - if: steps.filter.outputs.ocaml == 'true'
+        run: opam exec -- dune build
+      - if: steps.filter.outputs.ocaml == 'true'
+        id: crosscheck
         run: |
           n=$(opam exec -- dune exec reference/bin/crosscheck_run.exe -- engine/bench/test_plans/small_enterprise/plan.json \
             | tail -1 | grep -oE '[0-9]+ disagree' | grep -oE '^[0-9]+')
@@ -36,7 +46,7 @@ jobs:
           else
             echo "::info::crosscheck within baseline ($n <= $baseline)"
           fi
-      - if: always()
+      - if: always() && steps.filter.outputs.ocaml == 'true'
         uses: actions/github-script@v7
         with:
           script: |
