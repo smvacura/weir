@@ -1,0 +1,38 @@
+name: "update fidelity baseline"
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: write
+
+jobs:
+  update-baseline:
+    runs-on: "ubuntu-22.04"
+    defaults:
+      run:
+        working-directory: weir
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ocaml/setup-ocaml@v3.0.0
+        with:
+          ocaml-compiler: "5.4"
+      - run: opam install . --deps-only --with-test
+      - run: opam exec -- dune build
+      - run: |
+          n=$(opam exec -- dune exec reference/bin/crosscheck_run.exe -- engine/bench/test_plans/small_enterprise/plan.json \
+            | tail -1 | grep -oE '[0-9]+ disagree' | grep -oE '^[0-9]+')
+          baseline=$(grep -v '^#' reference/crosscheck_baseline.txt | tr -d '[:space:]')
+          echo "disagreements on main: $n (recorded baseline: $baseline)"
+          if [ "$n" = "$baseline" ]; then
+            echo "baseline unchanged"
+            exit 0
+          fi
+          sed -i "3s/.*/$n/" reference/crosscheck_baseline.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reference/crosscheck_baseline.txt
+          git commit -m "update crosscheck baseline to $n"
+          git push

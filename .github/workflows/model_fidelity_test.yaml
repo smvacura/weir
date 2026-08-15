@@ -33,6 +33,8 @@ jobs:
           if [ "$n" -gt "$baseline" ]; then
             echo "::error::crosscheck regressed: $n disagreements, baseline is $baseline"
             exit 1
+          else
+            echo "::info::crosscheck within baseline ($n <= $baseline)"
           fi
       - if: always()
         uses: actions/github-script@v7
