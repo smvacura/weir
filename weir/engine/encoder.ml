@@ -134,7 +134,7 @@ let encode_nsg ?direction ensg man  =
   let rules = Effective_nsg.get_effective_rules ensg
   |> List.filter ( fun r ->
     match direction with
-    | Some d -> SecurityRule.get_direction r = d
+    | Some d -> SecurityRule.get_direction r <> d
     | None -> true
   )
   |> List.sort SecurityRule.compare
