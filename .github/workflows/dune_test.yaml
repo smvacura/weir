@@ -1,7 +1,7 @@
 name: "dune test"
 
 on: 
-    push:
+    pull_request:
         branches:
             - "main"
 
