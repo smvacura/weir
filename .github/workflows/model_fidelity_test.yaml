@@ -5,6 +5,8 @@ on:
   pull_request:
     branches:
         - "main"
+    paths:
+        - "weir/**"
 
 permissions:
   pull-requests: write

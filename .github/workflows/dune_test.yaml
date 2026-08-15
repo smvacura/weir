@@ -1,9 +1,11 @@
 name: "dune test"
 
 on: 
-    pull_request:
-        branches:
-            - "main"
+  pull_request:
+      branches:
+        - "main"
+      paths:
+        - "weir/**"
 
 jobs:
   test:
