@@ -279,112 +279,121 @@ type analyze_timing = {
 
 let ms_since t = (Unix.gettimeofday () -. t) *. 1000.0
 
+let time f =
+  let t0 = Unix.gettimeofday () in
+  let result = f () in
+  (result, ms_since t0)
+
 let edge_count graph =
   Hashtbl.fold (fun _ edges acc -> acc + List.length edges) graph.out_list 0
 
 let build_graph world man =
   let t0 = Unix.gettimeofday () in
-  let subnet_to_nsg = world.World.assocs.subnet_nsg in
-  let subnet_to_rt  = world.World.assocs.subnet_rt in
-  let nic_to_nsg    = world.World.assocs.nic_nsg in
-  let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
-    let address = Nic.get_address nic in
-    match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
-    | Some subnet -> AddressMap.add address subnet acc
-    | None -> acc
-  ) world.nics AddressMap.empty in
-  let ctx = { 
-    subnet_to_rt; 
-    subnet_to_nsg; 
-    subnet_index = Utils.get_subnet_index world; 
-    nic_to_subnet; nic_to_nsg; 
-    peering_index = Utils.get_peering_index world;
-    asg_index = Utils.get_asg_index world ;
-    nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
-    } in
-  let t_assoc = ms_since t0 in
-  let t1 = Unix.gettimeofday () in
-  let hsa_graph = init_hsa_graph world in
-  add_internet_node hsa_graph;
-  AddressMap.iter (fun _addr subnet ->
-    add_subnet ctx subnet hsa_graph
-  ) world.subnets;
-  AddressMap.iter (fun _addr nic ->
-    add_nic ctx nic hsa_graph
-  ) world.nics;
-  add_src_in_node hsa_graph;
-  let t_nodes = ms_since t1 in
-  let t2 = Unix.gettimeofday () in
-  AddressMap.iter (fun _addr subnet ->
-    let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
-    add_subnet_edges man ctx subnet_id subnet hsa_graph
-  ) world.subnets;
-  AddressMap.iter (fun _addr nic ->
-    List.iter (fun ipconfig ->
-      let config_name = Nic.IpConfiguration.get_name ipconfig in
-      let subaddress = Nic.get_address nic ^ "/" ^ config_name in
-      Option.iter (fun nic_id ->
-        add_nic_edge ctx nic_id nic hsa_graph man
-      ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
-    ) (Nic.get_ipconfigs nic)
-  ) world.nics;
+  let ctx, association_build_ms = time (fun () ->
+    let subnet_to_nsg = world.World.assocs.subnet_nsg in
+    let subnet_to_rt  = world.World.assocs.subnet_rt in
+    let nic_to_nsg    = world.World.assocs.nic_nsg in
+    let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
+      let address = Nic.get_address nic in
+      match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
+      | Some subnet -> AddressMap.add address subnet acc
+      | None -> acc
+    ) world.nics AddressMap.empty in
+    { subnet_to_rt;
+      subnet_to_nsg;
+      subnet_index = Utils.get_subnet_index world;
+      nic_to_subnet; nic_to_nsg;
+      peering_index = Utils.get_peering_index world;
+      asg_index = Utils.get_asg_index world ;
+      nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
+    }
+  ) in
+  let hsa_graph, node_addition_ms = time (fun () ->
+    let hsa_graph = init_hsa_graph world in
+    add_internet_node hsa_graph;
+    AddressMap.iter (fun _addr subnet ->
+      add_subnet ctx subnet hsa_graph
+    ) world.subnets;
+    AddressMap.iter (fun _addr nic ->
+      add_nic ctx nic hsa_graph
+    ) world.nics;
+    add_src_in_node hsa_graph;
+    hsa_graph
+  ) in
+  let (), edge_addition_ms = time (fun () ->
+    AddressMap.iter (fun _addr subnet ->
+      let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
+      add_subnet_edges man ctx subnet_id subnet hsa_graph
+    ) world.subnets;
+    AddressMap.iter (fun _addr nic ->
+      List.iter (fun ipconfig ->
+        let config_name = Nic.IpConfiguration.get_name ipconfig in
+        let subaddress = Nic.get_address nic ^ "/" ^ config_name in
+        Option.iter (fun nic_id ->
+          add_nic_edge ctx nic_id nic hsa_graph man
+        ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
+      ) (Nic.get_ipconfigs nic)
+    ) world.nics
+  ) in
   let timing = {
-    association_build_ms = t_assoc;
-    node_addition_ms     = t_nodes;
-    edge_addition_ms     = ms_since t2;
-    total_build_ms       = ms_since t0;
+    association_build_ms;
+    node_addition_ms;
+    edge_addition_ms;
+    total_build_ms = ms_since t0;
   } in
   (hsa_graph, timing)
 
 let build_topological_graph world man =
   let t0 = Unix.gettimeofday () in
-  let subnet_to_nsg = world.World.assocs.subnet_nsg in
-  let subnet_to_rt  = world.World.assocs.subnet_rt in
-  let nic_to_nsg    = world.World.assocs.nic_nsg in
-  let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
-    let address = Nic.get_address nic in
-    match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
-    | Some subnet -> AddressMap.add address subnet acc
-    | None -> acc
-  ) world.nics AddressMap.empty in
-  let ctx = { 
-    subnet_to_rt; 
-    subnet_to_nsg; 
-    subnet_index = Utils.get_subnet_index world; 
-    nic_to_subnet; nic_to_nsg; 
-    peering_index = Utils.get_peering_index world;
-    asg_index = Utils.get_asg_index world ;
-    nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
-    } in
-  let t_assoc = ms_since t0 in
-  let t1 = Unix.gettimeofday () in
-  let hsa_graph = init_hsa_graph world in
-  AddressMap.iter (fun _addr subnet ->
-    add_subnet ctx subnet hsa_graph
-  ) world.subnets;
-  AddressMap.iter (fun _addr nic ->
-    add_nic ctx nic hsa_graph
-  ) world.nics;
-  let t_nodes = ms_since t1 in
-  let t2 = Unix.gettimeofday () in
-  AddressMap.iter (fun _addr subnet ->
-    let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
-    add_topological_subnet_edges man ctx subnet_id subnet hsa_graph
-  ) world.subnets;
-  AddressMap.iter (fun _addr nic ->
-    List.iter (fun ipconfig ->
-      let config_name = Nic.IpConfiguration.get_name ipconfig in
-      let subaddress = Nic.get_address nic ^ "/" ^ config_name in
-      Option.iter (fun nic_id ->
-        add_topological_nic_edge ctx nic_id nic hsa_graph man
-      ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
-    ) (Nic.get_ipconfigs nic)
-  ) world.nics;
+  let ctx, association_build_ms = time (fun () ->
+    let subnet_to_nsg = world.World.assocs.subnet_nsg in
+    let subnet_to_rt  = world.World.assocs.subnet_rt in
+    let nic_to_nsg    = world.World.assocs.nic_nsg in
+    let nic_to_subnet = AddressMap.fold (fun _ nic acc ->
+      let address = Nic.get_address nic in
+      match Nic.get_ipconfigs nic |> List.filter_map Nic.IpConfiguration.get_subnet |> List.find_opt (fun _ -> true) with
+      | Some subnet -> AddressMap.add address subnet acc
+      | None -> acc
+    ) world.nics AddressMap.empty in
+    { subnet_to_rt;
+      subnet_to_nsg;
+      subnet_index = Utils.get_subnet_index world;
+      nic_to_subnet; nic_to_nsg;
+      peering_index = Utils.get_peering_index world;
+      asg_index = Utils.get_asg_index world ;
+      nic_index = Hashtbl.create (AddressMap.cardinal world.nics)
+    }
+  ) in
+  let hsa_graph, node_addition_ms = time (fun () ->
+    let hsa_graph = init_hsa_graph world in
+    AddressMap.iter (fun _addr subnet ->
+      add_subnet ctx subnet hsa_graph
+    ) world.subnets;
+    AddressMap.iter (fun _addr nic ->
+      add_nic ctx nic hsa_graph
+    ) world.nics;
+    hsa_graph
+  ) in
+  let (), edge_addition_ms = time (fun () ->
+    AddressMap.iter (fun _addr subnet ->
+      let subnet_id = Hashtbl.find hsa_graph.addr_index (Subnet.get_address subnet) in
+      add_topological_subnet_edges man ctx subnet_id subnet hsa_graph
+    ) world.subnets;
+    AddressMap.iter (fun _addr nic ->
+      List.iter (fun ipconfig ->
+        let config_name = Nic.IpConfiguration.get_name ipconfig in
+        let subaddress = Nic.get_address nic ^ "/" ^ config_name in
+        Option.iter (fun nic_id ->
+          add_topological_nic_edge ctx nic_id nic hsa_graph man
+        ) (Hashtbl.find_opt hsa_graph.addr_index subaddress)
+      ) (Nic.get_ipconfigs nic)
+    ) world.nics
+  ) in
   let timing = {
-    association_build_ms = t_assoc;
-    node_addition_ms     = t_nodes;
-    edge_addition_ms     = ms_since t2;
-    total_build_ms       = ms_since t0;
+    association_build_ms;
+    node_addition_ms;
+    edge_addition_ms;
+    total_build_ms = ms_since t0;
   } in
   (hsa_graph, timing)
 
@@ -513,12 +522,13 @@ let run_analysis_timed world =
   let t0 = Unix.gettimeofday () in
   let man = Bdd.init () in
   let graph, build = build_graph world man in
-  let t1 = Unix.gettimeofday () in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
-  Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes;
+  let (), fixpoint_ms = time (fun () ->
+    Hashtbl.iter (fun src_id _src -> compute_fixpoint src_id graph table man) graph.nodes
+  ) in
   {
     build;
-    fixpoint_ms = ms_since t1;
+    fixpoint_ms;
     total_ms    = ms_since t0;
     node_count  = node_count graph;
     edge_count  = edge_count graph;
