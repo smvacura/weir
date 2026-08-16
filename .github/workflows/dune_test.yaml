@@ -15,7 +15,7 @@ jobs:
         working-directory: weir
     steps:
       - uses: actions/checkout@v4
-      - uses: ocaml/setup-ocaml@v3.0.0
+      - uses: ocaml/setup-ocaml@v3.7.1
         with:
           ocaml-compiler: "5.4"
           dune-cache: true

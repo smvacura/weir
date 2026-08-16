@@ -27,7 +27,7 @@ jobs:
             ocaml:
               - 'weir/**'
       - if: steps.filter.outputs.ocaml == 'true'
-        uses: ocaml/setup-ocaml@v3.0.0
+        uses: ocaml/setup-ocaml@v3.7.1
         with:
           ocaml-compiler: "5.4"
           dune-cache: true
