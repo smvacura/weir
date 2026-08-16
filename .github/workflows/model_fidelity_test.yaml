@@ -38,34 +38,50 @@ jobs:
       - if: steps.filter.outputs.ocaml == 'true'
         id: crosscheck
         run: |
-          n=$(opam exec -- dune exec reference/bin/crosscheck_run.exe -- engine/bench/test_plans/small_enterprise/plan.json \
-            | tail -1 | grep -oE '[0-9]+ disagree' | grep -oE '^[0-9]+')
-          baseline=$(grep -v '^#' reference/crosscheck_baseline.txt | tr -d '[:space:]')
-          echo "disagreements: $n (baseline: $baseline)"
-          echo "n=$n" >> "$GITHUB_OUTPUT"
-          echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
-          if [ "$n" -gt "$baseline" ]; then
-            echo "::error::crosscheck regressed: $n disagreements, baseline is $baseline"
-            exit 1
+          regressed=0
+          grep '^#' reference/crosscheck_baseline.txt > /tmp/new_baseline.txt
+          : > /tmp/comment_rows.txt
+          while read -r plan baseline; do
+            [ -z "$plan" ] && continue
+            n=$(opam exec -- dune exec reference/bin/crosscheck_run.exe -- "$plan" \
+              | tail -1 | grep -oE '[0-9]+ disagree' | grep -oE '^[0-9]+')
+            echo "$plan: $n disagreement(s) (baseline: $baseline)"
+            echo "- \`$plan\`: $n disagreement(s) (baseline: $baseline)" >> /tmp/comment_rows.txt
+            if [ "$n" -gt "$baseline" ]; then
+              echo "::error::crosscheck regressed for $plan: $n disagreements, baseline is $baseline"
+              regressed=1
+              echo "$plan $baseline" >> /tmp/new_baseline.txt
+            elif [ "$n" -lt "$baseline" ]; then
+              echo "$plan $n" >> /tmp/new_baseline.txt
+            else
+              echo "$plan $baseline" >> /tmp/new_baseline.txt
+            fi
+          done < <(grep -v '^#' reference/crosscheck_baseline.txt)
+          if diff -q /tmp/new_baseline.txt reference/crosscheck_baseline.txt > /dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "::info::crosscheck within baseline ($n <= $baseline)"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.filter.outputs.ocaml == 'true' && steps.crosscheck.outputs.n < steps.crosscheck.outputs.baseline
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/comment_rows.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          if [ "$regressed" -eq 1 ]; then
+            exit 1
+          fi
+      - if: steps.filter.outputs.ocaml == 'true' && steps.crosscheck.outputs.changed == 'true'
         run: |
-          n="${{ steps.crosscheck.outputs.n }}"
-          sed -i "3s/.*/$n/" reference/crosscheck_baseline.txt
+          cp /tmp/new_baseline.txt reference/crosscheck_baseline.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add reference/crosscheck_baseline.txt
-          git commit -m "update crosscheck baseline to $n"
+          git commit -m "update crosscheck baseline"
           git push origin HEAD:"${{ github.event.pull_request.head.ref }}"
       - if: always() && steps.filter.outputs.ocaml == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const n = "${{ steps.crosscheck.outputs.n }}";
-            const baseline = "${{ steps.crosscheck.outputs.baseline }}";
-            const body = `**Fidelity test (crosscheck)**: ${n} disagreement(s) (baseline: ${baseline})`;
+            const rows = `${{ steps.crosscheck.outputs.body }}`;
+            const body = `**Fidelity test (crosscheck)**\n${rows}`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
