@@ -450,7 +450,7 @@ let src_postprocessing table src src_in_id =
   match Hashtbl.find_opt table (src, src_in_id) with
   | Some bdd -> Hashtbl.replace table (src, src) bdd;
                 Hashtbl.remove table (src, src_in_id)
-  | None -> ()
+  | None -> Hashtbl.remove table (src, src)
 
 
 let node_count graph = Hashtbl.length graph.nodes
