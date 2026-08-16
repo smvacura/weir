@@ -78,9 +78,11 @@ jobs:
           git push origin HEAD:"${{ github.event.pull_request.head.ref }}"
       - if: always() && steps.filter.outputs.ocaml == 'true'
         uses: actions/github-script@v7
+        env:
+          CROSSCHECK_BODY: ${{ steps.crosscheck.outputs.body }}
         with:
           script: |
-            const rows = `${{ steps.crosscheck.outputs.body }}`;
+            const rows = process.env.CROSSCHECK_BODY;
             const body = `**Fidelity test (crosscheck)**\n${rows}`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
