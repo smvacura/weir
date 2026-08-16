@@ -22,7 +22,8 @@ type hsa_graph = {
   out_list: adjacency;
   addr_index: node_index;
   cidr_index: cidr_index;
-  next_id: int ref
+  next_id: node_id ref;
+  src_in_id: node_id ref;
 }
 
 type reachability_table = (node_id * node_id, bdd) Hashtbl.t
@@ -40,7 +41,8 @@ let init_hsa_graph (world : World.t) = {
   out_list = Hashtbl.create 0;
   addr_index = Hashtbl.create 0;
   cidr_index = Hashtbl.create 0;
-  next_id = ref 0
+  next_id = ref 0;
+  src_in_id = ref (-1);
 }
 
 let push tbl k v =
@@ -80,6 +82,11 @@ let add_internet_node hsa_graph =
   Hashtbl.replace hsa_graph.nodes id node;
   Hashtbl.replace hsa_graph.addr_index "$internet" id;
   hsa_graph.next_id := id + 1
+
+let add_src_in_node hsa_graph = 
+  let id = !(hsa_graph.next_id) in 
+  hsa_graph.next_id := id + 1;
+  hsa_graph.src_in_id := id
 
 
 let add_subnet ctx subnet hsa_graph =
@@ -305,6 +312,7 @@ let build_graph world man =
   AddressMap.iter (fun _addr nic ->
     add_nic ctx nic hsa_graph
   ) world.nics;
+  add_src_in_node hsa_graph;
   let t_nodes = ms_since t1 in
   let t2 = Unix.gettimeofday () in
   AddressMap.iter (fun _addr subnet ->
@@ -420,7 +428,7 @@ let compute_fixpoint src graph table man =
     match Hashtbl.find_opt graph.out_list node with
     | Some edges ->
       List.iter (fun edge ->
-        let dest_id     = edge.dest in
+        let dest_id     = if edge.dest = src then !(graph.src_in_id) else edge.dest in
         let src_packets = current_node_packets edge.src in
         let old_packets = current_node_packets dest_id in
         let new_packets = compute_new_headers edge src_packets in
@@ -438,6 +446,11 @@ let compute_fixpoint src graph table man =
     step curr_node
   done
 
+let src_postprocessing table src src_in_id =
+  match Hashtbl.find_opt table (src, src_in_id) with
+  | Some bdd -> Hashtbl.replace table (src, src) bdd;
+                Hashtbl.remove table (src, src_in_id)
+  | None -> Hashtbl.remove table (src, src)
 
 
 let node_count graph = Hashtbl.length graph.nodes
@@ -468,7 +481,10 @@ let get_decider graph src_addr dest_addr =
 let analyze ?srcs man world =
   let graph, _ = build_graph world man in
   let table = Hashtbl.create (Hashtbl.length graph.nodes) in
-  let run_from src_id = compute_fixpoint src_id graph table man in
+  let run_from src_id = (
+    compute_fixpoint src_id graph table man;
+    src_postprocessing table src_id !(graph.src_in_id)) 
+  in
   (match srcs with
    | None -> Hashtbl.iter (fun src_id _src -> run_from src_id) graph.nodes
    | Some addrs ->
