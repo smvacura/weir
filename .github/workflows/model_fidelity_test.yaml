@@ -9,6 +9,7 @@ on:
 permissions:
   pull-requests: write
   contents: write
+  checks: write
 
 jobs:
   crosscheck:
@@ -80,13 +81,31 @@ jobs:
             exit 1
           fi
       - if: steps.filter.outputs.ocaml == 'true' && steps.crosscheck.outputs.changed == 'true'
+        id: push_baseline
         run: |
           cp /tmp/new_baseline.txt reference/crosscheck_baseline.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add reference/crosscheck_baseline.txt
-          git commit -m "update crosscheck baseline"
+          git commit -m "update crosscheck baseline [skip ci]"
           git push origin HEAD:"${{ github.event.pull_request.head.ref }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - if: steps.filter.outputs.ocaml == 'true' && steps.crosscheck.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'crosscheck',
+              head_sha: '${{ steps.push_baseline.outputs.sha }}',
+              status: 'completed',
+              conclusion: 'success',
+              output: {
+                title: 'crosscheck',
+                summary: 'Baseline auto-updated by this workflow run; crosscheck already passed prior to the update commit.',
+              },
+            });
       - if: always() && steps.filter.outputs.ocaml == 'true'
         uses: actions/github-script@v7
         env:
