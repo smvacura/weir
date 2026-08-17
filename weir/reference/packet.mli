@@ -24,3 +24,6 @@ val make :
    held as [int32] but ordered as unsigned 32-bit, so comparison goes through
    [int64] to avoid the sign bit flipping order at 128.0.0.0. *)
 val ip_in_cidr : int32 -> CIDR.t -> bool
+
+(* An IPv4 address widened to its unsigned value, for the same reason. *)
+val to_u64 : int32 -> int64

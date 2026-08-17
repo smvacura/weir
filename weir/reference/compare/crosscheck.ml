@@ -62,8 +62,7 @@ let engine_reachable man ar src dst pkt =
 
 let subnet_owner (world : World.t) ip =
   AddressMap.bindings world.subnets
-  |> List.find_opt (fun (_, s) ->
-         match Subnet.get_cidrs s with c :: _ -> Packet.ip_in_cidr ip c | [] -> false)
+  |> List.find_opt (fun (_, s) -> List.exists (Packet.ip_in_cidr ip) (Subnet.get_cidrs s))
   |> Option.map fst
 
 let setup world =

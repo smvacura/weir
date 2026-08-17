@@ -1,5 +1,5 @@
 (library
  (name reference)
  (libraries parser terraform_ir)
- (flags (:standard -w -a))
+ (flags (:standard -w +8-26-27-32-34-69))
  (preprocess (pps ppx_deriving.show)))
