@@ -1,0 +1,96 @@
+File "engine/route_partition.ml", line 23, characters 4-18:
+23 | let get_route_mask route =
+         ^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_route_mask.
+
+File "engine/route_partition.ml", line 27, characters 2-16:
+27 |   type t = event
+       ^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type t.
+
+File "engine/route_partition.ml", line 37, characters 0-51:
+37 | type validity_index = (Route.t, validity) Hashtbl.t
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type validity_index.
+File "engine/route_partition.ml", line 23, characters 4-18:
+23 | let get_route_mask route =
+         ^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_route_mask.
+
+File "engine/route_partition.ml", line 27, characters 2-16:
+27 |   type t = event
+       ^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type t.
+
+File "engine/route_partition.ml", line 37, characters 0-51:
+37 | type validity_index = (Route.t, validity) Hashtbl.t
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 34 [unused-type-declaration]: unused type validity_index.
+File "engine/effective_route_table.ml", line 6, characters 11-48:
+6 | type t = { bgp_route_propagation_enabled : bool; routes : Route_table.Route.t list }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: record field bgp_route_propagation_enabled is never read.
+  (However, this field is used to build or mutate values.)
+
+File "engine/effective_route_table.ml", line 18, characters 4-24:
+18 | let vnetlocal_route_name vnet_name subnet_name =
+         ^^^^^^^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value vnetlocal_route_name.
+File "engine/effective_route_table.ml", line 6, characters 11-48:
+6 | type t = { bgp_route_propagation_enabled : bool; routes : Route_table.Route.t list }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: record field bgp_route_propagation_enabled is never read.
+  (However, this field is used to build or mutate values.)
+
+File "engine/effective_route_table.ml", line 18, characters 4-24:
+18 | let vnetlocal_route_name vnet_name subnet_name =
+         ^^^^^^^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value vnetlocal_route_name.
+File "engine/encoder.ml", line 24, characters 4-18:
+24 | let get_ip_bit_loc segment bit_loc = 
+         ^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_ip_bit_loc.
+
+File "engine/encoder.ml", line 106, characters 4-16:
+106 | let encode_allow man allow =
+          ^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value encode_allow.
+File "engine/encoder.ml", line 24, characters 4-18:
+24 | let get_ip_bit_loc segment bit_loc = 
+         ^^^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_ip_bit_loc.
+
+File "engine/encoder.ml", line 106, characters 4-16:
+106 | let encode_allow man allow =
+          ^^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value encode_allow.
+File "engine/hsa.ml", line 10, characters 14-52:
+10 | type node = { ip_range: Parser.Network_types.CIDR.t; attached: resource_address; nsg : Effective_nsg.t }
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: record field ip_range is never read.
+  (However, this field is used to build or mutate values.)
+
+File "engine/hsa.ml", line 51, characters 4-13:
+51 | let push_mult tbl k v = 
+         ^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value push_mult.
+
+File "engine/hsa.ml", line 126, characters 4-15:
+126 | let get_subnets vnet subnets =
+          ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_subnets.
+File "engine/hsa.ml", line 10, characters 14-52:
+10 | type node = { ip_range: Parser.Network_types.CIDR.t; attached: resource_address; nsg : Effective_nsg.t }
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: record field ip_range is never read.
+  (However, this field is used to build or mutate values.)
+
+File "engine/hsa.ml", line 51, characters 4-13:
+51 | let push_mult tbl k v = 
+         ^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value push_mult.
+
+File "engine/hsa.ml", line 126, characters 4-15:
+126 | let get_subnets vnet subnets =
+          ^^^^^^^^^^^
+Warning 32 [unused-value-declaration]: unused value get_subnets.

@@ -41,10 +41,21 @@ jobs:
           regressed=0
           grep '^#' reference/crosscheck_baseline.txt > /tmp/new_baseline.txt
           : > /tmp/comment_rows.txt
-          while read -r plan baseline; do
+          { grep -v '^#' reference/crosscheck_baseline.txt | awk '{print $1}'; \
+            find reference/test_plans -name plan.json | sort; } \
+            | sort -u > /tmp/all_plans.txt
+          while read -r plan; do
             [ -z "$plan" ] && continue
+            baseline=$(grep -v '^#' reference/crosscheck_baseline.txt \
+              | awk -v p="$plan" '$1 == p { print $2 }')
             n=$(opam exec -- dune exec reference/bin/crosscheck_run.exe -- "$plan" \
               | tail -1 | grep -oE '[0-9]+ disagree' | grep -oE '^[0-9]+')
+            if [ -z "$baseline" ]; then
+              echo "$plan: $n disagreement(s) (new plan, baseline set to $n)"
+              echo "- \`$plan\`: $n disagreement(s) (new plan, baseline set to $n)" >> /tmp/comment_rows.txt
+              echo "$plan $n" >> /tmp/new_baseline.txt
+              continue
+            fi
             echo "$plan: $n disagreement(s) (baseline: $baseline)"
             echo "- \`$plan\`: $n disagreement(s) (baseline: $baseline)" >> /tmp/comment_rows.txt
             if [ "$n" -gt "$baseline" ]; then
@@ -56,7 +67,7 @@ jobs:
             else
               echo "$plan $baseline" >> /tmp/new_baseline.txt
             fi
-          done < <(grep -v '^#' reference/crosscheck_baseline.txt)
+          done < /tmp/all_plans.txt
           if diff -q /tmp/new_baseline.txt reference/crosscheck_baseline.txt > /dev/null; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
