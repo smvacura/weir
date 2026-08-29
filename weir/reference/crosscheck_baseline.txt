@@ -1,4 +1,5 @@
 # per-plan crosscheck disagreement baseline
 # format: <plan.json path> <disagreement count>
+reference/test_plans/internet_egress/plan.json 16
 reference/test_plans/small_enterprise/plan.json 0
 reference/test_plans/vnet_peering_crosscheck/plan.json 0
