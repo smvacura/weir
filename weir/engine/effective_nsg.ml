@@ -1,4 +1,5 @@
 open Terraform_ir.Nsg
+open Terraform_ir.Vnet
 open Parser.Network_types
 open Utils
 
@@ -16,7 +17,8 @@ let make_exact_cidr ip mask =
 
 let vnetlocal_default_rules vnet rt peering_idx = 
   let peered_cidrs = match VnetMap.find_opt vnet peering_idx with
-  | Some entries -> List.filter_map (fun (cidr, allowed) -> if allowed then Some cidr else None) entries
+  | Some entries -> List.filter_map (fun p -> if p.access_allowed then Some p else None) entries 
+                    |> List.concat_map (fun p -> get_addresses @@ p.remote_vnet)
   | None -> []
   in
   [
