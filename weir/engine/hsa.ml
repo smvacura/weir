@@ -73,6 +73,15 @@ type build_context = {
   nic_index : (resource_address, node_id) Hashtbl.t;
 }
 
+let delivery_subnets ctx vnet =
+  let subnets_of vnet =
+    Option.value ~default:[] (Utils.VnetMap.find_opt vnet ctx.subnet_index)
+  in
+  subnets_of vnet
+  @ List.concat_map 
+    (fun (p : Utils.peer) -> subnets_of p.remote_vnet)
+    (Option.value ~default:[] (Utils.VnetMap.find_opt vnet ctx.peering_index)) 
+
 let get_nodes_from_nic address hsa ctx =
   List.filter_map (fun id -> get_node_opt (Some id) hsa ) (Hashtbl.find_all ctx.nic_index address)
 
@@ -175,7 +184,7 @@ let add_subnet_edges man ctx subnet_id subnet graph =
         | _ -> ()
       end
       | VirtualNetwork ->
-        let all_subnets = Utils.VnetMap.fold (fun _ subnets acc -> subnets @ acc) ctx.subnet_index [] in
+        let all_subnets = delivery_subnets ctx (Subnet.get_vnet subnet) in
         List.iter (fun subnet ->
           List.iter (fun cidr ->
             let subintervals = List.filter_map (CIDR.intersect cidr) interval in
@@ -203,7 +212,7 @@ let add_nic_edge ctx nic_id nic graph man =
   | Some subnet -> begin
     match Hashtbl.find_opt graph.addr_index (Subnet.get_address subnet) with
     | Some node_id -> 
-      let decider = Encoder.encode_nsg ensg man in
+      let decider = Encoder.encode_nsg ~direction:Outbound ensg man in
       let edge = { decider; src = nic_id; dest = node_id} in
       push graph.in_list node_id edge;
       push graph.out_list nic_id edge

@@ -4,8 +4,14 @@ open Parser.Network_types
 
 module VnetMap = Map.Make(Vnet)
 type subnet_index = Subnet.t list VnetMap.t
-(** [(cidr, allow_virtual_network_access)] per peered VNet, keyed by local VNet. *)
-type peering_index = (CIDR.t * bool) list VnetMap.t
+
+type peer = {
+  remote_vnet : Vnet.t;
+  access_allowed : bool;
+  remote_forwarding_allowed : bool
+}
+
+type peering_index = peer list VnetMap.t
 type asg_index = CIDR.t list AddressMap.t
 
 let get_subnet_index (world : World.t) =
@@ -26,11 +32,10 @@ let access_allowed peering =
   Vnet_peering.get_allow_virtual_network_access peering
   |> Option.value ~default:true
 
-let add_remote_cidrs lv rv access_flag map =
-  let entries = List.map (fun cidr -> (cidr, access_flag)) (Vnet.get_addresses rv) in
-  match VnetMap.find_opt lv map with
-  | Some existing -> VnetMap.add lv (existing @ entries) map
-  | None -> VnetMap.add lv entries map
+let forwarding_allowed peering = 
+  Vnet_peering.get_allow_forwarded_traffic peering
+  |> Option.value ~default:false
+
 
 let fold_resolved_peerings f (world : World.t) init =
   AddressMap.fold (fun _ peering acc ->
@@ -39,9 +44,31 @@ let fold_resolved_peerings f (world : World.t) init =
     | _ -> acc
   ) world.vnet_peerings init
 
-let get_peering_index (world : World.t) =
+let index_peerings_by_pair (world : World.t) =
+  let tbl = Hashtbl.create 8 in
   fold_resolved_peerings
-    (fun lv rv peering map -> add_remote_cidrs lv rv (access_allowed peering) map)
+    (fun lv rv peering () ->
+      Hashtbl.replace tbl (Vnet.get_address lv, Vnet.get_address rv) peering)
+    world ();
+  tbl
+
+let reverse_forwarding by_pair lv rv =
+  Hashtbl.find_opt by_pair (Vnet.get_address rv, Vnet.get_address lv)
+  |> Option.map forwarding_allowed
+  |> Option.value ~default:false
+
+let add_peer lv peer map =
+  VnetMap.add lv (peer :: Option.value ~default:[] (VnetMap.find_opt lv map)) map
+
+let get_peering_index (world : World.t) =
+  let by_pair = index_peerings_by_pair world in
+  fold_resolved_peerings
+    (fun lv rv peering map ->
+      add_peer lv
+        { remote_vnet = rv;
+          access_allowed = access_allowed peering;
+          remote_forwarding_allowed = reverse_forwarding by_pair lv rv }
+        map)
     world VnetMap.empty
 
 let nic_cidrs nic =

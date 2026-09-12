@@ -22,7 +22,7 @@ let get_vnet_routes vnet =
 let get_peered_routes vnet peer_idx =
   let vnet_name = Vnet.get_name vnet in
   let peered_cidrs = match VnetMap.find_opt vnet peer_idx with
-  | Some entries -> List.map fst entries
+  | Some peers -> List.fold_left (fun acc p -> (Vnet.get_addresses p.remote_vnet) @ acc) [] peers
   | None -> []
   in
   List.map (construct_vnetlocal_route_from_cidr ("peered_route_" ^ vnet_name)) peered_cidrs

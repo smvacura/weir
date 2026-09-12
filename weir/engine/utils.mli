@@ -6,11 +6,14 @@ module VnetMap : Map.S with type key = Vnet.t
 
 type subnet_index = Subnet.t list VnetMap.t
 
-(** [(cidr, allow_virtual_network_access)] per peered VNet, keyed by local VNet.
-    Filter by [snd] to restrict to entries that expand the VirtualNetwork NSG tag. *)
-type peering_index = (CIDR.t * bool) list VnetMap.t
+type peer = {
+  remote_vnet : Vnet.t;
+  access_allowed : bool;
+  remote_forwarding_allowed : bool
+}
 
-(** All private CIDRs of every NIC that is a member of each ASG, keyed by ASG address. *)
+type peering_index = peer list VnetMap.t
+
 type asg_index = CIDR.t list AddressMap.t
 
 val get_subnet_index : World.t -> subnet_index
