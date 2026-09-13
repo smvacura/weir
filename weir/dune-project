@@ -24,6 +24,7 @@
   subprocess
   ounit2
   yojson
+  csv
   yaml
   mlbdd
   ppx_deriving

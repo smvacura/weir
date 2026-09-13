@@ -1,0 +1,7 @@
+src_addr	dst_addr	protocol	dest_port	src_port	why
+azurerm_linux_virtual_machine.baseline	azurerm_linux_virtual_machine.destination	Tcp	8080		Measure default outbound NSG handling of the peered destination private address with no user rules.
+azurerm_linux_virtual_machine.baseline	azurerm_public_ip.destination	Tcp	8080		Measure default outbound NSG handling of the same destination through its public address with no user rules.
+azurerm_linux_virtual_machine.deny_virtual_network	azurerm_linux_virtual_machine.destination	Tcp	8080		Determine how an outbound destination VirtualNetwork deny interacts with defaults for the peered private address.
+azurerm_linux_virtual_machine.deny_virtual_network	azurerm_public_ip.destination	Tcp	8080		Determine whether an outbound destination VirtualNetwork deny changes handling of the same VM public address.
+azurerm_linux_virtual_machine.deny_internet	azurerm_linux_virtual_machine.destination	Tcp	8080		Determine whether an outbound destination Internet deny changes handling of the peered private address.
+azurerm_linux_virtual_machine.deny_internet	azurerm_public_ip.destination	Tcp	8080		Determine how an outbound destination Internet deny interacts with defaults for the same VM public address.

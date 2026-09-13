@@ -4,6 +4,7 @@ module IPv4 : sig
   val of_octets_opt : int -> int -> int -> int -> t option
   val of_string_opt : string -> t option
   val of_int32 : int32 -> t
+  val to_int32 : t -> int32
   val pp : Format.formatter -> t -> unit
   val show : t -> string
   val compare : t -> t -> int

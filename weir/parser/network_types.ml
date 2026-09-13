@@ -44,6 +44,8 @@ module IPv4 = struct
 
     let of_int32 (i : int32) : t = i
 
+  let to_int32 (ip : t) : int32 = ip
+
   let compare (a : t) (b : t) = compare a b
 end
 

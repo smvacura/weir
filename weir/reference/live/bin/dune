@@ -1,0 +1,4 @@
+(executables
+ (names test_live_run)
+ (libraries parser terraform_ir frontends reference live csv)
+ (flags (:standard -w -26-27-32-33)))
