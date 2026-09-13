@@ -7,5 +7,7 @@
 # provider semantic notes
 semantics/
 
+**/__pycache__
+
 # misc
 weir/build_warns.txt

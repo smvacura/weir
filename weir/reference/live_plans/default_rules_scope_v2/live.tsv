@@ -1,0 +1,7 @@
+src_address	src_subnet	src_ip	dest_address	dest_ip	src_port	dest_port	protocol	result
+azurerm_linux_virtual_machine.baseline	azurerm_subnet.baseline	10.70.1.4	azurerm_linux_virtual_machine.destination	10.71.1.4	40000	8080	Tcp	Connected
+azurerm_linux_virtual_machine.baseline	azurerm_subnet.baseline	10.70.1.4	azurerm_public_ip.destination	20.119.49.172	40000	8080	Tcp	Connected
+azurerm_linux_virtual_machine.deny_virtual_network	azurerm_subnet.deny_virtual_network	10.70.2.4	azurerm_linux_virtual_machine.destination	10.71.1.4	40000	8080	Tcp	Dropped
+azurerm_linux_virtual_machine.deny_virtual_network	azurerm_subnet.deny_virtual_network	10.70.2.4	azurerm_public_ip.destination	20.119.49.172	40000	8080	Tcp	Connected
+azurerm_linux_virtual_machine.deny_internet	azurerm_subnet.deny_internet	10.70.3.4	azurerm_linux_virtual_machine.destination	10.71.1.4	40000	8080	Tcp	Connected
+azurerm_linux_virtual_machine.deny_internet	azurerm_subnet.deny_internet	10.70.3.4	azurerm_public_ip.destination	20.119.49.172	40000	8080	Tcp	Dropped

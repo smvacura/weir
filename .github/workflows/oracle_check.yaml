@@ -1,0 +1,102 @@
+name: "oracle check"
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "weir/**"
+  push:
+    branches:
+      - "main"
+    paths:
+      - "weir/**"
+
+jobs:
+  oracle:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    defaults:
+      run:
+        working-directory: weir
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ocaml/setup-ocaml@v3.7.1
+        with:
+          ocaml-compiler: "5.4"
+          dune-cache: true
+      - run: opam install . --deps-only --with-test
+      - run: opam exec -- dune build reference/live/bin/test_live_run.exe
+
+      - name: Replay every live plan
+        id: replay
+        run: |
+          report="$RUNNER_TEMP/report.md"
+          {
+            echo "## Live oracle"
+            echo
+            echo "Azure measurements replayed against \`reference/\`."
+            echo
+          } > "$report"
+
+          scenarios=0
+          disagreed=0
+          errored=0
+          for dir in reference/live_plans/*/; do
+            [ -f "$dir/plan.json" ] && [ -f "$dir/live.tsv" ] || continue
+            scenarios=$((scenarios + 1))
+            echo "### $(basename "$dir")" >> "$report"
+            echo '```' >> "$report"
+            set +e
+            opam exec -- dune exec reference/live/bin/test_live_run.exe -- "$dir" >> "$report" 2>&1
+            status=$?
+            set -e
+            echo '```' >> "$report"
+            case "$status" in
+              0) ;;
+              1) disagreed=$((disagreed + 1)) ;;
+              *) errored=$((errored + 1))
+                 echo "could not be replayed (exit $status)" >> "$report" ;;
+            esac
+            echo >> "$report"
+          done
+
+          {
+            echo "$scenarios scenarios, $disagreed with disagreements, $errored unreplayable."
+          } >> "$report"
+
+          echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
+          echo "disagreed=$disagreed" >> "$GITHUB_OUTPUT"
+          echo "errored=$errored" >> "$GITHUB_OUTPUT"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on the pull request
+        if: github.event_name == 'pull_request' && steps.replay.outputs.scenarios != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+          REPO: ${{ github.repository }}
+        working-directory: .
+        run: |
+          marker="<!-- live-oracle -->"
+          body="$marker"$'\n'"$(cat "$RUNNER_TEMP/report.md")"
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" > /dev/null
+          else
+            gh pr comment "$PR" --body "$body"
+          fi
+
+      - name: Open an issue for disagreements on main
+        if: github.event_name == 'push' && (steps.replay.outputs.disagreed != '0' || steps.replay.outputs.errored != '0')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          gh issue create \
+            --title "oracle disagreement at ${GITHUB_SHA:0:7}" \
+            --body "$(cat "$RUNNER_TEMP/report.md")"

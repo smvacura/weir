@@ -12,13 +12,9 @@ let usage () =
 let arg i default = if Array.length Sys.argv > i then Sys.argv.(i) else default
 
 let ip_of_string s =
-  match String.split_on_char '.' s |> List.map int_of_string with
-  | [ a; b; c; d ] ->
-    let open Int32 in
-    logor (shift_left (of_int a) 24)
-      (logor (shift_left (of_int b) 16)
-         (logor (shift_left (of_int c) 8) (of_int d)))
-  | _ -> failwith (Printf.sprintf "malformed IPv4 address: %s" s)
+  match IPv4.of_string_opt s with
+  | Some ip -> IPv4.to_int32 ip
+  | None -> failwith (Printf.sprintf "malformed IPv4 address: %s" s)
 
 let protocol_of_string s =
   match String.lowercase_ascii s with

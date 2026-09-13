@@ -1,0 +1,20 @@
+Azure NSGs carry default security rules that apply when no user rule matches.
+This test establishes the reach of the VirtualNetwork service tag outbound, and
+how a user rule written against a service tag interacts with the defaults.
+
+Use one destination VM in a second VNet, peered in both directions to the VNet
+holding the sources, and give that VM a public IP. Its private address is then
+a VirtualNetwork-tagged destination and its public address a destination
+outside the virtual network, so both cases resolve against a machine the
+fixture owns and that answers. Give each source case its own subnet so one
+case's rules cannot affect another's path.
+
+- With no user rules, is the destination's private address delivered to? Is its
+  public address delivered to?
+- With a user outbound rule denying destination `VirtualNetwork`, which of the
+  two addresses stops being delivered to?
+- With a user outbound rule denying destination `Internet`, which of the two
+  stops being delivered to?
+
+Probe both addresses from every source subnet, so each case is measured against
+the same pair of destinations.
